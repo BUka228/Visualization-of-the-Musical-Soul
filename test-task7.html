@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест Задачи 7 - TrackObject</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #000;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        #container {
+            width: 800px;
+            height: 600px;
+            border: 1px solid #333;
+            margin: 20px 0;
+        }
+        
+        .test-header {
+            color: #4169E1;
+            font-size: 18px;
+            margin: 20px 0 10px 0;
+        }
+        
+        .success {
+            color: #00ff00;
+        }
+        
+        .error {
+            color: #ff0000;
+        }
+        
+        .info {
+            color: #ffff00;
+        }
+        
+        pre {
+            background: #111;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1 class="test-header">🧪 Интеграционный тест задачи 7: Создание и размещение 3D-объектов треков</h1>
+    
+    <div id="container"></div>
+    
+    <div id="console-output">
+        <h3>Вывод консоли:</h3>
+        <pre id="console-log"></pre>
+    </div>
+
+    <script type="module">
+        // Перехватываем console.log для отображения в HTML
+        const consoleOutput = document.getElementById('console-log');
+        const originalLog = console.log;
+        const originalError = console.error;
+        
+        console.log = function(...args) {
+            const message = args.join(' ');
+            const div = document.createElement('div');
+            
+            if (message.includes('✅')) {
+                div.className = 'success';
+            } else if (message.includes('❌')) {
+                div.className = 'error';
+            } else if (message.includes('📋') || message.includes('🧪')) {
+                div.className = 'info';
+            }
+            
+            div.textContent = message;
+            consoleOutput.appendChild(div);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            
+            originalLog.apply(console, args);
+        };
+        
+        console.error = function(...args) {
+            const message = args.join(' ');
+            const div = document.createElement('div');
+            div.className = 'error';
+            div.textContent = '❌ ' + message;
+            consoleOutput.appendChild(div);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            
+            originalError.apply(console, args);
+        };
+        
+        // Запускаем тест
+        import('./test-task7-integration.js');
+    </script>
+</body>
+</html>

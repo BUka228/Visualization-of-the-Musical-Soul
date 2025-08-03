@@ -82,6 +82,22 @@ export interface TrackObject extends Mesh {
   originalPosition: Vector3;
   isSelected: boolean;
   isHovered: boolean;
+  
+  // Методы для управления состоянием
+  setHovered(hovered: boolean): void;
+  setSelected(selected: boolean): void;
+  updateAnimation(deltaTime: number, globalTime: number): void;
+  updatePulse(globalTime: number): void;
+  getTrackInfo(): {
+    name: string;
+    artist: string;
+    album: string;
+    genre: string;
+    duration: string;
+    popularity: number;
+  };
+  dispose(): void;
+  getDistanceToCamera(camera: THREE.Camera): number;
 }
 
 export interface SceneManager {

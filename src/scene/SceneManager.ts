@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { SceneManager as ISceneManager, ProcessedTrack, TrackObject, SceneConfig } from '../types';
+import { SceneManager as ISceneManager, ProcessedTrack, TrackObject as ITrackObject, SceneConfig } from '../types';
 import { InteractionManager } from '../interaction/InteractionManager';
+import { TrackObject } from './TrackObject';
 
 export class SceneManager implements ISceneManager {
   private scene: THREE.Scene;
@@ -199,88 +200,81 @@ export class SceneManager implements ISceneManager {
   }
 
   createTrackObjects(tracks: ProcessedTrack[]): void {
-    console.log(`Создание ${tracks.length} объектов треков...`);
+    console.log(`🎵 Создание ${tracks.length} объектов треков...`);
     
     // Очистка существующих объектов
-    this.trackObjects.forEach(obj => {
-      this.scene.remove(obj);
-      obj.geometry.dispose();
-      if (obj.material instanceof THREE.Material) {
-        obj.material.dispose();
+    this.clearTrackObjects();
+    
+    // Удаляем тестовый объект при создании реальных треков
+    if (this.testObject) {
+      this.scene.remove(this.testObject);
+      this.testObject.geometry.dispose();
+      if (this.testObject.material instanceof THREE.Material) {
+        this.testObject.material.dispose();
       }
-    });
-    this.trackObjects = [];
-    
-    // Создание новых объектов треков
-    tracks.forEach((track, index) => {
-      const trackObject = this.createTrackObject(track);
-      this.trackObjects.push(trackObject);
-      this.scene.add(trackObject);
-    });
-    
-    console.log(`Создано ${this.trackObjects.length} объектов треков`);
-  }
-
-  private createTrackObject(track: ProcessedTrack): TrackObject {
-    // Создание геометрии в зависимости от жанра
-    let geometry: THREE.BufferGeometry;
-    
-    switch (track.genre.toLowerCase()) {
-      case 'metal':
-      case 'rock':
-        geometry = new THREE.ConeGeometry(track.size, track.size * 1.5, 6);
-        break;
-      case 'electronic':
-        geometry = new THREE.BoxGeometry(track.size, track.size, track.size);
-        break;
-      default:
-        geometry = new THREE.IcosahedronGeometry(track.size, 0);
+      this.testObject = undefined;
+      console.log('🗑️ Тестовый объект удален');
     }
     
-    // Создание материала
-    const material = new THREE.MeshStandardMaterial({
-      color: track.color,
-      metalness: 0.3,
-      roughness: 0.4,
-      emissive: track.color,
-      emissiveIntensity: 0.1
+    // Создание новых объектов треков с использованием TrackObject класса
+    tracks.forEach((track, index) => {
+      const trackObject = new TrackObject(track);
+      this.trackObjects.push(trackObject);
+      this.scene.add(trackObject);
+      
+      // Логирование для отладки (только для первых 5 объектов)
+      if (index < 5) {
+        console.log(`🎶 Создан объект: ${track.name} (${track.genre}) - позиция: ${track.position.x.toFixed(1)}, ${track.position.y.toFixed(1)}, ${track.position.z.toFixed(1)}`);
+      }
     });
     
-    // Создание меша
-    const mesh = new THREE.Mesh(geometry, material);
+    console.log(`✅ Создано ${this.trackObjects.length} объектов треков`);
+    this.logGenreDistribution(tracks);
+  }
+
+  /**
+   * Очищает все объекты треков из сцены
+   */
+  private clearTrackObjects(): void {
+    this.trackObjects.forEach(obj => {
+      this.scene.remove(obj);
+      obj.dispose(); // Используем метод dispose из TrackObject
+    });
+    this.trackObjects = [];
+  }
+
+  /**
+   * Логирует распределение треков по жанрам для отладки
+   */
+  private logGenreDistribution(tracks: ProcessedTrack[]): void {
+    const genreCount: { [genre: string]: number } = {};
     
-    // Установка позиции
-    mesh.position.copy(track.position);
+    tracks.forEach(track => {
+      genreCount[track.genre] = (genreCount[track.genre] || 0) + 1;
+    });
     
-    // Настройка теней
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    
-    // Добавление данных трека и создание TrackObject
-    const trackObject = mesh as unknown as TrackObject;
-    trackObject.trackData = track;
-    trackObject.originalPosition = track.position.clone();
-    trackObject.isSelected = false;
-    trackObject.isHovered = false;
-    
-    return trackObject;
+    console.log('📊 Распределение по жанрам:');
+    Object.entries(genreCount)
+      .sort(([,a], [,b]) => b - a)
+      .forEach(([genre, count]) => {
+        console.log(`  ${genre}: ${count} треков`);
+      });
   }
 
   updateScene(): void {
+    const currentTime = Date.now();
+    const deltaTime = 16; // Примерно 60 FPS
+    
     // Обновление анимаций объектов треков (только если анимация не приостановлена)
     if (!this.interactionManager.isAnimationPaused()) {
-      this.trackObjects.forEach((trackObject, index) => {
-        // Вращение вокруг собственной оси
-        trackObject.rotation.x += this.config.animationSpeed;
-        trackObject.rotation.y += this.config.animationSpeed * 0.7;
+      this.trackObjects.forEach((trackObject) => {
+        // Используем методы анимации из TrackObject
+        trackObject.updateAnimation(deltaTime, currentTime);
         
-        // Орбитальное движение вокруг центра
-        const time = Date.now() * this.config.animationSpeed * 0.1;
-        const radius = trackObject.originalPosition.length();
-        const angle = time + index * 0.1;
-        
-        trackObject.position.x = Math.cos(angle) * radius;
-        trackObject.position.z = Math.sin(angle) * radius;
+        // Обновляем эффект пульсации для выбранных объектов
+        if (trackObject.isSelected) {
+          trackObject.updatePulse(currentTime);
+        }
       });
     }
   }
@@ -295,14 +289,7 @@ export class SceneManager implements ISceneManager {
     window.removeEventListener('resize', this.handleResize.bind(this));
     
     // Очистка объектов треков
-    this.trackObjects.forEach(obj => {
-      this.scene.remove(obj);
-      obj.geometry.dispose();
-      if (obj.material instanceof THREE.Material) {
-        obj.material.dispose();
-      }
-    });
-    this.trackObjects = [];
+    this.clearTrackObjects();
     
     // Удаление тестового объекта
     if (this.testObject) {
