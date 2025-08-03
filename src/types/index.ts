@@ -125,6 +125,7 @@ export interface InteractionManager {
   deselectTrack(): void;
   resetCamera(): void;
   toggleAnimation(): void;
+  getAudioManager(): AudioManager;
 }
 
 // Интерфейсы для аудио
@@ -134,6 +135,15 @@ export interface AudioManager {
   setVolume(volume: number): void;
   getCurrentTime(): number;
   isPlaying(): boolean;
+  getDuration(): number;
+  getProgress(): number;
+  setCurrentTime(time: number): void;
+  pause(): void;
+  resume(): void;
+  setOnPlayStart(callback: () => void): void;
+  setOnPlayEnd(callback: () => void): void;
+  setOnError(callback: (error: Error) => void): void;
+  dispose(): void;
 }
 
 // Интерфейсы для анимации

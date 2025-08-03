@@ -491,4 +491,7 @@ function showDataCollectionInstructions(): void {
 
 // Экспорт для использования в других модулях
 export { MusicGalaxyApplication, DEFAULT_CONFIG };
+export { AudioManager } from './audio/AudioManager';
+export { SceneManager } from './scene/SceneManager';
+export { DataProcessor } from './data/DataProcessor';
 export * from './types';

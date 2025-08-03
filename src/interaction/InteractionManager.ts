@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { InteractionManager as IInteractionManager, SceneManager, TrackObject } from '../types';
+import { InteractionManager as IInteractionManager, SceneManager, TrackObject, AudioManager } from '../types';
+import { AudioManager as AudioManagerImpl } from '../audio/AudioManager';
 
 export class InteractionManager implements IInteractionManager {
   private sceneManager?: SceneManager;
@@ -8,6 +9,9 @@ export class InteractionManager implements IInteractionManager {
   private raycaster: THREE.Raycaster;
   private mouse: THREE.Vector2;
   private container?: HTMLElement;
+  
+  // Аудио менеджер
+  private audioManager: AudioManager;
   
   // Состояние взаимодействия
   private selectedTrack?: TrackObject;
@@ -24,6 +28,53 @@ export class InteractionManager implements IInteractionManager {
   constructor() {
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2();
+    this.audioManager = new AudioManagerImpl();
+    
+    // Настройка коллбэков аудио менеджера
+    this.setupAudioCallbacks();
+  }
+
+  private setupAudioCallbacks(): void {
+    this.audioManager.setOnPlayStart(() => {
+      console.log('🎵 Воспроизведение превью началось');
+    });
+
+    this.audioManager.setOnPlayEnd(() => {
+      console.log('🎵 Воспроизведение превью завершено');
+    });
+
+    this.audioManager.setOnError((error: Error) => {
+      console.error('❌ Ошибка воспроизведения аудио:', error.message);
+      this.showAudioErrorMessage(error.message);
+    });
+  }
+
+  private showAudioErrorMessage(message: string): void {
+    // Создаем временное уведомление об ошибке аудио
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(255, 0, 0, 0.8);
+      color: white;
+      padding: 10px 15px;
+      border-radius: 5px;
+      font-size: 14px;
+      z-index: 1000;
+      max-width: 300px;
+      word-wrap: break-word;
+    `;
+    errorDiv.textContent = `Ошибка аудио: ${message}`;
+    
+    document.body.appendChild(errorDiv);
+    
+    // Удаляем уведомление через 5 секунд
+    setTimeout(() => {
+      if (document.body.contains(errorDiv)) {
+        document.body.removeChild(errorDiv);
+      }
+    }, 5000);
   }
 
   initialize(sceneManager: SceneManager): void {
@@ -257,6 +308,9 @@ export class InteractionManager implements IInteractionManager {
     // Обновляем UI с информацией о треке
     this.updateTrackInfoUI(trackObject);
     
+    // Воспроизводим превью трека (если доступно)
+    this.playTrackPreview(trackObject);
+    
     console.log('Трек выбран:', trackObject.trackData?.name || 'Тестовый объект');
     
     // Вызов коллбэка
@@ -269,6 +323,9 @@ export class InteractionManager implements IInteractionManager {
     if (!this.selectedTrack) return;
     
     const trackObject = this.selectedTrack;
+    
+    // Останавливаем воспроизведение аудио
+    this.audioManager.stopPreview();
     
     // Делегируем анимацию отмены выбора AnimationManager
     if (this.sceneManager) {
@@ -290,6 +347,102 @@ export class InteractionManager implements IInteractionManager {
     // Вызов коллбэка
     if (this.onTrackDeselected) {
       this.onTrackDeselected();
+    }
+  }
+
+  /**
+   * Воспроизводит превью выбранного трека
+   */
+  private async playTrackPreview(trackObject: TrackObject): Promise<void> {
+    // Проверяем, есть ли данные трека и URL превью
+    if (!trackObject.trackData || !trackObject.trackData.previewUrl) {
+      console.log('⚠️ Превью недоступно для данного трека');
+      this.showAudioErrorMessage('Превью недоступно для данного трека');
+      return;
+    }
+
+    const previewUrl = trackObject.trackData.previewUrl;
+    console.log(`🎵 Попытка воспроизведения превью: ${trackObject.trackData.name}`);
+
+    try {
+      await this.audioManager.playPreview(previewUrl);
+      console.log(`✅ Превью трека "${trackObject.trackData.name}" воспроизводится`);
+      
+      // Обновляем UI с индикатором воспроизведения
+      this.updateAudioStatusUI(true, trackObject.trackData.name);
+      
+    } catch (error) {
+      console.error('❌ Ошибка воспроизведения превью:', error);
+      
+      // Показываем пользователю информацию об ошибке
+      const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
+      this.showAudioErrorMessage(`Не удалось воспроизвести превью: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Обновляет UI с информацией о статусе воспроизведения аудио
+   */
+  private updateAudioStatusUI(isPlaying: boolean, trackName?: string): void {
+    const trackInfoPanel = document.getElementById('track-info');
+    
+    if (!trackInfoPanel) {
+      return;
+    }
+
+    // Удаляем существующий индикатор аудио
+    const existingAudioStatus = trackInfoPanel.querySelector('.audio-status');
+    if (existingAudioStatus) {
+      existingAudioStatus.remove();
+    }
+
+    if (isPlaying && trackName) {
+      // Создаем индикатор воспроизведения
+      const audioStatusDiv = document.createElement('div');
+      audioStatusDiv.className = 'audio-status';
+      audioStatusDiv.style.cssText = `
+        margin-top: 10px;
+        padding: 8px 12px;
+        background: rgba(0, 255, 0, 0.2);
+        border: 1px solid rgba(0, 255, 0, 0.4);
+        border-radius: 4px;
+        font-size: 12px;
+        color: #00ff00;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      `;
+
+      // Добавляем анимированный индикатор
+      const indicator = document.createElement('div');
+      indicator.style.cssText = `
+        width: 8px;
+        height: 8px;
+        background: #00ff00;
+        border-radius: 50%;
+        animation: pulse 1s infinite;
+      `;
+
+      // Добавляем CSS анимацию для пульсации
+      if (!document.querySelector('#audio-pulse-animation')) {
+        const style = document.createElement('style');
+        style.id = 'audio-pulse-animation';
+        style.textContent = `
+          @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      const text = document.createElement('span');
+      text.textContent = '♪ Воспроизводится превью';
+
+      audioStatusDiv.appendChild(indicator);
+      audioStatusDiv.appendChild(text);
+      trackInfoPanel.appendChild(audioStatusDiv);
     }
   }
 
@@ -481,8 +634,16 @@ export class InteractionManager implements IInteractionManager {
     }
   }
 
+  // Геттер для AudioManager
+  getAudioManager(): AudioManager {
+    return this.audioManager;
+  }
+
   dispose(): void {
     console.log('Освобождение ресурсов InteractionManager...');
+    
+    // Освобождение ресурсов AudioManager
+    this.audioManager.dispose();
     
     // Удаление обработчиков событий
     if (this.container) {

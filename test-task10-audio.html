@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест Task 10 - Интеграция аудио-системы</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #track-info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            min-width: 250px;
+            display: none;
+            z-index: 100;
+        }
+        
+        #track-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #fff;
+        }
+        
+        #track-artist, #track-album {
+            font-size: 14px;
+            color: #ccc;
+            margin-bottom: 3px;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            z-index: 100;
+        }
+        
+        #controls h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #fff;
+        }
+        
+        #controls p {
+            margin: 5px 0;
+            font-size: 12px;
+            color: #ccc;
+        }
+        
+        #audio-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            z-index: 100;
+        }
+        
+        #audio-controls h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #fff;
+        }
+        
+        #audio-controls button {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #fff;
+            padding: 8px 12px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        #audio-controls button:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        #volume-control {
+            margin: 10px 0;
+        }
+        
+        #volume-control input {
+            width: 100px;
+            margin-left: 10px;
+        }
+        
+        #status {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            z-index: 100;
+            min-width: 200px;
+        }
+        
+        #status h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #fff;
+        }
+        
+        #status p {
+            margin: 5px 0;
+            font-size: 12px;
+            color: #ccc;
+        }
+        
+        .error {
+            color: #ff6b6b;
+        }
+        
+        .success {
+            color: #51cf66;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div id="track-info">
+        <div id="track-title">Название трека</div>
+        <div id="track-artist">Исполнитель: </div>
+        <div id="track-album">Альбом: </div>
+    </div>
+    
+    <div id="controls">
+        <h3>Управление</h3>
+        <p><strong>Мышь:</strong> Вращение камеры</p>
+        <p><strong>Колесо:</strong> Зум</p>
+        <p><strong>ПКМ:</strong> Панорамирование</p>
+        <p><strong>Клик:</strong> Выбор трека</p>
+        <p><strong>R:</strong> Сброс камеры</p>
+        <p><strong>Пробел:</strong> Пауза анимации</p>
+    </div>
+    
+    <div id="audio-controls">
+        <h3>Аудио управление</h3>
+        <button id="test-audio-btn">Тест аудио</button>
+        <button id="stop-audio-btn">Остановить</button>
+        <div id="volume-control">
+            <label>Громкость: <input type="range" id="volume-slider" min="0" max="100" value="50"></label>
+        </div>
+    </div>
+    
+    <div id="status">
+        <h3>Статус аудио</h3>
+        <p id="audio-status">Готов к воспроизведению</p>
+        <p id="current-track">Трек: Не выбран</p>
+        <p id="audio-time">Время: 0:00 / 0:00</p>
+    </div>
+
+    <script type="module">
+        import { SceneManager, DataProcessor } from './dist/bundle.js';
+
+        // Конфигурация сцены
+        const sceneConfig = {
+            galaxyRadius: 50,
+            objectMinSize: 0.5,
+            objectMaxSize: 3.0,
+            animationSpeed: 0.001,
+            cameraDistance: 80,
+            genreColors: {
+                'metal': '#FF0000',
+                'rock': '#FF4500', 
+                'indie': '#4169E1',
+                'pop': '#FFD700',
+                'electronic': '#9400D3',
+                'jazz': '#228B22',
+                'classical': '#F5F5DC',
+                'hip-hop': '#8B4513',
+                'default': '#FFFFFF'
+            }
+        };
+
+        // Тестовые данные с превью URL
+        const testTracks = [
+            {
+                id: '1',
+                name: 'Test Track 1',
+                artist: 'Test Artist 1',
+                album: 'Test Album 1',
+                genre: 'indie',
+                duration: 180,
+                popularity: 85,
+                previewUrl: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav'
+            },
+            {
+                id: '2',
+                name: 'Test Track 2',
+                artist: 'Test Artist 2',
+                album: 'Test Album 2',
+                genre: 'rock',
+                duration: 210,
+                popularity: 70,
+                previewUrl: 'https://www.soundjay.com/misc/sounds/bell-ringing-04.wav'
+            },
+            {
+                id: '3',
+                name: 'Test Track 3 (No Preview)',
+                artist: 'Test Artist 3',
+                album: 'Test Album 3',
+                genre: 'metal',
+                duration: 195,
+                popularity: 90,
+                // Нет previewUrl для тестирования обработки ошибок
+            },
+            {
+                id: '4',
+                name: 'Test Track 4 (Invalid URL)',
+                artist: 'Test Artist 4',
+                album: 'Test Album 4',
+                genre: 'pop',
+                duration: 165,
+                popularity: 60,
+                previewUrl: 'https://invalid-url-for-testing.com/nonexistent.mp3'
+            }
+        ];
+
+        let sceneManager;
+        let audioManager;
+
+        async function initializeApp() {
+            try {
+                console.log('🚀 Инициализация приложения...');
+                
+                // Инициализация SceneManager
+                const container = document.getElementById('container');
+                sceneManager = new SceneManager(container, sceneConfig);
+                sceneManager.initializeScene();
+                
+                // Получаем AudioManager из InteractionManager
+                const interactionManager = sceneManager.getInteractionManager();
+                audioManager = interactionManager.getAudioManager();
+                
+                console.log('✅ SceneManager и AudioManager инициализированы');
+                
+                // Обработка данных треков
+                const dataProcessor = new DataProcessor(sceneConfig);
+                const processedTracks = dataProcessor.processTrackData(testTracks);
+                
+                console.log('✅ Данные треков обработаны:', processedTracks.length);
+                
+                // Создание объектов треков в сцене
+                sceneManager.createTrackObjects(processedTracks);
+                
+                console.log('✅ Объекты треков созданы в сцене');
+                
+                // Настройка UI контролов
+                setupAudioControls();
+                
+                // Настройка мониторинга аудио статуса
+                setupAudioStatusMonitoring();
+                
+                updateStatus('Приложение готово к использованию', 'success');
+                
+            } catch (error) {
+                console.error('❌ Ошибка инициализации:', error);
+                updateStatus(`Ошибка инициализации: ${error.message}`, 'error');
+            }
+        }
+
+        function setupAudioControls() {
+            const testAudioBtn = document.getElementById('test-audio-btn');
+            const stopAudioBtn = document.getElementById('stop-audio-btn');
+            const volumeSlider = document.getElementById('volume-slider');
+
+            // Тест аудио с демо URL
+            testAudioBtn.addEventListener('click', async () => {
+                try {
+                    updateStatus('Тестирование аудио...', '');
+                    const testUrl = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
+                    await audioManager.playPreview(testUrl);
+                    updateStatus('Тест аудио запущен', 'success');
+                } catch (error) {
+                    console.error('Ошибка тест аудио:', error);
+                    updateStatus(`Ошибка тест аудио: ${error.message}`, 'error');
+                }
+            });
+
+            // Остановка аудио
+            stopAudioBtn.addEventListener('click', () => {
+                audioManager.stopPreview();
+                updateStatus('Аудио остановлено', '');
+            });
+
+            // Управление громкостью
+            volumeSlider.addEventListener('input', (e) => {
+                const volume = e.target.value / 100;
+                audioManager.setVolume(volume);
+                console.log(`Громкость установлена: ${Math.round(volume * 100)}%`);
+            });
+        }
+
+        function setupAudioStatusMonitoring() {
+            // Обновляем статус аудио каждые 500ms
+            setInterval(() => {
+                updateAudioStatus();
+            }, 500);
+        }
+
+        function updateAudioStatus() {
+            const audioStatusEl = document.getElementById('audio-status');
+            const currentTrackEl = document.getElementById('current-track');
+            const audioTimeEl = document.getElementById('audio-time');
+
+            if (audioManager.isPlaying()) {
+                audioStatusEl.textContent = 'Воспроизводится';
+                audioStatusEl.className = 'success';
+                
+                const currentTime = audioManager.getCurrentTime();
+                const duration = audioManager.getDuration ? audioManager.getDuration() : 0;
+                
+                const formatTime = (seconds) => {
+                    const mins = Math.floor(seconds / 60);
+                    const secs = Math.floor(seconds % 60);
+                    return `${mins}:${secs.toString().padStart(2, '0')}`;
+                };
+                
+                audioTimeEl.textContent = `Время: ${formatTime(currentTime)} / ${formatTime(duration)}`;
+            } else {
+                audioStatusEl.textContent = 'Остановлено';
+                audioStatusEl.className = '';
+                audioTimeEl.textContent = 'Время: 0:00 / 0:00';
+            }
+
+            // Обновляем информацию о текущем треке
+            const interactionManager = sceneManager?.getInteractionManager();
+            const selectedTrack = interactionManager?.getSelectedTrack?.();
+            
+            if (selectedTrack && selectedTrack.trackData) {
+                currentTrackEl.textContent = `Трек: ${selectedTrack.trackData.name}`;
+            } else {
+                currentTrackEl.textContent = 'Трек: Не выбран';
+            }
+        }
+
+        function updateStatus(message, type = '') {
+            const statusEl = document.getElementById('audio-status');
+            statusEl.textContent = message;
+            statusEl.className = type;
+            console.log(`Status: ${message}`);
+        }
+
+        // Инициализация при загрузке страницы
+        window.addEventListener('load', initializeApp);
+
+        // Очистка ресурсов при закрытии страницы
+        window.addEventListener('beforeunload', () => {
+            if (sceneManager) {
+                sceneManager.dispose();
+            }
+        });
+
+        // Обработка ошибок
+        window.addEventListener('error', (event) => {
+            console.error('Глобальная ошибка:', event.error);
+            updateStatus(`Ошибка: ${event.error.message}`, 'error');
+        });
+
+        // Экспорт для отладки
+        window.sceneManager = sceneManager;
+        window.audioManager = audioManager;
+    </script>
+    
+    <!-- Скрипт проверки аудио-системы -->
+    <script src="verify-task10-audio.js"></script>
+</body>
+</html>
