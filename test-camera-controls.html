@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Camera Controls - Music Galaxy 3D</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        #canvas-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #instructions {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            max-width: 300px;
+            z-index: 10;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 10;
+        }
+        
+        .control-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 16px;
+            margin: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .control-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container">
+        <div id="instructions">
+            <h3>Тест управления камерой</h3>
+            <p><strong>Управление мышью:</strong></p>
+            <ul>
+                <li>Левая кнопка + движение: вращение камеры</li>
+                <li>Правая кнопка + движение: панорамирование</li>
+                <li>Колесо мыши: зум</li>
+                <li>Клик по объекту: выбор</li>
+            </ul>
+            <p><strong>Клавиатура:</strong></p>
+            <ul>
+                <li>R: сброс камеры</li>
+                <li>Пробел: пауза анимации</li>
+            </ul>
+        </div>
+        
+        <div id="controls">
+            <button class="control-button" id="reset-camera">Сбросить камеру (R)</button>
+            <button class="control-button" id="toggle-animation">Пауза (Space)</button>
+        </div>
+    </div>
+    
+    <script src="dist/bundle.js"></script>
+</body>
+</html>

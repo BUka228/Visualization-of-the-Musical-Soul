@@ -111,13 +111,17 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
 
   resetView(): void {
     console.log('Сброс вида камеры');
-    // Реализация будет добавлена в следующих задачах
+    if (this.sceneManager) {
+      this.sceneManager.getInteractionManager().resetCamera();
+    }
   }
 
   toggleAnimation(): void {
-    this.state.animationPaused = !this.state.animationPaused;
-    console.log(`Анимация ${this.state.animationPaused ? 'приостановлена' : 'возобновлена'}`);
-    // Реализация будет добавлена в следующих задачах
+    console.log('Переключение анимации');
+    if (this.sceneManager) {
+      this.sceneManager.getInteractionManager().toggleAnimation();
+      this.state.animationPaused = this.sceneManager.getInteractionManager().isAnimationPaused();
+    }
   }
 
   dispose(): void {

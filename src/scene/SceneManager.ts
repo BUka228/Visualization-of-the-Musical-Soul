@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { SceneManager as ISceneManager, ProcessedTrack, TrackObject, SceneConfig } from '../types';
+import { InteractionManager } from '../interaction/InteractionManager';
 
 export class SceneManager implements ISceneManager {
   private scene: THREE.Scene;
@@ -17,6 +18,9 @@ export class SceneManager implements ISceneManager {
   
   // Массив объектов треков
   private trackObjects: TrackObject[] = [];
+  
+  // Менеджер взаимодействия
+  private interactionManager: InteractionManager;
 
   constructor(container: HTMLElement, config: SceneConfig) {
     this.container = container;
@@ -30,6 +34,9 @@ export class SceneManager implements ISceneManager {
     // Инициализация освещения
     this.ambientLight = new THREE.AmbientLight();
     this.directionalLight = new THREE.DirectionalLight();
+    
+    // Инициализация менеджера взаимодействия
+    this.interactionManager = new InteractionManager();
   }
 
   initializeScene(): void {
@@ -49,6 +56,9 @@ export class SceneManager implements ISceneManager {
     
     // Создание тестового объекта
     this.createTestObject();
+    
+    // Инициализация менеджера взаимодействия
+    this.interactionManager.initialize(this);
     
     // Запуск цикла рендеринга
     this.startRenderLoop();
@@ -144,6 +154,9 @@ export class SceneManager implements ISceneManager {
     this.testObject.castShadow = true;
     this.testObject.receiveShadow = true;
     
+    // Добавляем userData для идентификации как тестовый объект
+    this.testObject.userData = { isTestObject: true };
+    
     this.scene.add(this.testObject);
     
     console.log('Тестовый объект создан и добавлен в сцену');
@@ -153,8 +166,11 @@ export class SceneManager implements ISceneManager {
     const animate = () => {
       requestAnimationFrame(animate);
       
-      // Анимация тестового объекта
-      if (this.testObject) {
+      // Обновление менеджера взаимодействия
+      this.interactionManager.update();
+      
+      // Анимация тестового объекта (только если анимация не приостановлена)
+      if (this.testObject && !this.interactionManager.isAnimationPaused()) {
         this.testObject.rotation.x += 0.01;
         this.testObject.rotation.y += 0.01;
       }
@@ -251,24 +267,29 @@ export class SceneManager implements ISceneManager {
   }
 
   updateScene(): void {
-    // Обновление анимаций объектов треков
-    this.trackObjects.forEach((trackObject, index) => {
-      // Вращение вокруг собственной оси
-      trackObject.rotation.x += this.config.animationSpeed;
-      trackObject.rotation.y += this.config.animationSpeed * 0.7;
-      
-      // Орбитальное движение вокруг центра
-      const time = Date.now() * this.config.animationSpeed * 0.1;
-      const radius = trackObject.originalPosition.length();
-      const angle = time + index * 0.1;
-      
-      trackObject.position.x = Math.cos(angle) * radius;
-      trackObject.position.z = Math.sin(angle) * radius;
-    });
+    // Обновление анимаций объектов треков (только если анимация не приостановлена)
+    if (!this.interactionManager.isAnimationPaused()) {
+      this.trackObjects.forEach((trackObject, index) => {
+        // Вращение вокруг собственной оси
+        trackObject.rotation.x += this.config.animationSpeed;
+        trackObject.rotation.y += this.config.animationSpeed * 0.7;
+        
+        // Орбитальное движение вокруг центра
+        const time = Date.now() * this.config.animationSpeed * 0.1;
+        const radius = trackObject.originalPosition.length();
+        const angle = time + index * 0.1;
+        
+        trackObject.position.x = Math.cos(angle) * radius;
+        trackObject.position.z = Math.sin(angle) * radius;
+      });
+    }
   }
 
   dispose(): void {
     console.log('Освобождение ресурсов SceneManager...');
+    
+    // Освобождение ресурсов менеджера взаимодействия
+    this.interactionManager.dispose();
     
     // Удаление обработчика изменения размера
     window.removeEventListener('resize', this.handleResize.bind(this));
@@ -323,5 +344,9 @@ export class SceneManager implements ISceneManager {
 
   getTestObject(): THREE.Mesh | undefined {
     return this.testObject;
+  }
+
+  getInteractionManager(): InteractionManager {
+    return this.interactionManager;
   }
 }
