@@ -108,6 +108,8 @@ export interface SceneManager {
   getScene(): THREE.Scene;
   getCamera(): THREE.Camera;
   getRenderer(): THREE.WebGLRenderer;
+  getAnimationManager(): AnimationManager;
+  getTrackObjects(): TrackObject[];
 }
 
 // Интерфейсы для взаимодействия

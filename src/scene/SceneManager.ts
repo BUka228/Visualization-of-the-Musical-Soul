@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { SceneManager as ISceneManager, ProcessedTrack, TrackObject as ITrackObject, SceneConfig } from '../types';
 import { InteractionManager } from '../interaction/InteractionManager';
+import { AnimationManager } from '../animation/AnimationManager';
 import { TrackObject } from './TrackObject';
 
 export class SceneManager implements ISceneManager {
@@ -22,6 +23,9 @@ export class SceneManager implements ISceneManager {
   
   // Менеджер взаимодействия
   private interactionManager: InteractionManager;
+  
+  // Менеджер анимаций
+  private animationManager: AnimationManager;
 
   constructor(container: HTMLElement, config: SceneConfig) {
     this.container = container;
@@ -38,6 +42,9 @@ export class SceneManager implements ISceneManager {
     
     // Инициализация менеджера взаимодействия
     this.interactionManager = new InteractionManager();
+    
+    // Инициализация менеджера анимаций
+    this.animationManager = new AnimationManager();
   }
 
   initializeScene(): void {
@@ -60,6 +67,9 @@ export class SceneManager implements ISceneManager {
     
     // Инициализация менеджера взаимодействия
     this.interactionManager.initialize(this);
+    
+    // Инициализация менеджера анимаций
+    this.animationManager.initialize(this);
     
     // Запуск цикла рендеринга
     this.startRenderLoop();
@@ -230,6 +240,10 @@ export class SceneManager implements ISceneManager {
     
     console.log(`✅ Создано ${this.trackObjects.length} объектов треков`);
     this.logGenreDistribution(tracks);
+    
+    // Запускаем анимации после создания объектов
+    this.animationManager.startAnimation();
+    console.log('🎬 Анимации запущены для объектов треков');
   }
 
   /**
@@ -262,25 +276,15 @@ export class SceneManager implements ISceneManager {
   }
 
   updateScene(): void {
-    const currentTime = Date.now();
-    const deltaTime = 16; // Примерно 60 FPS
-    
-    // Обновление анимаций объектов треков (только если анимация не приостановлена)
-    if (!this.interactionManager.isAnimationPaused()) {
-      this.trackObjects.forEach((trackObject) => {
-        // Используем методы анимации из TrackObject
-        trackObject.updateAnimation(deltaTime, currentTime);
-        
-        // Обновляем эффект пульсации для выбранных объектов
-        if (trackObject.isSelected) {
-          trackObject.updatePulse(currentTime);
-        }
-      });
-    }
+    // AnimationManager теперь управляет всеми анимациями
+    // Дополнительная логика обновления сцены может быть добавлена здесь при необходимости
   }
 
   dispose(): void {
     console.log('Освобождение ресурсов SceneManager...');
+    
+    // Освобождение ресурсов менеджера анимаций
+    this.animationManager.dispose();
     
     // Освобождение ресурсов менеджера взаимодействия
     this.interactionManager.dispose();
@@ -335,5 +339,9 @@ export class SceneManager implements ISceneManager {
 
   getInteractionManager(): InteractionManager {
     return this.interactionManager;
+  }
+
+  getAnimationManager(): AnimationManager {
+    return this.animationManager;
   }
 }

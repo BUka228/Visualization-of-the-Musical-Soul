@@ -251,17 +251,14 @@ export class InteractionManager implements IInteractionManager {
     }
     
     this.selectedTrack = trackObject;
-    trackObject.isSelected = true;
     
-    // Визуальные эффекты выбора
-    trackObject.scale.setScalar(1.5);
-    
-    if (trackObject.material instanceof THREE.MeshStandardMaterial) {
-      trackObject.material.emissiveIntensity = 0.5;
+    // Делегируем анимацию выбора AnimationManager
+    if (this.sceneManager) {
+      const animationManager = this.sceneManager.getAnimationManager();
+      if (animationManager) {
+        animationManager.animateTrackSelection(trackObject);
+      }
     }
-    
-    // Приближение камеры к объекту
-    this.animateCameraToTrack(trackObject);
     
     console.log('Трек выбран:', trackObject.trackData?.name || 'Тестовый объект');
     
@@ -275,16 +272,17 @@ export class InteractionManager implements IInteractionManager {
     if (!this.selectedTrack) return;
     
     const trackObject = this.selectedTrack;
-    trackObject.isSelected = false;
     
-    // Возврат к исходному размеру
-    trackObject.scale.setScalar(trackObject.isHovered ? 1.2 : 1.0);
-    
-    // Возврат к исходной интенсивности свечения
-    if (trackObject.material instanceof THREE.MeshStandardMaterial) {
-      trackObject.material.emissiveIntensity = trackObject.isHovered ? 0.3 : 0.1;
+    // Делегируем анимацию отмены выбора AnimationManager
+    if (this.sceneManager) {
+      const animationManager = this.sceneManager.getAnimationManager();
+      if (animationManager) {
+        animationManager.animateTrackDeselection();
+      }
     }
     
+    // Сбрасываем состояние выбора
+    trackObject.setSelected(false);
     this.selectedTrack = undefined;
     
     console.log('Трек отменен');
@@ -309,6 +307,14 @@ export class InteractionManager implements IInteractionManager {
 
   toggleAnimation(): void {
     this.animationPaused = !this.animationPaused;
+    
+    // Делегируем управление анимацией AnimationManager
+    if (this.sceneManager) {
+      const animationManager = this.sceneManager.getAnimationManager();
+      if (animationManager) {
+        animationManager.toggleAnimation();
+      }
+    }
     
     console.log(`Анимация ${this.animationPaused ? 'приостановлена' : 'возобновлена'}`);
     

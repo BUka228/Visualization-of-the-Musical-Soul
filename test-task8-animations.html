@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Task 8 - Basic Animations</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: white;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 100;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        #controls button {
+            margin: 5px;
+            padding: 8px 12px;
+            background: #4fc3f7;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        #controls button:hover {
+            background: #29b6f6;
+        }
+        
+        #info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            max-width: 300px;
+        }
+        
+        .status {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        
+        .status.success {
+            background: rgba(76, 175, 80, 0.3);
+            border-left: 3px solid #4caf50;
+        }
+        
+        .status.info {
+            background: rgba(33, 150, 243, 0.3);
+            border-left: 3px solid #2196f3;
+        }
+        
+        .status.warning {
+            background: rgba(255, 193, 7, 0.3);
+            border-left: 3px solid #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container">
+        <div id="loading">
+            <h2>🎵 Загрузка Music Galaxy 3D...</h2>
+            <p>Инициализация анимаций...</p>
+        </div>
+    </div>
+    
+    <div id="controls">
+        <h3>🎮 Управление</h3>
+        <button id="reset-camera">🔄 Сброс камеры (R)</button>
+        <button id="toggle-animation">⏯️ Пауза/Воспроизведение (Space)</button>
+        <button id="collect-data-button">📥 Обновить данные</button>
+    </div>
+    
+    <div id="info">
+        <h3>📊 Информация о задаче 8</h3>
+        <div class="status info">
+            <strong>Задача:</strong> Реализация базовых анимаций
+        </div>
+        <div class="status info">
+            <strong>Функции:</strong>
+            <ul>
+                <li>✅ Орбитальное вращение объектов</li>
+                <li>✅ Вращение вокруг собственной оси</li>
+                <li>✅ AnimationManager для управления</li>
+                <li>✅ Плавное появление объектов</li>
+            </ul>
+        </div>
+        <div class="status success" id="animation-status">
+            <strong>Статус анимации:</strong> <span id="animation-state">Загрузка...</span>
+        </div>
+        <div class="status info">
+            <strong>Управление:</strong><br>
+            • Левая кнопка мыши: вращение камеры<br>
+            • Колесо мыши: зум<br>
+            • Правая кнопка мыши: панорамирование<br>
+            • R: сброс камеры<br>
+            • Space: пауза анимации
+        </div>
+    </div>
+
+    <script src="./dist/bundle.js"></script>
+    
+    <script>
+        // Дополнительная логика для отображения статуса анимации
+        document.addEventListener('DOMContentLoaded', () => {
+            const animationStateElement = document.getElementById('animation-state');
+            
+            // Проверяем статус анимации каждую секунду
+            setInterval(() => {
+                // Эта информация будет обновляться из основного приложения
+                if (window.musicGalaxyApp) {
+                    const state = window.musicGalaxyApp.getState();
+                    if (state.isInitialized) {
+                        animationStateElement.textContent = state.animationPaused ? 'Приостановлена' : 'Активна';
+                        animationStateElement.parentElement.className = 
+                            'status ' + (state.animationPaused ? 'warning' : 'success');
+                    }
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
+</script>

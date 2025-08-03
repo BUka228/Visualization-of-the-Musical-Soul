@@ -151,8 +151,8 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
     
     if (this.sceneManager) {
       // Создаем 3D-объекты для треков
-      // Реализация будет добавлена в следующих задачах
-      console.log('Создание 3D-объектов треков...');
+      this.sceneManager.createTrackObjects(tracks);
+      console.log('3D-объекты треков созданы и анимации запущены');
     }
   }
 
@@ -172,7 +172,7 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
     console.log('Переключение анимации');
     if (this.sceneManager) {
       this.sceneManager.getInteractionManager().toggleAnimation();
-      this.state.animationPaused = this.sceneManager.getInteractionManager().isAnimationPaused();
+      this.state.animationPaused = this.sceneManager.getAnimationManager().isPausedState();
     }
   }
 
