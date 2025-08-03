@@ -112,6 +112,7 @@ export interface SceneManager {
   getTrackObjects(): TrackObject[];
   getTestObject(): THREE.Mesh | undefined;
   getInteractionManager(): InteractionManager;
+  getEffectsManager(): EffectsManager;
 }
 
 // Интерфейсы для взаимодействия
@@ -157,6 +158,33 @@ export interface AnimationManager {
   animateCameraToTrack(trackObject: TrackObject): void;
   animateCameraReset(): void;
   isAnimating(): boolean;
+}
+
+// Интерфейсы для эффектов
+export interface EffectsManager {
+  initialize(scene: THREE.Scene, camera: THREE.Camera, audioManager?: AudioManager): void;
+  activateSelectionEffects(trackObject: TrackObject): void;
+  deactivateSelectionEffects(): void;
+  createTrackChangeExplosion(position: THREE.Vector3, color: string): void;
+  createGenreAura(tracks: TrackObject[], genreColor: string): void;
+  createTrackAppearanceEffect(trackObject: TrackObject): void;
+  createTrackDisappearanceEffect(trackObject: TrackObject): void;
+  update(deltaTime: number): void;
+  setEffectsEnabled(enabled: boolean): void;
+  setMusicPulseEnabled(enabled: boolean): void;
+  setParticleSystemSettings(starCount?: number, selectionParticleCount?: number): void;
+  setLightingSettings(pulseSpeed?: number, glowIntensity?: number): void;
+  getEffectsStats(): {
+    starCount: number;
+    selectionParticleCount: number;
+    activeGlowCount: number;
+    pulseObjectsCount: number;
+    isSelectionActive: boolean;
+    isMusicPulseEnabled: boolean;
+  };
+  isReady(): boolean;
+  areEffectsEnabled(): boolean;
+  dispose(): void;
 }
 
 // События и коллбэки

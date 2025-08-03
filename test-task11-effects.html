@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест Task 11 - Система частиц и эффектов</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            z-index: 100;
+            max-width: 300px;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            z-index: 100;
+        }
+        
+        .control-group {
+            margin-bottom: 10px;
+        }
+        
+        button {
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            padding: 8px 12px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin: 2px;
+        }
+        
+        button:hover {
+            background: #555;
+        }
+        
+        button:active {
+            background: #777;
+        }
+        
+        #track-info {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            z-index: 100;
+            display: none;
+            min-width: 250px;
+        }
+        
+        #effects-stats {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 100;
+            min-width: 200px;
+        }
+        
+        .stat-item {
+            margin: 3px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .stat-value {
+            color: #00ff00;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div id="info">
+        <h3>🎭 Тест системы частиц и эффектов</h3>
+        <p><strong>Управление:</strong></p>
+        <ul>
+            <li>ЛКМ - выбор объекта</li>
+            <li>ПКМ - панорамирование</li>
+            <li>Колесо - зум</li>
+            <li>R - сброс камеры</li>
+            <li>Space - пауза анимации</li>
+        </ul>
+        <p><strong>Эффекты:</strong></p>
+        <ul>
+            <li>⭐ Звездное поле</li>
+            <li>✨ Частицы вокруг выбранного объекта</li>
+            <li>💡 Световые эффекты и блики</li>
+            <li>🎵 Пульсация в ритм музыки</li>
+        </ul>
+    </div>
+    
+    <div id="controls">
+        <h4>🎛️ Управление эффектами</h4>
+        <div class="control-group">
+            <button onclick="toggleEffects()">Вкл/Выкл эффекты</button>
+            <button onclick="toggleMusicPulse()">Вкл/Выкл пульсацию</button>
+        </div>
+        <div class="control-group">
+            <button onclick="createExplosion()">Создать взрыв</button>
+            <button onclick="createGenreAura()">Создать ауру жанра</button>
+        </div>
+        <div class="control-group">
+            <button onclick="adjustLighting()">Настроить освещение</button>
+            <button onclick="resetEffects()">Сбросить эффекты</button>
+        </div>
+    </div>
+    
+    <div id="track-info">
+        <h4 id="track-title">Название трека</h4>
+        <p id="track-artist">Исполнитель</p>
+        <p id="track-album">Альбом</p>
+    </div>
+    
+    <div id="effects-stats">
+        <h4>📊 Статистика эффектов</h4>
+        <div class="stat-item">
+            <span>Звезды:</span>
+            <span class="stat-value" id="star-count">0</span>
+        </div>
+        <div class="stat-item">
+            <span>Частицы выбора:</span>
+            <span class="stat-value" id="selection-particles">0</span>
+        </div>
+        <div class="stat-item">
+            <span>Активные свечения:</span>
+            <span class="stat-value" id="glow-count">0</span>
+        </div>
+        <div class="stat-item">
+            <span>Пульсирующие объекты:</span>
+            <span class="stat-value" id="pulse-objects">0</span>
+        </div>
+        <div class="stat-item">
+            <span>Эффекты выбора:</span>
+            <span class="stat-value" id="selection-active">Нет</span>
+        </div>
+        <div class="stat-item">
+            <span>Пульсация музыки:</span>
+            <span class="stat-value" id="music-pulse">Да</span>
+        </div>
+    </div>
+
+    <script type="module">
+        import { SceneManager } from './src/scene/SceneManager.js';
+        import { DataProcessor } from './src/data/DataProcessor.js';
+        
+        // Глобальные переменные для управления
+        let sceneManager;
+        let effectsManager;
+        let testTracks = [];
+        
+        // Создаем тестовые данные треков
+        function createTestTracks() {
+            const genres = ['rock', 'pop', 'jazz', 'electronic', 'indie'];
+            const colors = ['#ff4444', '#44ff44', '#4444ff', '#ffff44', '#ff44ff'];
+            
+            const tracks = [];
+            for (let i = 0; i < 20; i++) {
+                const genreIndex = i % genres.length;
+                tracks.push({
+                    id: `test-track-${i}`,
+                    name: `Тестовый трек ${i + 1}`,
+                    artist: `Исполнитель ${Math.floor(i / 5) + 1}`,
+                    album: `Альбом ${Math.floor(i / 3) + 1}`,
+                    genre: genres[genreIndex],
+                    popularity: Math.floor(Math.random() * 100),
+                    duration: 180 + Math.floor(Math.random() * 120),
+                    previewUrl: null,
+                    color: colors[genreIndex],
+                    size: 1 + Math.random() * 2,
+                    position: {
+                        x: (Math.random() - 0.5) * 100,
+                        y: (Math.random() - 0.5) * 50,
+                        z: (Math.random() - 0.5) * 100
+                    }
+                });
+            }
+            return tracks;
+        }
+        
+        // Инициализация сцены
+        async function initScene() {
+            const container = document.getElementById('container');
+            
+            const config = {
+                galaxyRadius: 50,
+                objectMinSize: 0.5,
+                objectMaxSize: 3,
+                animationSpeed: 1,
+                cameraDistance: 100,
+                genreColors: {
+                    'rock': '#ff4444',
+                    'pop': '#44ff44',
+                    'jazz': '#4444ff',
+                    'electronic': '#ffff44',
+                    'indie': '#ff44ff'
+                }
+            };
+            
+            sceneManager = new SceneManager(container, config);
+            sceneManager.initializeScene();
+            
+            effectsManager = sceneManager.getEffectsManager();
+            
+            // Создаем и обрабатываем тестовые треки
+            const rawTracks = createTestTracks();
+            const dataProcessor = new DataProcessor(config);
+            testTracks = dataProcessor.processTrackData(rawTracks);
+            
+            // Создаем объекты треков в сцене
+            sceneManager.createTrackObjects(testTracks);
+            
+            console.log('✅ Сцена с эффектами инициализирована');
+            console.log(`📊 Создано ${testTracks.length} тестовых треков`);
+            
+            // Запускаем обновление статистики
+            startStatsUpdate();
+        }
+        
+        // Обновление статистики эффектов
+        function updateEffectsStats() {
+            if (!effectsManager || !effectsManager.isReady()) return;
+            
+            const stats = effectsManager.getEffectsStats();
+            
+            document.getElementById('star-count').textContent = stats.starCount;
+            document.getElementById('selection-particles').textContent = stats.selectionParticleCount;
+            document.getElementById('glow-count').textContent = stats.activeGlowCount;
+            document.getElementById('pulse-objects').textContent = stats.pulseObjectsCount;
+            document.getElementById('selection-active').textContent = stats.isSelectionActive ? 'Да' : 'Нет';
+            document.getElementById('music-pulse').textContent = stats.isMusicPulseEnabled ? 'Да' : 'Нет';
+        }
+        
+        function startStatsUpdate() {
+            setInterval(updateEffectsStats, 1000); // Обновляем каждую секунду
+        }
+        
+        // Функции управления эффектами
+        window.toggleEffects = function() {
+            if (!effectsManager) return;
+            
+            const currentState = effectsManager.areEffectsEnabled();
+            effectsManager.setEffectsEnabled(!currentState);
+            
+            console.log(`🎭 Эффекты ${!currentState ? 'включены' : 'выключены'}`);
+        };
+        
+        window.toggleMusicPulse = function() {
+            if (!effectsManager) return;
+            
+            const stats = effectsManager.getEffectsStats();
+            effectsManager.setMusicPulseEnabled(!stats.isMusicPulseEnabled);
+            
+            console.log(`🎵 Пульсация в ритм музыки ${!stats.isMusicPulseEnabled ? 'включена' : 'выключена'}`);
+        };
+        
+        window.createExplosion = function() {
+            if (!effectsManager || testTracks.length === 0) return;
+            
+            // Создаем взрыв в случайной позиции
+            const randomTrack = testTracks[Math.floor(Math.random() * testTracks.length)];
+            effectsManager.createTrackChangeExplosion(randomTrack.position, randomTrack.color);
+            
+            console.log('💥 Создан эффект взрыва');
+        };
+        
+        window.createGenreAura = function() {
+            if (!effectsManager || !sceneManager) return;
+            
+            // Получаем все объекты треков одного жанра
+            const trackObjects = sceneManager.getTrackObjects();
+            const rockTracks = trackObjects.filter(obj => obj.trackData.genre === 'rock');
+            
+            if (rockTracks.length > 0) {
+                effectsManager.createGenreAura(rockTracks, '#ff4444');
+                console.log(`✨ Создана аура для ${rockTracks.length} rock треков`);
+            }
+        };
+        
+        window.adjustLighting = function() {
+            if (!effectsManager) return;
+            
+            // Случайные настройки освещения
+            const pulseSpeed = 1 + Math.random() * 3;
+            const glowIntensity = 0.3 + Math.random() * 0.7;
+            
+            effectsManager.setLightingSettings(pulseSpeed, glowIntensity);
+            
+            console.log(`💡 Настройки освещения: скорость=${pulseSpeed.toFixed(2)}, интенсивность=${glowIntensity.toFixed(2)}`);
+        };
+        
+        window.resetEffects = function() {
+            if (!effectsManager) return;
+            
+            effectsManager.deactivateSelectionEffects();
+            effectsManager.setEffectsEnabled(true);
+            effectsManager.setMusicPulseEnabled(true);
+            effectsManager.setLightingSettings(2.0, 0.5);
+            
+            console.log('🔄 Эффекты сброшены к настройкам по умолчанию');
+        };
+        
+        // Обработка ошибок
+        window.addEventListener('error', (event) => {
+            console.error('❌ Ошибка:', event.error);
+        });
+        
+        // Экспортируем переменные для проверочного скрипта
+        window.sceneManager = null;
+        
+        // Запуск инициализации
+        initScene().then(() => {
+            window.sceneManager = sceneManager;
+            console.log('🎭 Сцена готова для проверки эффектов');
+        }).catch(error => {
+            console.error('❌ Ошибка инициализации:', error);
+        });
+    </script>
+    
+    <!-- Подключаем скрипт проверки -->
+    <script src="verify-task11-effects.js"></script>
+</body>
+</html>

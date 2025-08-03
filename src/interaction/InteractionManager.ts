@@ -303,6 +303,12 @@ export class InteractionManager implements IInteractionManager {
       if (animationManager) {
         animationManager.animateTrackSelection(trackObject);
       }
+      
+      // Активируем эффекты для выбранного трека
+      const effectsManager = this.sceneManager.getEffectsManager();
+      if (effectsManager) {
+        effectsManager.activateSelectionEffects(trackObject);
+      }
     }
     
     // Обновляем UI с информацией о треке
@@ -332,6 +338,12 @@ export class InteractionManager implements IInteractionManager {
       const animationManager = this.sceneManager.getAnimationManager();
       if (animationManager) {
         animationManager.animateTrackDeselection();
+      }
+      
+      // Деактивируем эффекты
+      const effectsManager = this.sceneManager.getEffectsManager();
+      if (effectsManager) {
+        effectsManager.deactivateSelectionEffects();
       }
     }
     

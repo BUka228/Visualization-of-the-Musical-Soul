@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SceneManager as ISceneManager, ProcessedTrack, TrackObject as ITrackObject, SceneConfig } from '../types';
 import { InteractionManager } from '../interaction/InteractionManager';
 import { AnimationManager } from '../animation/AnimationManager';
+import { EffectsManager } from '../effects/EffectsManager';
 import { TrackObject } from './TrackObject';
 
 export class SceneManager implements ISceneManager {
@@ -26,6 +27,9 @@ export class SceneManager implements ISceneManager {
   
   // Менеджер анимаций
   private animationManager: AnimationManager;
+  
+  // Менеджер эффектов
+  private effectsManager: EffectsManager;
 
   constructor(container: HTMLElement, config: SceneConfig) {
     this.container = container;
@@ -45,6 +49,9 @@ export class SceneManager implements ISceneManager {
     
     // Инициализация менеджера анимаций
     this.animationManager = new AnimationManager();
+    
+    // Инициализация менеджера эффектов
+    this.effectsManager = new EffectsManager();
   }
 
   initializeScene(): void {
@@ -70,6 +77,9 @@ export class SceneManager implements ISceneManager {
     
     // Инициализация менеджера анимаций
     this.animationManager.initialize(this);
+    
+    // Инициализация менеджера эффектов
+    this.effectsManager.initialize(this.scene, this.camera, this.interactionManager.getAudioManager());
     
     // Запуск цикла рендеринга
     this.startRenderLoop();
@@ -277,11 +287,15 @@ export class SceneManager implements ISceneManager {
 
   updateScene(): void {
     // AnimationManager теперь управляет всеми анимациями
-    // Дополнительная логика обновления сцены может быть добавлена здесь при необходимости
+    // Обновляем эффекты
+    this.effectsManager.update(16); // ~60 FPS
   }
 
   dispose(): void {
     console.log('Освобождение ресурсов SceneManager...');
+    
+    // Освобождение ресурсов менеджера эффектов
+    this.effectsManager.dispose();
     
     // Освобождение ресурсов менеджера анимаций
     this.animationManager.dispose();
@@ -343,5 +357,9 @@ export class SceneManager implements ISceneManager {
 
   getAnimationManager(): AnimationManager {
     return this.animationManager;
+  }
+
+  getEffectsManager(): EffectsManager {
+    return this.effectsManager;
   }
 }
