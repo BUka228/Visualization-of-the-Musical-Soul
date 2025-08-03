@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Простой тест оптимизации производительности</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            font-size: 14px;
+            z-index: 1000;
+            max-width: 400px;
+        }
+        
+        #info h3 {
+            margin: 0 0 10px 0;
+            color: #4CAF50;
+        }
+        
+        .stat {
+            margin: 5px 0;
+        }
+        
+        .controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            z-index: 1000;
+        }
+        
+        .controls button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 2px;
+        }
+        
+        .controls button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div id="info">
+        <h3>🚀 Тест оптимизации производительности</h3>
+        <div class="stat">Статус: <span id="status">Инициализация...</span></div>
+        <div class="stat">Треков создано: <span id="track-count">0</span></div>
+        <div class="stat">FPS: <span id="fps">0</span></div>
+        <div class="stat">Инстансированных объектов: <span id="instanced">0</span></div>
+        <div class="stat">Отсеченных объектов: <span id="culled">0</span></div>
+        <div class="stat">Сокращено draw calls: <span id="draw-calls-saved">0</span></div>
+        <div class="stat">Переиспользованных ресурсов: <span id="reused-resources">0</span></div>
+        <div id="console-output" style="margin-top: 10px; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto;"></div>
+    </div>
+    
+    <div class="controls">
+        <h3>⚙️ Управление</h3>
+        <button onclick="generateReport()">📋 Отчет</button>
+        <button onclick="addObjects()">➕ Добавить объекты</button>
+        <button onclick="resetScene()">🔄 Сброс</button>
+    </div>
+
+    <script src="./dist/bundle.js"></script>
+    <script>
+        // Глобальные переменные
+        let app;
+        let trackCount = 0;
+        
+        // Функция для логирования в UI
+        function logToUI(message) {
+            const output = document.getElementById('console-output');
+            const div = document.createElement('div');
+            div.textContent = new Date().toLocaleTimeString() + ': ' + message;
+            output.appendChild(div);
+            output.scrollTop = output.scrollHeight;
+            console.log(message);
+        }
+        
+        // Обновление статистики в UI
+        function updateStats() {
+            if (app && app.sceneManager) {
+                try {
+                    const performanceOptimizer = app.sceneManager.getPerformanceOptimizer();
+                    if (performanceOptimizer) {
+                        const stats = performanceOptimizer.getStats();
+                        
+                        document.getElementById('track-count').textContent = stats.totalObjects;
+                        document.getElementById('fps').textContent = Math.round(stats.currentFps);
+                        document.getElementById('instanced').textContent = stats.instancedObjects;
+                        document.getElementById('culled').textContent = stats.culledObjects;
+                        document.getElementById('draw-calls-saved').textContent = stats.drawCallsReduced;
+                        document.getElementById('reused-resources').textContent = stats.reusedResources;
+                    }
+                } catch (error) {
+                    console.warn('Ошибка обновления статистики:', error);
+                }
+            }
+        }
+        
+        // Инициализация приложения
+        async function initApp() {
+            try {
+                document.getElementById('status').textContent = 'Инициализация...';
+                logToUI('🚀 Начало инициализации приложения');
+                
+                // Создание экземпляра приложения
+                const container = document.getElementById('container');
+                
+                // Используем глобальные классы из bundle.js
+                if (typeof window.MusicGalaxyApplication !== 'undefined') {
+                    app = new window.MusicGalaxyApplication();
+                    await app.initialize(container);
+                    
+                    // Генерация тестовых данных
+                    const testTracks = generateTestTracks(300);
+                    app.loadTracks(testTracks);
+                    trackCount = testTracks.length;
+                    
+                    document.getElementById('status').textContent = 'Готово';
+                    logToUI(`✅ Приложение инициализировано с ${trackCount} треками`);
+                    
+                    // Запуск обновления статистики
+                    setInterval(updateStats, 1000);
+                    
+                } else {
+                    throw new Error('MusicGalaxyApp не найден в bundle.js');
+                }
+                
+            } catch (error) {
+                document.getElementById('status').textContent = 'Ошибка';
+                logToUI('❌ Ошибка инициализации: ' + error.message);
+                console.error('Ошибка инициализации:', error);
+            }
+        }
+        
+        // Генерация тестовых данных
+        function generateTestTracks(count) {
+            const genres = ['metal', 'rock', 'indie', 'pop', 'electronic', 'jazz', 'classical', 'hip-hop'];
+            const artists = ['Artist A', 'Artist B', 'Artist C', 'Artist D', 'Artist E'];
+            const tracks = [];
+
+            for (let i = 0; i < count; i++) {
+                const genre = genres[Math.floor(Math.random() * genres.length)];
+                const artist = artists[Math.floor(Math.random() * artists.length)];
+                
+                tracks.push({
+                    id: `track_${i}`,
+                    name: `Track ${i + 1}`,
+                    artist: artist,
+                    album: `Album ${Math.floor(i / 10) + 1}`,
+                    genre: genre,
+                    duration: 180 + Math.random() * 240,
+                    popularity: Math.random() * 100,
+                    previewUrl: `https://example.com/preview_${i}.mp3`,
+                    imageUrl: `https://example.com/cover_${i}.jpg`
+                });
+            }
+
+            return tracks;
+        }
+        
+        // Глобальные функции для кнопок
+        window.generateReport = function() {
+            if (app && app.sceneManager) {
+                try {
+                    const performanceOptimizer = app.sceneManager.getPerformanceOptimizer();
+                    if (performanceOptimizer) {
+                        const report = performanceOptimizer.generateReport();
+                        logToUI('📋 Отчет сгенерирован (см. консоль)');
+                        console.log(report);
+                        
+                        // Показываем краткий отчет в UI
+                        const stats = performanceOptimizer.getStats();
+                        logToUI(`📊 Краткий отчет: ${stats.totalObjects} объектов, ${stats.instancedObjects} инстансированных, ${stats.drawCallsReduced} draw calls сокращено`);
+                    }
+                } catch (error) {
+                    logToUI('❌ Ошибка генерации отчета: ' + error.message);
+                }
+            }
+        };
+        
+        window.addObjects = function() {
+            if (app) {
+                try {
+                    const additionalTracks = generateTestTracks(100);
+                    // Здесь нужно будет добавить метод для добавления треков
+                    logToUI(`➕ Попытка добавить ${additionalTracks.length} объектов`);
+                    trackCount += additionalTracks.length;
+                } catch (error) {
+                    logToUI('❌ Ошибка добавления объектов: ' + error.message);
+                }
+            }
+        };
+        
+        window.resetScene = function() {
+            if (app) {
+                try {
+                    app.resetView();
+                    logToUI('🔄 Сцена сброшена');
+                } catch (error) {
+                    logToUI('❌ Ошибка сброса сцены: ' + error.message);
+                }
+            }
+        };
+        
+        // Запуск приложения после загрузки страницы
+        window.addEventListener('load', initApp);
+    </script>
+</body>
+</html>

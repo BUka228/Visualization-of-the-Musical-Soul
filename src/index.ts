@@ -2,6 +2,7 @@ import { MusicGalaxyApp, AppConfig, AppState, ProcessedTrack } from './types';
 import { SceneManager } from './scene/SceneManager';
 import { DataLoader } from './data/DataLoader';
 import { DataProcessor } from './data/DataProcessor';
+import { UIManager } from './ui/UIManager';
 import { Vector3 } from 'three';
 
 // Импорт тестов в режиме разработки
@@ -51,6 +52,7 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
   private state: AppState;
   private container?: HTMLElement;
   private sceneManager?: SceneManager;
+  private uiManager?: UIManager;
 
   constructor(config: Partial<AppConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -78,6 +80,11 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
 
       console.log('WebGL поддерживается');
       console.log('Конфигурация приложения:', this.config);
+      
+      // Инициализация UI менеджера
+      this.uiManager = new UIManager();
+      this.uiManager.initialize();
+      this.uiManager.createDataCollectionButton();
       
       // Инициализация 3D-сцены
       this.sceneManager = new SceneManager(container, this.config.scene);
@@ -134,7 +141,11 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
       // Обновляем статистику с помощью DataProcessor
       const genreStats = dataProcessor.analyzeGenres(convertedTracks);
       this.state.genreStats = genreStats;
-      this.updateStatsUI();
+      
+      // Обновляем UI через UIManager
+      if (this.uiManager) {
+        this.uiManager.updateAppState(this.state);
+      }
       
       console.log(`✅ Загружено ${processedTracks.length} треков`);
       
@@ -182,6 +193,11 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
     if (this.sceneManager) {
       this.sceneManager.dispose();
       this.sceneManager = undefined;
+    }
+    
+    if (this.uiManager) {
+      this.uiManager.dispose();
+      this.uiManager = undefined;
     }
     
     this.state.isInitialized = false;
@@ -495,3 +511,10 @@ export { AudioManager } from './audio/AudioManager';
 export { SceneManager } from './scene/SceneManager';
 export { DataProcessor } from './data/DataProcessor';
 export * from './types';
+
+// Глобальный экспорт для использования в браузере
+if (typeof window !== 'undefined') {
+  (window as any).MusicGalaxyApplication = MusicGalaxyApplication;
+  (window as any).SceneManager = SceneManager;
+  (window as any).DataProcessor = DataProcessor;
+}

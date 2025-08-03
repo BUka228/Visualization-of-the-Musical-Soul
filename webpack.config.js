@@ -8,6 +8,8 @@ module.exports = {
     filename: 'bundle.js',
     path: path.resolve(__dirname, 'dist'),
     clean: true,
+    library: 'MusicGalaxy',
+    libraryTarget: 'window',
   },
   resolve: {
     extensions: ['.ts', '.js'],

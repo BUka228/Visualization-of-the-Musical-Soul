@@ -4,6 +4,8 @@ import { InteractionManager } from '../interaction/InteractionManager';
 import { AnimationManager } from '../animation/AnimationManager';
 import { EffectsManager } from '../effects/EffectsManager';
 import { TrackObject } from './TrackObject';
+import { PerformanceOptimizer } from '../performance/PerformanceOptimizer';
+import { PerformanceWarning } from '../performance/PerformanceMonitor';
 
 export class SceneManager implements ISceneManager {
   private scene: THREE.Scene;
@@ -30,6 +32,9 @@ export class SceneManager implements ISceneManager {
   
   // Менеджер эффектов
   private effectsManager: EffectsManager;
+  
+  // Оптимизатор производительности
+  private performanceOptimizer: PerformanceOptimizer;
 
   constructor(container: HTMLElement, config: SceneConfig) {
     this.container = container;
@@ -52,6 +57,9 @@ export class SceneManager implements ISceneManager {
     
     // Инициализация менеджера эффектов
     this.effectsManager = new EffectsManager();
+    
+    // Инициализация оптимизатора производительности
+    this.performanceOptimizer = new PerformanceOptimizer(this.scene, this.camera, this.renderer);
   }
 
   initializeScene(): void {
@@ -236,11 +244,30 @@ export class SceneManager implements ISceneManager {
       console.log('🗑️ Тестовый объект удален');
     }
     
-    // Создание новых объектов треков с использованием TrackObject класса
+    // Инициализация оптимизации производительности для треков
+    console.log('🚀 Инициализация оптимизации производительности...');
+    this.performanceOptimizer.initializeOptimization(tracks);
+    
+    // Настройка коллбэков для мониторинга производительности
+    this.performanceOptimizer.setOnWarning((warning: PerformanceWarning) => {
+      console.warn(`⚠️ Предупреждение о производительности: ${warning.message}`);
+    });
+    
+    this.performanceOptimizer.setOnStatsUpdate((stats) => {
+      // Можно добавить обновление UI с информацией о производительности
+      if (stats.currentFps < 30) {
+        console.warn(`⚠️ Низкий FPS: ${stats.currentFps}`);
+      }
+    });
+    
+    // Создание обычных объектов треков для совместимости с существующим кодом
+    // (PerformanceOptimizer создает оптимизированные версии внутри себя)
     tracks.forEach((track, index) => {
       const trackObject = new TrackObject(track);
       this.trackObjects.push(trackObject);
-      this.scene.add(trackObject);
+      
+      // Не добавляем в сцену напрямую - PerformanceOptimizer управляет рендерингом
+      // this.scene.add(trackObject);
       
       // Логирование для отладки (только для первых 5 объектов)
       if (index < 5) {
@@ -248,12 +275,19 @@ export class SceneManager implements ISceneManager {
       }
     });
     
-    console.log(`✅ Создано ${this.trackObjects.length} объектов треков`);
+    console.log(`✅ Создано ${this.trackObjects.length} объектов треков с оптимизацией`);
     this.logGenreDistribution(tracks);
     
     // Запускаем анимации после создания объектов
     this.animationManager.startAnimation();
     console.log('🎬 Анимации запущены для объектов треков');
+    
+    // Выводим отчет об оптимизации
+    console.log('📊 Отчет об оптимизации производительности:');
+    const stats = this.performanceOptimizer.getStats();
+    console.log(`- Инстансированных объектов: ${stats.instancedObjects}/${stats.totalObjects}`);
+    console.log(`- Сокращено draw calls: ${stats.drawCallsReduced}`);
+    console.log(`- Переиспользованных ресурсов: ${stats.reusedResources}`);
   }
 
   /**
@@ -289,10 +323,16 @@ export class SceneManager implements ISceneManager {
     // AnimationManager теперь управляет всеми анимациями
     // Обновляем эффекты
     this.effectsManager.update(16); // ~60 FPS
+    
+    // Обновляем оптимизацию производительности
+    this.performanceOptimizer.update(16); // ~60 FPS
   }
 
   dispose(): void {
     console.log('Освобождение ресурсов SceneManager...');
+    
+    // Освобождение ресурсов оптимизатора производительности
+    this.performanceOptimizer.dispose();
     
     // Освобождение ресурсов менеджера эффектов
     this.effectsManager.dispose();
@@ -361,5 +401,9 @@ export class SceneManager implements ISceneManager {
 
   getEffectsManager(): EffectsManager {
     return this.effectsManager;
+  }
+
+  getPerformanceOptimizer(): PerformanceOptimizer {
+    return this.performanceOptimizer;
   }
 }

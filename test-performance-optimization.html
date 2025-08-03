@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест оптимизации производительности - Music Galaxy 3D</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #performance-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            font-size: 12px;
+            line-height: 1.4;
+            z-index: 1000;
+            max-width: 300px;
+        }
+        
+        #performance-panel h3 {
+            margin: 0 0 10px 0;
+            color: #4CAF50;
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+        }
+        
+        .stat-label {
+            color: #ccc;
+        }
+        
+        .stat-value {
+            color: #fff;
+            font-weight: bold;
+        }
+        
+        .warning {
+            color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.1);
+            padding: 5px;
+            border-radius: 3px;
+            margin: 5px 0;
+        }
+        
+        .optimization-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            z-index: 1000;
+        }
+        
+        .optimization-controls h3 {
+            margin: 0 0 10px 0;
+            color: #2196F3;
+        }
+        
+        .control-group {
+            margin: 10px 0;
+        }
+        
+        .control-group label {
+            display: block;
+            margin: 5px 0;
+            cursor: pointer;
+        }
+        
+        .control-group input[type="checkbox"] {
+            margin-right: 8px;
+        }
+        
+        .control-group button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 2px;
+        }
+        
+        .control-group button:hover {
+            background: #45a049;
+        }
+        
+        .fps-indicator {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            z-index: 1000;
+        }
+        
+        .fps-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .fps-good { color: #4CAF50; }
+        .fps-medium { color: #FF9800; }
+        .fps-bad { color: #f44336; }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div id="performance-panel">
+        <h3>📊 Статистика производительности</h3>
+        <div class="stat-row">
+            <span class="stat-label">FPS:</span>
+            <span class="stat-value" id="fps-stat">0</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Время кадра:</span>
+            <span class="stat-value" id="frame-time-stat">0ms</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Память:</span>
+            <span class="stat-value" id="memory-stat">0MB</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Draw calls:</span>
+            <span class="stat-value" id="draw-calls-stat">0</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Треугольники:</span>
+            <span class="stat-value" id="triangles-stat">0</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Всего объектов:</span>
+            <span class="stat-value" id="total-objects-stat">0</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Инстансированных:</span>
+            <span class="stat-value" id="instanced-objects-stat">0</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Отсеченных:</span>
+            <span class="stat-value" id="culled-objects-stat">0</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Сокращено draw calls:</span>
+            <span class="stat-value" id="reduced-calls-stat">0</span>
+        </div>
+        <div id="warnings-container"></div>
+    </div>
+    
+    <div class="optimization-controls">
+        <h3>⚙️ Управление оптимизацией</h3>
+        <div class="control-group">
+            <label>
+                <input type="checkbox" id="instanced-rendering" checked>
+                Инстансированный рендеринг
+            </label>
+            <label>
+                <input type="checkbox" id="frustum-culling" checked>
+                Frustum culling
+            </label>
+            <label>
+                <input type="checkbox" id="resource-optimization" checked>
+                Оптимизация ресурсов
+            </label>
+            <label>
+                <input type="checkbox" id="auto-optimization" checked>
+                Автооптимизация
+            </label>
+        </div>
+        <div class="control-group">
+            <button onclick="generateReport()">📋 Отчет</button>
+            <button onclick="forceOptimization()">🔄 Принудительная оптимизация</button>
+            <button onclick="clearWarnings()">🗑️ Очистить предупреждения</button>
+        </div>
+        <div class="control-group">
+            <button onclick="addMoreObjects()">➕ Добавить объекты (стресс-тест)</button>
+            <button onclick="resetScene()">🔄 Сбросить сцену</button>
+        </div>
+    </div>
+    
+    <div class="fps-indicator">
+        <div>FPS</div>
+        <div class="fps-value" id="fps-indicator">60</div>
+    </div>
+
+    <script type="module">
+        import { SceneManager } from './dist/scene/SceneManager.js';
+        import { DataProcessor } from './dist/data/DataProcessor.js';
+
+        // Глобальные переменные
+        let sceneManager;
+        let performanceOptimizer;
+        let dataProcessor;
+        let currentTracks = [];
+
+        // Конфигурация сцены
+        const sceneConfig = {
+            galaxyRadius: 50,
+            objectMinSize: 0.5,
+            objectMaxSize: 3.0,
+            animationSpeed: 0.001,
+            cameraDistance: 80,
+            genreColors: {
+                'metal': '#FF0000',
+                'rock': '#FF4500',
+                'indie': '#4169E1',
+                'pop': '#FFD700',
+                'electronic': '#9400D3',
+                'jazz': '#228B22',
+                'classical': '#F5F5DC',
+                'hip-hop': '#8B4513',
+                'default': '#FFFFFF'
+            }
+        };
+
+        // Генерация тестовых данных
+        function generateTestTracks(count = 500) {
+            const genres = ['metal', 'rock', 'indie', 'pop', 'electronic', 'jazz', 'classical', 'hip-hop'];
+            const artists = ['Artist A', 'Artist B', 'Artist C', 'Artist D', 'Artist E'];
+            const tracks = [];
+
+            for (let i = 0; i < count; i++) {
+                const genre = genres[Math.floor(Math.random() * genres.length)];
+                const artist = artists[Math.floor(Math.random() * artists.length)];
+                
+                tracks.push({
+                    id: `track_${i}`,
+                    name: `Track ${i + 1}`,
+                    artist: artist,
+                    album: `Album ${Math.floor(i / 10) + 1}`,
+                    genre: genre,
+                    duration: 180 + Math.random() * 240, // 3-7 минут
+                    popularity: Math.random() * 100,
+                    previewUrl: `https://example.com/preview_${i}.mp3`,
+                    imageUrl: `https://example.com/cover_${i}.jpg`
+                });
+            }
+
+            return tracks;
+        }
+
+        // Инициализация приложения
+        async function initializeApp() {
+            try {
+                console.log('🚀 Инициализация приложения с оптимизацией производительности...');
+
+                // Создание менеджера сцены
+                const container = document.getElementById('container');
+                sceneManager = new SceneManager(container, sceneConfig);
+                sceneManager.initializeScene();
+
+                // Получение оптимизатора производительности
+                performanceOptimizer = sceneManager.getPerformanceOptimizer();
+
+                // Создание процессора данных
+                dataProcessor = new DataProcessor(sceneConfig);
+
+                // Генерация и обработка тестовых данных
+                const testTracks = generateTestTracks(500);
+                currentTracks = dataProcessor.processTrackData(testTracks);
+
+                // Создание объектов треков с оптимизацией
+                sceneManager.createTrackObjects(currentTracks);
+
+                // Настройка обновления статистики
+                setupPerformanceMonitoring();
+
+                // Настройка контролов
+                setupControls();
+
+                console.log('✅ Приложение инициализировано успешно');
+                console.log(`📊 Создано ${currentTracks.length} треков с оптимизацией`);
+
+            } catch (error) {
+                console.error('❌ Ошибка инициализации:', error);
+            }
+        }
+
+        // Настройка мониторинга производительности
+        function setupPerformanceMonitoring() {
+            // Обновление статистики каждую секунду
+            setInterval(() => {
+                if (performanceOptimizer) {
+                    const stats = performanceOptimizer.getDetailedStats();
+                    updatePerformanceUI(stats);
+                }
+            }, 1000);
+
+            // Обновление FPS индикатора каждый кадр
+            function updateFpsIndicator() {
+                if (performanceOptimizer) {
+                    const stats = performanceOptimizer.getStats();
+                    const fpsElement = document.getElementById('fps-indicator');
+                    const fps = Math.round(stats.currentFps);
+                    
+                    fpsElement.textContent = fps;
+                    fpsElement.className = 'fps-value ' + 
+                        (fps >= 50 ? 'fps-good' : fps >= 30 ? 'fps-medium' : 'fps-bad');
+                }
+                requestAnimationFrame(updateFpsIndicator);
+            }
+            updateFpsIndicator();
+        }
+
+        // Обновление UI с информацией о производительности
+        function updatePerformanceUI(detailedStats) {
+            const { optimization, performance, culling, instancing } = detailedStats;
+
+            // Основная статистика
+            document.getElementById('fps-stat').textContent = performance.fps;
+            document.getElementById('frame-time-stat').textContent = performance.frameTime + 'ms';
+            document.getElementById('memory-stat').textContent = performance.memoryUsage + 'MB';
+            document.getElementById('draw-calls-stat').textContent = performance.drawCalls;
+            document.getElementById('triangles-stat').textContent = performance.triangles;
+
+            // Статистика оптимизации
+            document.getElementById('total-objects-stat').textContent = optimization.totalObjects;
+            document.getElementById('instanced-objects-stat').textContent = optimization.instancedObjects;
+            document.getElementById('culled-objects-stat').textContent = optimization.culledObjects;
+            document.getElementById('reduced-calls-stat').textContent = optimization.drawCallsReduced;
+
+            // Обновление предупреждений
+            updateWarningsUI();
+        }
+
+        // Обновление UI предупреждений
+        function updateWarningsUI() {
+            const warningsContainer = document.getElementById('warnings-container');
+            const monitor = performanceOptimizer.performanceMonitor;
+            
+            if (monitor) {
+                const recentWarnings = monitor.getRecentWarnings(10000); // Последние 10 секунд
+                
+                warningsContainer.innerHTML = '';
+                recentWarnings.forEach(warning => {
+                    const warningDiv = document.createElement('div');
+                    warningDiv.className = 'warning';
+                    warningDiv.textContent = `⚠️ ${warning.message}`;
+                    warningsContainer.appendChild(warningDiv);
+                });
+            }
+        }
+
+        // Настройка контролов
+        function setupControls() {
+            // Чекбоксы для управления оптимизацией
+            document.getElementById('instanced-rendering').addEventListener('change', (e) => {
+                performanceOptimizer.updateConfig({ enableInstancedRendering: e.target.checked });
+            });
+
+            document.getElementById('frustum-culling').addEventListener('change', (e) => {
+                performanceOptimizer.updateConfig({ enableFrustumCulling: e.target.checked });
+            });
+
+            document.getElementById('resource-optimization').addEventListener('change', (e) => {
+                performanceOptimizer.updateConfig({ enableResourceOptimization: e.target.checked });
+            });
+
+            document.getElementById('auto-optimization').addEventListener('change', (e) => {
+                performanceOptimizer.updateConfig({ autoOptimization: e.target.checked });
+            });
+        }
+
+        // Глобальные функции для кнопок
+        window.generateReport = function() {
+            if (performanceOptimizer) {
+                const report = performanceOptimizer.generateReport();
+                console.log(report);
+                
+                // Создаем модальное окно с отчетом
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                    background: rgba(0,0,0,0.8); z-index: 2000; display: flex;
+                    align-items: center; justify-content: center;
+                `;
+                
+                const content = document.createElement('div');
+                content.style.cssText = `
+                    background: #1a1a1a; color: white; padding: 20px;
+                    border-radius: 8px; max-width: 80%; max-height: 80%;
+                    overflow: auto; font-family: monospace; font-size: 12px;
+                    white-space: pre-wrap;
+                `;
+                content.textContent = report;
+                
+                const closeBtn = document.createElement('button');
+                closeBtn.textContent = 'Закрыть';
+                closeBtn.style.cssText = `
+                    position: absolute; top: 10px; right: 10px;
+                    background: #f44336; color: white; border: none;
+                    padding: 5px 10px; border-radius: 4px; cursor: pointer;
+                `;
+                closeBtn.onclick = () => document.body.removeChild(modal);
+                
+                modal.appendChild(content);
+                modal.appendChild(closeBtn);
+                document.body.appendChild(modal);
+            }
+        };
+
+        window.forceOptimization = function() {
+            if (performanceOptimizer) {
+                performanceOptimizer.forceUpdate();
+                console.log('🔄 Принудительная оптимизация выполнена');
+            }
+        };
+
+        window.clearWarnings = function() {
+            if (performanceOptimizer && performanceOptimizer.performanceMonitor) {
+                performanceOptimizer.performanceMonitor.clearWarnings();
+                updateWarningsUI();
+                console.log('🗑️ Предупреждения очищены');
+            }
+        };
+
+        window.addMoreObjects = function() {
+            const additionalTracks = generateTestTracks(200);
+            const processedTracks = dataProcessor.processTrackData(additionalTracks);
+            currentTracks = [...currentTracks, ...processedTracks];
+            
+            sceneManager.createTrackObjects(currentTracks);
+            console.log(`➕ Добавлено ${additionalTracks.length} объектов. Всего: ${currentTracks.length}`);
+        };
+
+        window.resetScene = function() {
+            currentTracks = [];
+            const testTracks = generateTestTracks(500);
+            currentTracks = dataProcessor.processTrackData(testTracks);
+            sceneManager.createTrackObjects(currentTracks);
+            console.log('🔄 Сцена сброшена');
+        };
+
+        // Запуск приложения
+        initializeApp();
+    </script>
+</body>
+</html>

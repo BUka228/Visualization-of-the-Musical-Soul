@@ -113,6 +113,7 @@ export interface SceneManager {
   getTestObject(): THREE.Mesh | undefined;
   getInteractionManager(): InteractionManager;
   getEffectsManager(): EffectsManager;
+  getPerformanceOptimizer(): any; // PerformanceOptimizer type will be imported separately
 }
 
 // Интерфейсы для взаимодействия
