@@ -168,20 +168,15 @@ export class InteractionManager implements IInteractionManager {
     if (!this.sceneManager) return null;
     
     const camera = this.sceneManager.getCamera();
-    const scene = this.sceneManager.getScene();
     
-    // Настройка raycaster
+    // Настройка raycaster с оптимизированными параметрами
     this.raycaster.setFromCamera(this.mouse, camera);
     
-    // Получение всех объектов треков
-    const trackObjects = scene.children.filter(child => 
-      child.userData && child.userData.isTrackObject
-    ) as TrackObject[];
+    // Получаем объекты треков напрямую из SceneManager для лучшей производительности
+    const trackObjects = this.sceneManager.getTrackObjects();
     
     // Получение тестового объекта
-    const testObject = scene.children.find(child => 
-      child.userData && child.userData.isTestObject
-    );
+    const testObject = this.sceneManager.getTestObject();
     
     // Создаем массив всех интерактивных объектов
     const interactiveObjects: THREE.Object3D[] = [...trackObjects];
@@ -189,25 +184,33 @@ export class InteractionManager implements IInteractionManager {
       interactiveObjects.push(testObject);
     }
     
-    // Проверка пересечений
+    // Проверка пересечений с оптимизацией
     if (interactiveObjects.length > 0) {
-      const intersects = this.raycaster.intersectObjects(interactiveObjects);
-      return intersects.length > 0 ? intersects[0].object as TrackObject : null;
+      // Сортируем объекты по расстоянию до камеры для оптимизации
+      const sortedObjects = interactiveObjects.sort((a, b) => {
+        const distA = a.position.distanceTo(camera.position);
+        const distB = b.position.distanceTo(camera.position);
+        return distA - distB;
+      });
+      
+      // Проверяем пересечения только с ближайшими объектами
+      const maxObjectsToCheck = Math.min(50, sortedObjects.length); // Ограничиваем количество проверяемых объектов
+      const nearObjects = sortedObjects.slice(0, maxObjectsToCheck);
+      
+      const intersects = this.raycaster.intersectObjects(nearObjects);
+      
+      if (intersects.length > 0) {
+        // Возвращаем ближайший пересекаемый объект
+        return intersects[0].object as TrackObject;
+      }
     }
     
     return null;
   }
 
   private hoverTrack(trackObject: TrackObject): void {
-    // Увеличение размера объекта при наведении
-    trackObject.scale.setScalar(1.2);
-    
-    // Увеличение интенсивности свечения
-    if (trackObject.material instanceof THREE.MeshStandardMaterial) {
-      trackObject.material.emissiveIntensity = 0.3;
-    }
-    
-    trackObject.isHovered = true;
+    // Используем метод TrackObject для установки состояния наведения
+    trackObject.setHovered(true);
     
     // Изменение курсора
     if (this.container) {
@@ -221,17 +224,8 @@ export class InteractionManager implements IInteractionManager {
   }
 
   private unhoverTrack(trackObject: TrackObject): void {
-    // Возврат к исходному размеру (если объект не выбран)
-    if (!trackObject.isSelected) {
-      trackObject.scale.setScalar(1.0);
-    }
-    
-    // Возврат к исходной интенсивности свечения
-    if (trackObject.material instanceof THREE.MeshStandardMaterial) {
-      trackObject.material.emissiveIntensity = trackObject.isSelected ? 0.2 : 0.1;
-    }
-    
-    trackObject.isHovered = false;
+    // Используем метод TrackObject для снятия состояния наведения
+    trackObject.setHovered(false);
     
     // Возврат курсора
     if (this.container) {
@@ -260,6 +254,9 @@ export class InteractionManager implements IInteractionManager {
       }
     }
     
+    // Обновляем UI с информацией о треке
+    this.updateTrackInfoUI(trackObject);
+    
     console.log('Трек выбран:', trackObject.trackData?.name || 'Тестовый объект');
     
     // Вызов коллбэка
@@ -280,6 +277,9 @@ export class InteractionManager implements IInteractionManager {
         animationManager.animateTrackDeselection();
       }
     }
+    
+    // Скрываем информацию о треке в UI
+    this.hideTrackInfoUI();
     
     // Сбрасываем состояние выбора
     trackObject.setSelected(false);
@@ -336,6 +336,108 @@ export class InteractionManager implements IInteractionManager {
     
     // Анимация будет выполнена через OrbitControls с dampingFactor
     this.controls.update();
+  }
+
+  /**
+   * Обновляет UI с информацией о выбранном треке
+   */
+  private updateTrackInfoUI(trackObject: TrackObject): void {
+    const trackInfoPanel = document.getElementById('track-info');
+    const trackTitle = document.getElementById('track-title');
+    const trackArtist = document.getElementById('track-artist');
+    const trackAlbum = document.getElementById('track-album');
+    
+    if (!trackInfoPanel || !trackTitle || !trackArtist || !trackAlbum) {
+      console.warn('UI элементы для отображения информации о треке не найдены');
+      return;
+    }
+    
+    // Получаем информацию о треке
+    if (trackObject.trackData) {
+      const trackInfo = trackObject.getTrackInfo();
+      
+      // Обновляем содержимое элементов
+      trackTitle.textContent = trackInfo.name;
+      trackArtist.textContent = `Исполнитель: ${trackInfo.artist}`;
+      trackAlbum.textContent = `Альбом: ${trackInfo.album}`;
+      
+      // Добавляем дополнительную информацию
+      const existingDetails = trackInfoPanel.querySelector('.track-details');
+      if (existingDetails) {
+        existingDetails.remove();
+      }
+      
+      const detailsDiv = document.createElement('div');
+      detailsDiv.className = 'track-details';
+      detailsDiv.style.cssText = `
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        font-size: 12px;
+        color: #ccc;
+      `;
+      
+      detailsDiv.innerHTML = `
+        <div style="margin: 4px 0;"><strong>Жанр:</strong> ${trackInfo.genre}</div>
+        <div style="margin: 4px 0;"><strong>Длительность:</strong> ${trackInfo.duration}</div>
+        <div style="margin: 4px 0;"><strong>Популярность:</strong> ${trackInfo.popularity}/100</div>
+      `;
+      
+      trackInfoPanel.appendChild(detailsDiv);
+      
+      // Показываем панель
+      trackInfoPanel.style.display = 'block';
+      
+      // Добавляем анимацию появления
+      trackInfoPanel.style.opacity = '0';
+      trackInfoPanel.style.transform = 'translateY(-10px)';
+      trackInfoPanel.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+      
+      // Запускаем анимацию через небольшую задержку
+      setTimeout(() => {
+        trackInfoPanel.style.opacity = '1';
+        trackInfoPanel.style.transform = 'translateY(0)';
+      }, 50);
+      
+    } else {
+      // Для тестового объекта
+      trackTitle.textContent = 'Тестовый объект';
+      trackArtist.textContent = 'Исполнитель: Демо';
+      trackAlbum.textContent = 'Альбом: Тестовый альбом';
+      
+      trackInfoPanel.style.display = 'block';
+    }
+    
+    console.log('UI обновлен с информацией о треке');
+  }
+
+  /**
+   * Скрывает UI с информацией о треке
+   */
+  private hideTrackInfoUI(): void {
+    const trackInfoPanel = document.getElementById('track-info');
+    
+    if (!trackInfoPanel) {
+      return;
+    }
+    
+    // Добавляем анимацию исчезновения
+    trackInfoPanel.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+    trackInfoPanel.style.opacity = '0';
+    trackInfoPanel.style.transform = 'translateY(-10px)';
+    
+    // Скрываем панель после анимации
+    setTimeout(() => {
+      trackInfoPanel.style.display = 'none';
+      
+      // Удаляем дополнительные детали
+      const existingDetails = trackInfoPanel.querySelector('.track-details');
+      if (existingDetails) {
+        existingDetails.remove();
+      }
+    }, 300);
+    
+    console.log('UI с информацией о треке скрыт');
   }
 
   // Методы для установки коллбэков

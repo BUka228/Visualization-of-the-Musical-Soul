@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Task 9 - Object Interactivity</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        #canvas-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        .ui-panel {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            pointer-events: auto;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        #track-info {
+            top: 20px;
+            left: 20px;
+            max-width: 350px;
+            display: none;
+        }
+        
+        #track-info h4 {
+            margin: 0 0 10px 0;
+            color: #4fc3f7;
+            font-size: 16px;
+        }
+        
+        #track-info p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        #instructions {
+            bottom: 20px;
+            left: 20px;
+            max-width: 400px;
+        }
+        
+        #instructions h3 {
+            margin: 0 0 15px 0;
+            color: #4fc3f7;
+        }
+        
+        #instructions ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        #instructions li {
+            margin: 8px 0;
+            line-height: 1.4;
+        }
+        
+        #test-status {
+            top: 20px;
+            right: 20px;
+            max-width: 300px;
+        }
+        
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 8px 0;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #666;
+        }
+        
+        .status-indicator.active {
+            background: #4fc3f7;
+            box-shadow: 0 0 10px #4fc3f7;
+        }
+        
+        .status-indicator.success {
+            background: #4caf50;
+            box-shadow: 0 0 10px #4caf50;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container">
+        <div id="loading">Загрузка теста интерактивности...</div>
+        
+        <div id="ui-overlay">
+            <!-- Панель информации о треке -->
+            <div id="track-info" class="ui-panel">
+                <h4 id="track-title">Название трека</h4>
+                <p id="track-artist">Исполнитель</p>
+                <p id="track-album">Альбом</p>
+            </div>
+            
+            <!-- Инструкции по тестированию -->
+            <div id="instructions" class="ui-panel">
+                <h3>🎮 Тест интерактивности</h3>
+                <ul>
+                    <li><strong>Наведение мыши:</strong> Объекты должны подсвечиваться и увеличиваться</li>
+                    <li><strong>Клик по объекту:</strong> Выбор трека с приближением камеры</li>
+                    <li><strong>Информация о треке:</strong> Отображается в левом верхнем углу</li>
+                    <li><strong>Клик в пустоту:</strong> Отмена выбора и возврат камеры</li>
+                    <li><strong>R:</strong> Сброс камеры в исходное положение</li>
+                    <li><strong>Пробел:</strong> Пауза/возобновление анимации</li>
+                </ul>
+            </div>
+            
+            <!-- Статус тестирования -->
+            <div id="test-status" class="ui-panel">
+                <h3>📊 Статус тестирования</h3>
+                <div class="status-item">
+                    <span>Raycasting</span>
+                    <div id="raycasting-status" class="status-indicator"></div>
+                </div>
+                <div class="status-item">
+                    <span>Hover эффекты</span>
+                    <div id="hover-status" class="status-indicator"></div>
+                </div>
+                <div class="status-item">
+                    <span>Выбор объектов</span>
+                    <div id="selection-status" class="status-indicator"></div>
+                </div>
+                <div class="status-item">
+                    <span>Информация о треке</span>
+                    <div id="info-status" class="status-indicator"></div>
+                </div>
+                <div class="status-item">
+                    <span>Анимация камеры</span>
+                    <div id="camera-status" class="status-indicator"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { SceneManager } from './src/scene/SceneManager.js';
+        import { DataProcessor } from './src/data/DataProcessor.js';
+
+        // Конфигурация для тестирования
+        const testConfig = {
+            galaxyRadius: 30,
+            objectMinSize: 0.8,
+            objectMaxSize: 2.5,
+            animationSpeed: 0.001,
+            cameraDistance: 80,
+            genreColors: {
+                'metal': '#FF0000',
+                'rock': '#FF4500', 
+                'indie': '#4169E1',
+                'pop': '#FFD700',
+                'electronic': '#9400D3',
+                'jazz': '#228B22',
+                'default': '#FFFFFF'
+            }
+        };
+
+        // Создание тестовых данных
+        function createTestTracks() {
+            const genres = ['metal', 'rock', 'indie', 'pop', 'electronic', 'jazz'];
+            const tracks = [];
+            
+            for (let i = 0; i < 20; i++) {
+                const genre = genres[i % genres.length];
+                tracks.push({
+                    id: `test-track-${i}`,
+                    name: `Тестовый трек ${i + 1}`,
+                    artist: `Исполнитель ${Math.floor(i / 3) + 1}`,
+                    album: `Альбом ${Math.floor(i / 5) + 1}`,
+                    genre: genre,
+                    duration: 180 + Math.random() * 120, // 3-5 минут
+                    popularity: Math.floor(Math.random() * 100),
+                    previewUrl: `https://example.com/preview-${i}.mp3`
+                });
+            }
+            
+            return tracks;
+        }
+
+        // Статус индикаторы
+        const statusIndicators = {
+            raycasting: document.getElementById('raycasting-status'),
+            hover: document.getElementById('hover-status'),
+            selection: document.getElementById('selection-status'),
+            info: document.getElementById('info-status'),
+            camera: document.getElementById('camera-status')
+        };
+
+        function updateStatus(indicator, active = false, success = false) {
+            indicator.className = 'status-indicator';
+            if (success) {
+                indicator.classList.add('success');
+            } else if (active) {
+                indicator.classList.add('active');
+            }
+        }
+
+        // Инициализация теста
+        async function initTest() {
+            try {
+                const container = document.getElementById('canvas-container');
+                
+                // Создание SceneManager
+                const sceneManager = new SceneManager(container, testConfig);
+                sceneManager.initializeScene();
+                
+                // Создание тестовых данных
+                const testTracks = createTestTracks();
+                const dataProcessor = new DataProcessor();
+                const processedTracks = dataProcessor.processTrackData(testTracks);
+                
+                // Загрузка треков в сцену
+                sceneManager.createTrackObjects(processedTracks);
+                
+                // Получение менеджера взаимодействия
+                const interactionManager = sceneManager.getInteractionManager();
+                
+                // Настройка обработчиков событий для тестирования
+                setupTestEventHandlers(interactionManager);
+                
+                // Скрытие индикатора загрузки
+                document.getElementById('loading').style.display = 'none';
+                
+                console.log('✅ Тест интерактивности инициализирован');
+                console.log(`📊 Создано ${processedTracks.length} тестовых объектов`);
+                
+            } catch (error) {
+                console.error('❌ Ошибка инициализации теста:', error);
+                document.getElementById('loading').innerHTML = `
+                    <div style="color: #ff6b6b;">
+                        <h3>Ошибка теста</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function setupTestEventHandlers(interactionManager) {
+            let hoverCount = 0;
+            let selectionCount = 0;
+            let infoDisplayCount = 0;
+            let cameraAnimationCount = 0;
+
+            // Обработчик наведения
+            interactionManager.setOnTrackHovered((track) => {
+                hoverCount++;
+                updateStatus(statusIndicators.hover, true);
+                updateStatus(statusIndicators.raycasting, false, true);
+                console.log(`🎯 Hover: ${track.trackData?.name || 'Тестовый объект'} (${hoverCount})`);
+            });
+
+            // Обработчик снятия наведения
+            interactionManager.setOnTrackUnhovered(() => {
+                updateStatus(statusIndicators.hover, false);
+                console.log('🎯 Hover снят');
+            });
+
+            // Обработчик выбора трека
+            interactionManager.setOnTrackSelected((track) => {
+                selectionCount++;
+                infoDisplayCount++;
+                cameraAnimationCount++;
+                
+                updateStatus(statusIndicators.selection, false, true);
+                updateStatus(statusIndicators.info, false, true);
+                updateStatus(statusIndicators.camera, true);
+                
+                console.log(`🎵 Выбран трек: ${track.trackData?.name || 'Тестовый объект'} (${selectionCount})`);
+                
+                // Проверяем, что информация о треке отображается
+                const trackInfoPanel = document.getElementById('track-info');
+                if (trackInfoPanel && trackInfoPanel.style.display === 'block') {
+                    console.log('✅ Информация о треке отображается корректно');
+                }
+                
+                // Имитируем завершение анимации камеры через 1 секунду
+                setTimeout(() => {
+                    updateStatus(statusIndicators.camera, false, true);
+                    console.log('📷 Анимация камеры завершена');
+                }, 1000);
+            });
+
+            // Обработчик отмены выбора
+            interactionManager.setOnTrackDeselected(() => {
+                updateStatus(statusIndicators.selection, false);
+                updateStatus(statusIndicators.info, false);
+                updateStatus(statusIndicators.camera, true);
+                
+                console.log('🎵 Выбор трека отменен');
+                
+                // Проверяем, что информация о треке скрыта
+                setTimeout(() => {
+                    const trackInfoPanel = document.getElementById('track-info');
+                    if (trackInfoPanel && trackInfoPanel.style.display === 'none') {
+                        console.log('✅ Информация о треке скрыта корректно');
+                    }
+                    updateStatus(statusIndicators.camera, false, true);
+                }, 300);
+            });
+
+            // Дополнительные обработчики клавиатуры для тестирования
+            document.addEventListener('keydown', (event) => {
+                switch (event.code) {
+                    case 'KeyT':
+                        // Тестовая клавиша для вывода статистики
+                        console.log('📊 Статистика тестирования:');
+                        console.log(`  - Наведений: ${hoverCount}`);
+                        console.log(`  - Выборов: ${selectionCount}`);
+                        console.log(`  - Отображений информации: ${infoDisplayCount}`);
+                        console.log(`  - Анимаций камеры: ${cameraAnimationCount}`);
+                        break;
+                }
+            });
+
+            console.log('🎮 Обработчики событий для тестирования настроены');
+            console.log('💡 Нажмите T для вывода статистики тестирования');
+        }
+
+        // Запуск теста при загрузке страницы
+        document.addEventListener('DOMContentLoaded', initTest);
+    </script>
+</body>
+</html>

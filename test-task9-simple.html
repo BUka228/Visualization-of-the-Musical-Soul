@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task 9 Simple Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            max-width: 300px;
+            z-index: 100;
+        }
+        
+        #track-info {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            max-width: 300px;
+            z-index: 100;
+            display: none;
+        }
+        
+        #track-title {
+            color: #4fc3f7;
+            margin: 0 0 10px 0;
+        }
+        
+        #track-artist, #track-album {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        .track-details {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 12px;
+            color: #ccc;
+        }
+        
+        .track-details div {
+            margin: 4px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="info">
+            <h3>🎮 Task 9 Test</h3>
+            <p>Тест интерактивности объектов:</p>
+            <ul>
+                <li>Наведите мышь на объект</li>
+                <li>Кликните для выбора</li>
+                <li>Кликните в пустоту для отмены</li>
+                <li>R - сброс камеры</li>
+                <li>Пробел - пауза</li>
+            </ul>
+        </div>
+        
+        <div id="track-info">
+            <h4 id="track-title">Название трека</h4>
+            <p id="track-artist">Исполнитель</p>
+            <p id="track-album">Альбом</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from './node_modules/three/build/three.module.js';
+        import { OrbitControls } from './node_modules/three/examples/jsm/controls/OrbitControls.js';
+
+        // Simple test implementation
+        class SimpleInteractivityTest {
+            constructor() {
+                this.container = document.getElementById('container');
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.raycaster = new THREE.Raycaster();
+                this.mouse = new THREE.Vector2();
+                this.objects = [];
+                this.selectedObject = null;
+                this.hoveredObject = null;
+                
+                this.init();
+            }
+            
+            init() {
+                // Setup renderer
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.renderer.setClearColor(0x000011);
+                this.container.appendChild(this.renderer.domElement);
+                
+                // Setup camera
+                this.camera.position.set(0, 0, 50);
+                
+                // Setup controls
+                this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enableDamping = true;
+                this.controls.dampingFactor = 0.05;
+                
+                // Setup lighting
+                const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+                this.scene.add(ambientLight);
+                
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+                directionalLight.position.set(50, 50, 50);
+                this.scene.add(directionalLight);
+                
+                // Create test objects
+                this.createTestObjects();
+                
+                // Setup event listeners
+                this.setupEventListeners();
+                
+                // Start render loop
+                this.animate();
+                
+                console.log('✅ Simple interactivity test initialized');
+            }
+            
+            createTestObjects() {
+                const colors = [0xFF0000, 0x4169E1, 0xFFD700, 0x9400D3, 0x228B22];
+                const names = ['Metal Track', 'Indie Track', 'Pop Track', 'Electronic Track', 'Jazz Track'];
+                
+                for (let i = 0; i < 5; i++) {
+                    const geometry = new THREE.IcosahedronGeometry(2, 1);
+                    const material = new THREE.MeshStandardMaterial({
+                        color: colors[i],
+                        metalness: 0.3,
+                        roughness: 0.4,
+                        emissive: colors[i],
+                        emissiveIntensity: 0.1
+                    });
+                    
+                    const mesh = new THREE.Mesh(geometry, material);
+                    mesh.position.set(
+                        (i - 2) * 8,
+                        Math.sin(i) * 5,
+                        Math.cos(i) * 5
+                    );
+                    
+                    // Add track data
+                    mesh.userData = {
+                        name: names[i],
+                        artist: `Artist ${i + 1}`,
+                        album: `Album ${i + 1}`,
+                        genre: ['metal', 'indie', 'pop', 'electronic', 'jazz'][i],
+                        duration: '3:45',
+                        popularity: Math.floor(Math.random() * 100),
+                        originalEmissive: 0.1,
+                        originalScale: 1.0
+                    };
+                    
+                    this.scene.add(mesh);
+                    this.objects.push(mesh);
+                }
+                
+                console.log(`📦 Created ${this.objects.length} test objects`);
+            }
+            
+            setupEventListeners() {
+                this.renderer.domElement.addEventListener('mousemove', this.onMouseMove.bind(this));
+                this.renderer.domElement.addEventListener('click', this.onClick.bind(this));
+                
+                document.addEventListener('keydown', (event) => {
+                    if (event.code === 'KeyR') {
+                        this.resetCamera();
+                    }
+                });
+            }
+            
+            onMouseMove(event) {
+                const rect = this.renderer.domElement.getBoundingClientRect();
+                this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+                
+                this.checkIntersections();
+            }
+            
+            onClick(event) {
+                const rect = this.renderer.domElement.getBoundingClientRect();
+                this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+                
+                this.raycaster.setFromCamera(this.mouse, this.camera);
+                const intersects = this.raycaster.intersectObjects(this.objects);
+                
+                if (intersects.length > 0) {
+                    this.selectObject(intersects[0].object);
+                } else {
+                    this.deselectObject();
+                }
+            }
+            
+            checkIntersections() {
+                this.raycaster.setFromCamera(this.mouse, this.camera);
+                const intersects = this.raycaster.intersectObjects(this.objects);
+                
+                const intersectedObject = intersects.length > 0 ? intersects[0].object : null;
+                
+                if (intersectedObject !== this.hoveredObject) {
+                    if (this.hoveredObject) {
+                        this.unhoverObject(this.hoveredObject);
+                    }
+                    
+                    if (intersectedObject) {
+                        this.hoverObject(intersectedObject);
+                    }
+                    
+                    this.hoveredObject = intersectedObject;
+                }
+            }
+            
+            hoverObject(object) {
+                if (object === this.selectedObject) return;
+                
+                object.scale.setScalar(1.15);
+                object.material.emissiveIntensity = 0.25;
+                this.renderer.domElement.style.cursor = 'pointer';
+                
+                console.log(`🎯 Hover: ${object.userData.name}`);
+            }
+            
+            unhoverObject(object) {
+                if (object === this.selectedObject) return;
+                
+                object.scale.setScalar(1.0);
+                object.material.emissiveIntensity = 0.1;
+                this.renderer.domElement.style.cursor = 'default';
+            }
+            
+            selectObject(object) {
+                if (this.selectedObject) {
+                    this.deselectObject();
+                }
+                
+                this.selectedObject = object;
+                object.scale.setScalar(1.4);
+                object.material.emissiveIntensity = 0.4;
+                
+                // Update UI
+                this.updateTrackInfo(object.userData);
+                
+                // Animate camera
+                this.animateCameraToObject(object);
+                
+                console.log(`🎵 Selected: ${object.userData.name}`);
+            }
+            
+            deselectObject() {
+                if (!this.selectedObject) return;
+                
+                this.selectedObject.scale.setScalar(1.0);
+                this.selectedObject.material.emissiveIntensity = 0.1;
+                this.selectedObject = null;
+                
+                // Hide UI
+                this.hideTrackInfo();
+                
+                // Reset camera
+                this.resetCamera();
+                
+                console.log('🎵 Deselected');
+            }
+            
+            updateTrackInfo(trackData) {
+                const trackInfo = document.getElementById('track-info');
+                const title = document.getElementById('track-title');
+                const artist = document.getElementById('track-artist');
+                const album = document.getElementById('track-album');
+                
+                title.textContent = trackData.name;
+                artist.textContent = `Исполнитель: ${trackData.artist}`;
+                album.textContent = `Альбом: ${trackData.album}`;
+                
+                // Add details
+                let details = trackInfo.querySelector('.track-details');
+                if (!details) {
+                    details = document.createElement('div');
+                    details.className = 'track-details';
+                    trackInfo.appendChild(details);
+                }
+                
+                details.innerHTML = `
+                    <div><strong>Жанр:</strong> ${trackData.genre}</div>
+                    <div><strong>Длительность:</strong> ${trackData.duration}</div>
+                    <div><strong>Популярность:</strong> ${trackData.popularity}/100</div>
+                `;
+                
+                trackInfo.style.display = 'block';
+                trackInfo.style.opacity = '0';
+                trackInfo.style.transform = 'translateY(-10px)';
+                trackInfo.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                
+                setTimeout(() => {
+                    trackInfo.style.opacity = '1';
+                    trackInfo.style.transform = 'translateY(0)';
+                }, 50);
+            }
+            
+            hideTrackInfo() {
+                const trackInfo = document.getElementById('track-info');
+                trackInfo.style.opacity = '0';
+                trackInfo.style.transform = 'translateY(-10px)';
+                
+                setTimeout(() => {
+                    trackInfo.style.display = 'none';
+                }, 300);
+            }
+            
+            animateCameraToObject(object) {
+                const targetPosition = object.position.clone();
+                targetPosition.add(new THREE.Vector3(0, 0, 15));
+                
+                this.controls.target.copy(object.position);
+                this.controls.update();
+            }
+            
+            resetCamera() {
+                this.controls.target.set(0, 0, 0);
+                this.controls.reset();
+            }
+            
+            animate() {
+                requestAnimationFrame(this.animate.bind(this));
+                
+                // Rotate objects
+                this.objects.forEach((obj, i) => {
+                    obj.rotation.x += 0.01;
+                    obj.rotation.y += 0.01;
+                });
+                
+                this.controls.update();
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        // Initialize test
+        document.addEventListener('DOMContentLoaded', () => {
+            new SimpleInteractivityTest();
+        });
+    </script>
+</body>
+</html>

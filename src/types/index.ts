@@ -110,6 +110,8 @@ export interface SceneManager {
   getRenderer(): THREE.WebGLRenderer;
   getAnimationManager(): AnimationManager;
   getTrackObjects(): TrackObject[];
+  getTestObject(): THREE.Mesh | undefined;
+  getInteractionManager(): InteractionManager;
 }
 
 // Интерфейсы для взаимодействия

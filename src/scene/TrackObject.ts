@@ -193,12 +193,29 @@ export class TrackObject extends THREE.Mesh implements ITrackObject {
     
     if (hovered) {
       // Увеличиваем свечение при наведении
-      material.emissiveIntensity = this.originalEmissiveIntensity * 2;
-      this.scale.setScalar(1.1);
-    } else {
-      // Возвращаем к исходному состоянию
+      material.emissiveIntensity = this.originalEmissiveIntensity * 2.5;
+      
+      // Плавное увеличение размера
+      this.scale.setScalar(1.15);
+      
+      // Добавляем легкое свечение границ
+      material.transparent = true;
+      material.opacity = 0.9;
+      
+      // Увеличиваем металличность для более яркого эффекта
+      material.metalness = Math.min(1.0, material.metalness + 0.2);
+      
+    } else if (!this.isSelected) {
+      // Возвращаем к исходному состоянию только если объект не выбран
       material.emissiveIntensity = this.originalEmissiveIntensity;
       this.scale.copy(this.originalScale);
+      
+      // Убираем прозрачность для производительности
+      material.transparent = false;
+      material.opacity = 1.0;
+      
+      // Возвращаем исходную металличность
+      material.metalness = Math.max(0.0, material.metalness - 0.2);
     }
   }
 
@@ -213,15 +230,34 @@ export class TrackObject extends THREE.Mesh implements ITrackObject {
     
     if (selected) {
       // Эффекты для выбранного объекта
-      material.emissiveIntensity = this.originalEmissiveIntensity * 3;
-      this.scale.setScalar(1.3);
+      material.emissiveIntensity = this.originalEmissiveIntensity * 4;
+      this.scale.setScalar(1.4);
+      
+      // Добавляем яркое свечение для выбранного объекта
+      material.transparent = true;
+      material.opacity = 0.95;
+      
+      // Увеличиваем металличность для более драматичного эффекта
+      material.metalness = Math.min(1.0, material.metalness + 0.3);
+      
+      // Уменьшаем шероховатость для более яркого отражения
+      material.roughness = Math.max(0.0, material.roughness - 0.2);
       
       // Добавляем пульсацию
       this.userData.pulsePhase = 0;
+      
     } else {
       // Возвращаем к исходному состоянию
       material.emissiveIntensity = this.originalEmissiveIntensity;
       this.scale.copy(this.originalScale);
+      
+      // Убираем прозрачность
+      material.transparent = false;
+      material.opacity = 1.0;
+      
+      // Возвращаем исходные значения материала
+      material.metalness = Math.max(0.0, material.metalness - 0.3);
+      material.roughness = Math.min(1.0, material.roughness + 0.2);
       
       // Возвращаем к исходной позиции
       this.position.copy(this.originalPosition);
