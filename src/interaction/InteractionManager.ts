@@ -220,39 +220,65 @@ export class InteractionManager implements IInteractionManager {
     
     const camera = this.sceneManager.getCamera();
     
-    // Настройка raycaster с оптимизированными параметрами
+    // Настройка raycaster
     this.raycaster.setFromCamera(this.mouse, camera);
     
-    // Получаем объекты треков напрямую из SceneManager для лучшей производительности
-    const trackObjects = this.sceneManager.getTrackObjects();
+    // Получаем все объекты сцены для raycasting
+    const allObjects: THREE.Object3D[] = [];
     
-    // Получение тестового объекта
+    // Добавляем тестовый объект если есть
     const testObject = this.sceneManager.getTestObject();
-    
-    // Создаем массив всех интерактивных объектов
-    const interactiveObjects: THREE.Object3D[] = [...trackObjects];
     if (testObject) {
-      interactiveObjects.push(testObject);
+      allObjects.push(testObject);
     }
     
-    // Проверка пересечений с оптимизацией
-    if (interactiveObjects.length > 0) {
-      // Сортируем объекты по расстоянию до камеры для оптимизации
-      const sortedObjects = interactiveObjects.sort((a, b) => {
-        const distA = a.position.distanceTo(camera.position);
-        const distB = b.position.distanceTo(camera.position);
-        return distA - distB;
-      });
+    // Получаем все меши из сцены (включая InstancedMesh)
+    this.sceneManager.getScene().traverse((child) => {
+      if (child instanceof THREE.Mesh || child instanceof THREE.InstancedMesh) {
+        allObjects.push(child);
+      }
+    });
+    
+    // Проверяем пересечения
+    const intersects = this.raycaster.intersectObjects(allObjects);
+    
+    if (intersects.length > 0) {
+      const intersectedObject = intersects[0].object;
       
-      // Проверяем пересечения только с ближайшими объектами
-      const maxObjectsToCheck = Math.min(50, sortedObjects.length); // Ограничиваем количество проверяемых объектов
-      const nearObjects = sortedObjects.slice(0, maxObjectsToCheck);
+      // Если это тестовый объект, возвращаем его как TrackObject
+      if (intersectedObject.userData?.isTestObject) {
+        return intersectedObject as any as TrackObject;
+      }
       
-      const intersects = this.raycaster.intersectObjects(nearObjects);
+      // Если это InstancedMesh, находим соответствующий трек
+      if (intersectedObject instanceof THREE.InstancedMesh) {
+        const instanceId = intersects[0].instanceId;
+        if (instanceId !== undefined) {
+          // Получаем трек напрямую через instanceId
+          const groupKey = intersectedObject.userData?.groupKey;
+          if (groupKey) {
+            const performanceOptimizer = this.sceneManager.getPerformanceOptimizer();
+            const instancedRenderingManager = performanceOptimizer.getInstancedRenderingManager();
+            
+            if (instancedRenderingManager) {
+              const track = instancedRenderingManager.getTrackByInstanceId(groupKey, instanceId);
+              if (track) {
+                // Находим соответствующий TrackObject
+                const trackObjects = this.sceneManager.getTrackObjects();
+                const trackObject = trackObjects.find(obj => obj.trackData?.id === track.id);
+                return trackObject || null;
+              }
+            }
+          }
+        }
+      }
       
-      if (intersects.length > 0) {
-        // Возвращаем ближайший пересекаемый объект
-        return intersects[0].object as TrackObject;
+      // Если это обычный меш с userData о треке
+      if (intersectedObject.userData?.isTrackObject) {
+        const trackId = intersectedObject.userData.trackId;
+        const trackObjects = this.sceneManager.getTrackObjects();
+        const trackObject = trackObjects.find(obj => obj.trackData?.id === trackId);
+        return trackObject || null;
       }
     }
     

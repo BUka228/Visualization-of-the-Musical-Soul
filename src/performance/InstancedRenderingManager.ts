@@ -234,19 +234,18 @@ export class InstancedRenderingManager {
         group.mesh.getMatrixAt(i, matrix);
         matrix.decompose(position, new THREE.Quaternion(), scale);
         
-        // Обновляем вращение
+        // Обновляем только вращение, позицию оставляем неизменной
         rotation.setFromQuaternion(new THREE.Quaternion().setFromRotationMatrix(matrix));
         rotation.x += deltaTime * 0.001;
         rotation.y += deltaTime * 0.001;
         rotation.z += deltaTime * 0.001;
         
-        // Орбитальное движение
-        const radius = track.position.length();
-        const angle = globalTime * 0.0001 + track.id.charCodeAt(0) * 0.01;
+        // Сохраняем исходную позицию трека (не перезаписываем орбитальным движением)
+        position.copy(track.position);
         
-        position.x = Math.cos(angle) * radius;
-        position.z = Math.sin(angle) * radius;
-        // Y остается неизменным
+        // Добавляем небольшое плавающее движение для живости
+        const floatOffset = Math.sin(globalTime * 0.001 + track.id.charCodeAt(0) * 0.1) * 0.2;
+        position.y += floatOffset;
         
         // Обновляем матрицу
         matrix.compose(position, new THREE.Quaternion().setFromEuler(rotation), scale);
@@ -313,6 +312,17 @@ export class InstancedRenderingManager {
     });
     
     return tracksInRadius;
+  }
+
+  /**
+   * Получает трек по groupKey и instanceId
+   */
+  public getTrackByInstanceId(groupKey: string, instanceId: number): ProcessedTrack | null {
+    const group = this.instanceGroups.get(groupKey);
+    if (group && instanceId >= 0 && instanceId < group.tracks.length) {
+      return group.tracks[instanceId];
+    }
+    return null;
   }
 
   /**

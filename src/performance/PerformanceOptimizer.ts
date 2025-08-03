@@ -397,6 +397,13 @@ export class PerformanceOptimizer {
   }
 
   /**
+   * Получает менеджер инстансированного рендеринга
+   */
+  public getInstancedRenderingManager(): InstancedRenderingManager {
+    return this.instancedRenderingManager;
+  }
+
+  /**
    * Устанавливает коллбэк для предупреждений
    */
   public setOnWarning(callback: (warning: PerformanceWarning) => void): void {

@@ -6,6 +6,8 @@ import { EffectsManager } from '../effects/EffectsManager';
 import { TrackObject } from './TrackObject';
 import { PerformanceOptimizer } from '../performance/PerformanceOptimizer';
 import { PerformanceWarning } from '../performance/PerformanceMonitor';
+import { SoulGalaxyRenderer } from '../soul-galaxy/core/SoulGalaxyRenderer';
+import { VisualMode } from '../soul-galaxy/types';
 
 export class SceneManager implements ISceneManager {
   private scene: THREE.Scene;
@@ -36,6 +38,10 @@ export class SceneManager implements ISceneManager {
   // Оптимизатор производительности
   private performanceOptimizer: PerformanceOptimizer;
 
+  // Soul Galaxy система
+  private soulGalaxyRenderer: SoulGalaxyRenderer;
+  private currentVisualMode: VisualMode = VisualMode.CLASSIC;
+
   constructor(container: HTMLElement, config: SceneConfig) {
     this.container = container;
     this.config = config;
@@ -60,6 +66,9 @@ export class SceneManager implements ISceneManager {
     
     // Инициализация оптимизатора производительности
     this.performanceOptimizer = new PerformanceOptimizer(this.scene, this.camera, this.renderer);
+    
+    // Инициализация Soul Galaxy рендерера
+    this.soulGalaxyRenderer = new SoulGalaxyRenderer();
   }
 
   initializeScene(): void {
@@ -88,6 +97,9 @@ export class SceneManager implements ISceneManager {
     
     // Инициализация менеджера эффектов
     this.effectsManager.initialize(this.scene, this.camera, this.interactionManager.getAudioManager());
+    
+    // Инициализация Soul Galaxy рендерера
+    this.soulGalaxyRenderer.initialize(this.scene, this.camera);
     
     // Запуск цикла рендеринга
     this.startRenderLoop();
@@ -326,10 +338,16 @@ export class SceneManager implements ISceneManager {
     
     // Обновляем оптимизацию производительности
     this.performanceOptimizer.update(16); // ~60 FPS
+    
+    // Обновляем Soul Galaxy рендерер
+    this.soulGalaxyRenderer.updateScene(16); // ~60 FPS
   }
 
   dispose(): void {
     console.log('Освобождение ресурсов SceneManager...');
+    
+    // Освобождение ресурсов Soul Galaxy рендерера
+    this.soulGalaxyRenderer.dispose();
     
     // Освобождение ресурсов оптимизатора производительности
     this.performanceOptimizer.dispose();
@@ -405,5 +423,28 @@ export class SceneManager implements ISceneManager {
 
   getPerformanceOptimizer(): PerformanceOptimizer {
     return this.performanceOptimizer;
+  }
+
+  // Visual mode switching methods
+  setVisualMode(mode: string): void {
+    const visualMode = mode as VisualMode;
+    console.log(`🔄 Switching visual mode to: ${visualMode}`);
+    
+    this.currentVisualMode = visualMode;
+    this.soulGalaxyRenderer.setVisualMode(visualMode);
+    
+    // If switching to Soul Galaxy mode and we have tracks, create crystal cluster
+    if (visualMode === VisualMode.SOUL_GALAXY && this.trackObjects.length > 0) {
+      const tracks = this.trackObjects.map(obj => obj.trackData);
+      this.soulGalaxyRenderer.createCrystalCluster(tracks);
+    }
+  }
+
+  getCurrentMode(): string {
+    return this.currentVisualMode;
+  }
+
+  getSoulGalaxyRenderer(): SoulGalaxyRenderer {
+    return this.soulGalaxyRenderer;
   }
 }

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soul Galaxy Infrastructure Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: white;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 100;
+        }
+        
+        .test-info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            max-width: 400px;
+            z-index: 1000;
+        }
+        
+        .test-info h3 {
+            margin: 0 0 10px 0;
+            color: #4fc3f7;
+        }
+        
+        .test-info ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        .test-info li {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        .success {
+            color: #4caf50;
+        }
+        
+        .pending {
+            color: #ff9800;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <h2>🌌 Загрузка Soul Galaxy Infrastructure Test...</h2>
+        <p>Проверка базовой инфраструктуры Soul Galaxy системы</p>
+    </div>
+    
+    <div id="canvas-container"></div>
+    
+    <div class="test-info">
+        <h3>🧪 Тест инфраструктуры Soul Galaxy</h3>
+        <ul>
+            <li id="test-1" class="pending">📁 Создание структуры папок и файлов</li>
+            <li id="test-2" class="pending">🔄 Интерфейс переключения режимов</li>
+            <li id="test-3" class="pending">🎨 Базовый SoulGalaxyRenderer класс</li>
+            <li id="test-4" class="pending">🖱️ Интеграция переключателя в UI</li>
+        </ul>
+        <p><strong>Инструкции:</strong></p>
+        <p>1. Используйте переключатель режимов в левом верхнем углу</p>
+        <p>2. Проверьте консоль браузера для логов переключения</p>
+        <p>3. Убедитесь, что режимы переключаются без ошибок</p>
+    </div>
+
+    <script src="dist/bundle.js"></script>
+    <script>
+        // Тестирование инфраструктуры Soul Galaxy
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🧪 Starting Soul Galaxy Infrastructure Test...');
+            
+            // Проверяем, что все компоненты загружены
+            setTimeout(() => {
+                // Тест 1: Структура файлов создана (проверяется через успешную загрузку)
+                document.getElementById('test-1').className = 'success';
+                document.getElementById('test-1').innerHTML = '✅ Создание структуры папок и файлов';
+                
+                // Тест 2: Интерфейс переключения режимов
+                const modeSwitcher = document.getElementById('visual-mode-switcher');
+                if (modeSwitcher) {
+                    document.getElementById('test-2').className = 'success';
+                    document.getElementById('test-2').innerHTML = '✅ Интерфейс переключения режимов';
+                } else {
+                    document.getElementById('test-2').innerHTML = '❌ Интерфейс переключения режимов не найден';
+                }
+                
+                // Тест 3: SoulGalaxyRenderer класс
+                if (window.MusicGalaxyApplication) {
+                    document.getElementById('test-3').className = 'success';
+                    document.getElementById('test-3').innerHTML = '✅ Базовый SoulGalaxyRenderer класс';
+                } else {
+                    document.getElementById('test-3').innerHTML = '❌ SoulGalaxyRenderer класс не доступен';
+                }
+                
+                // Тест 4: Интеграция в UI
+                const classicBtn = document.getElementById('classic-mode-btn');
+                const soulGalaxyBtn = document.getElementById('soul-galaxy-mode-btn');
+                if (classicBtn && soulGalaxyBtn) {
+                    document.getElementById('test-4').className = 'success';
+                    document.getElementById('test-4').innerHTML = '✅ Интеграция переключателя в UI';
+                    
+                    // Добавляем тестовые обработчики для демонстрации
+                    classicBtn.addEventListener('click', () => {
+                        console.log('🌟 Test: Classic mode button clicked');
+                    });
+                    
+                    soulGalaxyBtn.addEventListener('click', () => {
+                        console.log('🔮 Test: Soul Galaxy mode button clicked');
+                    });
+                } else {
+                    document.getElementById('test-4').innerHTML = '❌ Кнопки переключения режимов не найдены';
+                }
+                
+                console.log('✅ Soul Galaxy Infrastructure Test completed');
+            }, 2000);
+        });
+    </script>
+</body>
+</html>

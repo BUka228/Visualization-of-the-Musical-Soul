@@ -114,6 +114,8 @@ export interface SceneManager {
   getInteractionManager(): InteractionManager;
   getEffectsManager(): EffectsManager;
   getPerformanceOptimizer(): any; // PerformanceOptimizer type will be imported separately
+  setVisualMode(mode: string): void;
+  getCurrentMode(): string;
 }
 
 // Интерфейсы для взаимодействия
