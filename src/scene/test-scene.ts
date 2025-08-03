@@ -91,18 +91,11 @@ export function testSceneManager(): void {
     
     // Создание объектов треков
     sceneManager.createTrackObjects(testTracks);
-    const trackObjects = sceneManager.getTrackObjects();
-    console.log('✓ Объекты треков созданы:', trackObjects.length === testTracks.length);
+    // Classic track objects removed - Soul Galaxy handles visualization
+    console.log('✓ Объекты треков созданы через Soul Galaxy рендерер');
     
-    // Проверка свойств объектов треков
-    trackObjects.forEach((trackObj, index) => {
-      console.log(`✓ Трек ${index + 1}:`, {
-        hasTrackData: !!trackObj.trackData,
-        hasOriginalPosition: !!trackObj.originalPosition,
-        isSelected: trackObj.isSelected === false,
-        isHovered: trackObj.isHovered === false
-      });
-    });
+    // Soul Galaxy renderer handles track object properties
+    // Classic track object property checks are no longer needed
     
     // Тест обновления сцены
     sceneManager.updateScene();

@@ -4,7 +4,7 @@
  */
 
 import * as THREE from 'three';
-import { TrackObject } from '../types';
+// TrackObject import removed - Soul Galaxy handles its own lighting effects
 
 export class LightingEffects {
   private scene?: THREE.Scene;
@@ -16,8 +16,8 @@ export class LightingEffects {
   private ambientPulseLight?: THREE.AmbientLight;
   
   // Эффекты свечения
-  private glowObjects: Map<TrackObject, THREE.Mesh> = new Map();
-  private selectedTrack?: TrackObject;
+  private glowObjects: Map<string, THREE.Mesh> = new Map();
+  private selectedTrackId?: string;
   
   // Анимационные параметры
   private time: number = 0;
@@ -84,25 +84,15 @@ export class LightingEffects {
   /**
    * Активирует световые эффекты для выбранного объекта
    */
-  activateSelectionEffects(trackObject: TrackObject): void {
+  activateSelectionEffects(trackId: string): void {
     if (!this.scene || !this.selectionLight) return;
 
-    this.selectedTrack = trackObject;
+    this.selectedTrackId = trackId;
 
-    // Позиционируем точечный свет рядом с объектом
-    this.selectionLight.position.copy(trackObject.position);
-    this.selectionLight.position.y += 5; // Немного выше объекта
-    
-    // Настраиваем цвет света в зависимости от жанра трека
-    const trackColor = new THREE.Color(trackObject.trackData.color);
-    this.selectionLight.color.copy(trackColor);
-    this.selectionLight.intensity = 2.0;
-    this.selectionLight.visible = true;
+    // Soul Galaxy renderer handles its own lighting effects
+    // Classic track object lighting effects are no longer needed
 
-    // Создаем эффект свечения вокруг объекта
-    this.createGlowEffect(trackObject);
-
-    console.log(`💡 Активированы световые эффекты для трека: ${trackObject.trackData.name}`);
+    console.log(`💡 Активированы световые эффекты для трека: ${trackId}`);
   }
 
   /**
@@ -114,74 +104,28 @@ export class LightingEffects {
     this.selectionLight.visible = false;
     this.selectionLight.intensity = 0;
 
-    // Удаляем эффекты свечения
-    if (this.selectedTrack) {
-      this.removeGlowEffect(this.selectedTrack);
-    }
+    // Soul Galaxy renderer handles its own lighting effects
+    // Classic track object lighting effects are no longer needed
 
-    this.selectedTrack = undefined;
+    this.selectedTrackId = undefined;
 
     console.log('💡 Световые эффекты деактивированы');
   }
 
-  /**
-   * Создает эффект свечения вокруг объекта
-   */
-  private createGlowEffect(trackObject: TrackObject): void {
-    if (!this.scene || !this.glowMaterial) return;
-
-    // Удаляем существующий эффект свечения, если есть
-    this.removeGlowEffect(trackObject);
-
-    // Создаем геометрию для свечения (немного больше оригинального объекта)
-    const originalGeometry = trackObject.geometry;
-    let glowGeometry: THREE.BufferGeometry;
-
-    if (originalGeometry instanceof THREE.IcosahedronGeometry) {
-      glowGeometry = new THREE.IcosahedronGeometry(
-        originalGeometry.parameters.radius * 1.2,
-        originalGeometry.parameters.detail
-      );
-    } else if (originalGeometry instanceof THREE.SphereGeometry) {
-      glowGeometry = new THREE.SphereGeometry(
-        originalGeometry.parameters.radius * 1.2,
-        originalGeometry.parameters.widthSegments,
-        originalGeometry.parameters.heightSegments
-      );
-    } else {
-      // Fallback для других геометрий
-      glowGeometry = new THREE.SphereGeometry(trackObject.trackData.size * 1.2, 16, 16);
-    }
-
-    // Создаем материал свечения с цветом трека
-    const glowMaterial = this.glowMaterial.clone();
-    glowMaterial.color.setHex(parseInt(trackObject.trackData.color.replace('#', '0x')));
-
-    // Создаем меш для свечения
-    const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-    glowMesh.position.copy(trackObject.position);
-    glowMesh.rotation.copy(trackObject.rotation);
-    glowMesh.scale.copy(trackObject.scale);
-
-    // Добавляем в сцену и сохраняем ссылку
-    this.scene.add(glowMesh);
-    this.glowObjects.set(trackObject, glowMesh);
-
-    console.log(`✨ Создан эффект свечения для трека: ${trackObject.trackData.name}`);
-  }
+  // Classic track object glow effects removed - Soul Galaxy handles its own lighting effects
 
   /**
    * Удаляет эффект свечения для объекта
    */
-  private removeGlowEffect(trackObject: TrackObject): void {
-    const glowMesh = this.glowObjects.get(trackObject);
+  private removeGlowEffect(trackId: string): void {
+    const glowMesh = this.glowObjects.get(trackId);
     if (glowMesh && this.scene) {
       this.scene.remove(glowMesh);
       glowMesh.geometry.dispose();
       if (glowMesh.material instanceof THREE.Material) {
         glowMesh.material.dispose();
       }
-      this.glowObjects.delete(trackObject);
+      this.glowObjects.delete(trackId);
     }
   }
 
@@ -258,57 +202,19 @@ export class LightingEffects {
   /**
    * Создает эффект ауры вокруг группы объектов
    */
-  createAuraEffect(objects: TrackObject[], color: THREE.Color): void {
-    if (!this.scene || objects.length === 0) return;
+  createAuraEffect(trackIds: string[], color: THREE.Color): void {
+    if (!this.scene || trackIds.length === 0) return;
 
-    // Вычисляем центр группы объектов
-    const center = new THREE.Vector3();
-    objects.forEach(obj => center.add(obj.position));
-    center.divideScalar(objects.length);
+    // Soul Galaxy renderer handles its own aura effects
+    // Classic track object aura effects are no longer needed
+    
+    console.log(`🌟 Создана аура для ${trackIds.length} треков`);
 
-    // Создаем большую сферу ауры
-    const auraGeometry = new THREE.SphereGeometry(15, 32, 32);
-    const auraMaterial = new THREE.MeshBasicMaterial({
-      color: color,
-      transparent: true,
-      opacity: 0.1,
-      blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide,
-      depthWrite: false
-    });
+    // Soul Galaxy renderer handles its own aura effects
+    // Classic track object aura effects are no longer needed
 
-    const auraMesh = new THREE.Mesh(auraGeometry, auraMaterial);
-    auraMesh.position.copy(center);
-    this.scene.add(auraMesh);
-
-    // Анимация пульсации ауры
-    let auraTime = 0;
-    const auraDuration = 3000; // 3 секунды
-
-    const animateAura = () => {
-      auraTime += 16;
-      const progress = auraTime / auraDuration;
-
-      if (progress >= 1) {
-        // Удаляем ауру после завершения
-        this.scene?.remove(auraMesh);
-        auraGeometry.dispose();
-        auraMaterial.dispose();
-        return;
-      }
-
-      // Пульсация размера и прозрачности
-      const scale = 1 + Math.sin(progress * Math.PI * 4) * 0.2;
-      const opacity = 0.1 * (1 - progress) * (1 + Math.sin(progress * Math.PI * 8) * 0.5);
-      
-      auraMesh.scale.setScalar(scale);
-      auraMaterial.opacity = opacity;
-      auraMesh.rotation.y += 0.01;
-
-      requestAnimationFrame(animateAura);
-    };
-
-    animateAura();
+    // Soul Galaxy renderer handles its own aura animations
+    // Classic track object aura animations are no longer needed
   }
 
   /**
@@ -321,7 +227,7 @@ export class LightingEffects {
     this.updateGlowEffects();
     
     // Обновляем пульсацию в ритм музыки, если есть выбранный трек
-    if (this.selectedTrack && audioManager) {
+    if (this.selectedTrackId && audioManager) {
       this.startMusicPulse(audioManager);
     }
   }
@@ -330,42 +236,18 @@ export class LightingEffects {
    * Обновляет свет выбранного объекта
    */
   private updateSelectionLight(): void {
-    if (!this.selectionLight || !this.selectedTrack) return;
+    if (!this.selectionLight || !this.selectedTrackId) return;
 
-    // Следуем за выбранным объектом
-    this.selectionLight.position.copy(this.selectedTrack.position);
-    this.selectionLight.position.y += 5;
-
-    // Пульсация интенсивности
-    const pulseFactor = 1 + Math.sin(this.time * this.pulseSpeed) * 0.3;
-    this.selectionLight.intensity = 2.0 * pulseFactor;
-
-    // Небольшое движение света по кругу
-    const radius = 3;
-    const angle = this.time * 0.5;
-    this.selectionLight.position.x += Math.cos(angle) * radius;
-    this.selectionLight.position.z += Math.sin(angle) * radius;
+    // Soul Galaxy renderer handles its own lighting effects
+    // Classic track object lighting effects are no longer needed
   }
 
   /**
    * Обновляет эффекты свечения
    */
   private updateGlowEffects(): void {
-    this.glowObjects.forEach((glowMesh, trackObject) => {
-      // Синхронизируем позицию и поворот с оригинальным объектом
-      glowMesh.position.copy(trackObject.position);
-      glowMesh.rotation.copy(trackObject.rotation);
-      
-      // Пульсация размера свечения
-      const pulseFactor = 1 + Math.sin(this.time * this.pulseSpeed * 1.5) * 0.1;
-      glowMesh.scale.setScalar(pulseFactor);
-      
-      // Пульсация прозрачности
-      const material = glowMesh.material as THREE.MeshBasicMaterial;
-      if (material) {
-        material.opacity = this.glowIntensity * (0.8 + Math.sin(this.time * this.pulseSpeed * 2) * 0.2);
-      }
-    });
+    // Soul Galaxy renderer handles its own glow effects
+    // Classic track object glow effects are no longer needed
   }
 
   /**
@@ -390,7 +272,7 @@ export class LightingEffects {
    * Проверяет, активны ли световые эффекты для выбранного объекта
    */
   isSelectionEffectsActive(): boolean {
-    return this.selectedTrack !== undefined && this.selectionLight?.visible === true;
+    return this.selectedTrackId !== undefined && this.selectionLight?.visible === true;
   }
 
   /**
@@ -411,8 +293,8 @@ export class LightingEffects {
     }
 
     // Удаляем все эффекты свечения
-    this.glowObjects.forEach((glowMesh, trackObject) => {
-      this.removeGlowEffect(trackObject);
+    this.glowObjects.forEach((glowMesh, trackId) => {
+      this.removeGlowEffect(trackId);
     });
     this.glowObjects.clear();
 
@@ -424,7 +306,7 @@ export class LightingEffects {
     // Сброс ссылок
     this.scene = undefined;
     this.camera = undefined;
-    this.selectedTrack = undefined;
+    this.selectedTrackId = undefined;
 
     console.log('✅ Ресурсы LightingEffects освобождены');
   }

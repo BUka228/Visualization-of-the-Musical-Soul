@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deep Space Environment Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            z-index: 100;
+            max-width: 300px;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        
+        button {
+            background: #4fc3f7;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 5px;
+        }
+        
+        button:hover {
+            background: #29b6f6;
+        }
+        
+        #info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            max-width: 400px;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    
+    <div id="controls">
+        <h3>🌌 Deep Space Environment Test</h3>
+        
+        <div class="control-group">
+            <label for="intensity">Nebula Intensity: <span id="intensity-value">0.3</span></label>
+            <input type="range" id="intensity" min="0" max="1" step="0.1" value="0.3">
+        </div>
+        
+        <div class="control-group">
+            <label for="particles">Particle Count: <span id="particles-value">500</span></label>
+            <input type="range" id="particles" min="100" max="2000" step="100" value="500">
+        </div>
+        
+        <div class="control-group">
+            <label for="layers">Depth Layers: <span id="layers-value">3</span></label>
+            <input type="range" id="layers" min="1" max="5" step="1" value="3">
+        </div>
+        
+        <div class="control-group">
+            <button id="reset-camera">Reset Camera</button>
+            <button id="toggle-animation">Pause Animation</button>
+        </div>
+    </div>
+    
+    <div id="info">
+        <strong>Controls:</strong><br>
+        • Mouse: Look around<br>
+        • Mouse Wheel: Zoom in/out<br>
+        • WASD: Move camera<br>
+        • Space: Pause animation<br>
+        <br>
+        <strong>Features being tested:</strong><br>
+        ✓ Dark cosmic scene initialization<br>
+        ✓ Multi-layer nebula background<br>
+        ✓ Parallax particle system<br>
+        ✓ Dynamic intensity control<br>
+        ✓ Configurable particle count<br>
+        ✓ Adjustable depth layers
+    </div>
+
+    <script type="module">
+        import * as THREE from './node_modules/three/build/three.module.js';
+        import { OrbitControls } from './node_modules/three/examples/jsm/controls/OrbitControls.js';
+        
+        // Import our DeepSpaceEnvironment class
+        // Note: In a real build system, this would be handled by webpack
+        // For testing, we'll create a simplified version
+        
+        class DeepSpaceEnvironment {
+            constructor() {
+                this.scene = null;
+                this.camera = null;
+                this.initialized = false;
+                this.nebulaGroup = new THREE.Group();
+                this.config = {
+                    intensity: 0.3,
+                    colorPalette: [
+                        new THREE.Color(0x000033),
+                        new THREE.Color(0x001122),
+                        new THREE.Color(0x000011),
+                        new THREE.Color(0x110022)
+                    ],
+                    density: 0.5,
+                    driftSpeed: 0.001,
+                    turbulence: 0.1,
+                    layerCount: 3,
+                    layerSeparation: 20
+                };
+            }
+            
+            initialize(scene, camera) {
+                console.log('🌌 Initializing Deep Space Environment...');
+                
+                this.scene = scene;
+                this.camera = camera;
+                
+                this.setupDarkScene();
+                this.createNebulaBackground();
+                this.createParallaxParticles();
+                
+                this.scene.add(this.nebulaGroup);
+                
+                this.initialized = true;
+                console.log('✅ Deep Space Environment initialized');
+            }
+            
+            setupDarkScene() {
+                if (!this.scene) return;
+                
+                this.scene.background = new THREE.Color(0x000008);
+                this.scene.fog = new THREE.Fog(0x000011, 100, 300);
+                
+                console.log('🌑 Dark cosmic scene configured');
+            }
+            
+            createNebulaBackground() {
+                if (!this.scene) return;
+                
+                console.log('🌫️ Creating nebula background...');
+                
+                for (let i = 0; i < this.config.layerCount; i++) {
+                    const layer = this.createNebulaLayer(i);
+                    this.nebulaGroup.add(layer);
+                }
+                
+                console.log(`✅ Created ${this.config.layerCount} nebula layers`);
+            }
+            
+            createNebulaLayer(layerIndex) {
+                const geometry = new THREE.PlaneGeometry(200, 200, 32, 32);
+                
+                const material = new THREE.MeshBasicMaterial({
+                    color: this.config.colorPalette[layerIndex % this.config.colorPalette.length],
+                    transparent: true,
+                    opacity: this.config.intensity * (0.8 - layerIndex * 0.2),
+                    side: THREE.DoubleSide,
+                    blending: THREE.AdditiveBlending
+                });
+                
+                const nebulaMesh = new THREE.Mesh(geometry, material);
+                
+                const distance = 50 + layerIndex * this.config.layerSeparation;
+                nebulaMesh.position.z = -distance;
+                nebulaMesh.rotation.z = (layerIndex * Math.PI) / 4;
+                
+                nebulaMesh.userData = { 
+                    isNebulaLayer: true, 
+                    layerIndex,
+                    originalOpacity: material.opacity,
+                    driftSpeed: this.config.driftSpeed * (1 + layerIndex * 0.5)
+                };
+                
+                return nebulaMesh;
+            }
+            
+            createParallaxParticles() {
+                if (!this.scene) return;
+                
+                console.log('✨ Creating parallax particles...');
+                
+                const particleCount = Math.floor(1000 * this.config.density);
+                const positions = new Float32Array(particleCount * 3);
+                const colors = new Float32Array(particleCount * 3);
+                const sizes = new Float32Array(particleCount);
+                
+                for (let i = 0; i < particleCount; i++) {
+                    const i3 = i * 3;
+                    
+                    const radius = 100 + Math.random() * 200;
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.random() * Math.PI;
+                    
+                    positions[i3] = radius * Math.sin(phi) * Math.cos(theta);
+                    positions[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+                    positions[i3 + 2] = radius * Math.cos(phi);
+                    
+                    const colorIndex = Math.floor(Math.random() * this.config.colorPalette.length);
+                    const color = this.config.colorPalette[colorIndex];
+                    colors[i3] = color.r;
+                    colors[i3 + 1] = color.g;
+                    colors[i3 + 2] = color.b;
+                    
+                    sizes[i] = Math.random() * 2 + 0.5;
+                }
+                
+                this.particleGeometry = new THREE.BufferGeometry();
+                this.particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                this.particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                this.particleGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+                
+                this.particleMaterial = new THREE.PointsMaterial({
+                    size: 1,
+                    transparent: true,
+                    opacity: 0.6,
+                    vertexColors: true,
+                    blending: THREE.AdditiveBlending,
+                    sizeAttenuation: true
+                });
+                
+                this.particleSystem = new THREE.Points(this.particleGeometry, this.particleMaterial);
+                this.particleSystem.userData = { isParallaxParticles: true };
+                
+                this.nebulaGroup.add(this.particleSystem);
+                
+                console.log(`✅ Created ${particleCount} parallax particles`);
+            }
+            
+            updateParallax(cameraMovement) {
+                if (!this.initialized || !this.particleSystem) return;
+                
+                const parallaxFactor = 0.1;
+                
+                this.particleSystem.position.x -= cameraMovement.x * parallaxFactor;
+                this.particleSystem.position.y -= cameraMovement.y * parallaxFactor;
+                this.particleSystem.position.z -= cameraMovement.z * parallaxFactor * 0.5;
+                
+                this.nebulaGroup.children.forEach((child) => {
+                    if (child.userData.isNebulaLayer) {
+                        const layerParallax = 0.05 * (1 + child.userData.layerIndex * 0.2);
+                        child.position.x -= cameraMovement.x * layerParallax;
+                        child.position.y -= cameraMovement.y * layerParallax;
+                        child.rotation.z += child.userData.driftSpeed;
+                    }
+                });
+            }
+            
+            setNebulaIntensity(intensity) {
+                this.config.intensity = Math.max(0, Math.min(1, intensity));
+                
+                this.nebulaGroup.children.forEach((child) => {
+                    if (child.userData.isNebulaLayer && child instanceof THREE.Mesh) {
+                        const material = child.material;
+                        const layerIndex = child.userData.layerIndex;
+                        material.opacity = this.config.intensity * (0.8 - layerIndex * 0.2);
+                    }
+                });
+                
+                console.log(`🌫️ Nebula intensity set to ${intensity}`);
+            }
+            
+            setParticleCount(count) {
+                this.config.density = count / 1000;
+                
+                if (this.particleSystem) {
+                    this.nebulaGroup.remove(this.particleSystem);
+                    this.particleGeometry?.dispose();
+                    this.particleMaterial?.dispose();
+                }
+                
+                this.createParallaxParticles();
+                console.log(`✨ Particle count updated to ${count}`);
+            }
+            
+            setDepthLayers(layers) {
+                this.config.layerCount = Math.max(1, Math.min(5, layers));
+                
+                const nebulaLayers = this.nebulaGroup.children.filter(child => child.userData.isNebulaLayer);
+                nebulaLayers.forEach(layer => {
+                    this.nebulaGroup.remove(layer);
+                    if (layer instanceof THREE.Mesh) {
+                        layer.geometry.dispose();
+                        if (layer.material instanceof THREE.Material) {
+                            layer.material.dispose();
+                        }
+                    }
+                });
+                
+                this.createNebulaBackground();
+                console.log(`🌫️ Depth layers updated to ${layers}`);
+            }
+        }
+        
+        // Test setup
+        let scene, camera, renderer, controls, deepSpace;
+        let animationPaused = false;
+        let previousCameraPosition = new THREE.Vector3();
+        
+        function init() {
+            const container = document.getElementById('canvas-container');
+            
+            // Scene
+            scene = new THREE.Scene();
+            
+            // Camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 0, 50);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+            
+            // Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 200;
+            controls.minDistance = 10;
+            
+            // Initialize Deep Space Environment
+            deepSpace = new DeepSpaceEnvironment();
+            deepSpace.initialize(scene, camera);
+            
+            // Store initial camera position
+            previousCameraPosition.copy(camera.position);
+            
+            // Setup controls
+            setupControls();
+            
+            // Start animation
+            animate();
+            
+            console.log('🚀 Deep Space Environment test initialized');
+        }
+        
+        function setupControls() {
+            // Intensity control
+            const intensitySlider = document.getElementById('intensity');
+            const intensityValue = document.getElementById('intensity-value');
+            
+            intensitySlider.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                intensityValue.textContent = value.toFixed(1);
+                deepSpace.setNebulaIntensity(value);
+            });
+            
+            // Particle count control
+            const particlesSlider = document.getElementById('particles');
+            const particlesValue = document.getElementById('particles-value');
+            
+            particlesSlider.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                particlesValue.textContent = value;
+                deepSpace.setParticleCount(value);
+            });
+            
+            // Depth layers control
+            const layersSlider = document.getElementById('layers');
+            const layersValue = document.getElementById('layers-value');
+            
+            layersSlider.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                layersValue.textContent = value;
+                deepSpace.setDepthLayers(value);
+            });
+            
+            // Reset camera button
+            document.getElementById('reset-camera').addEventListener('click', () => {
+                camera.position.set(0, 0, 50);
+                controls.target.set(0, 0, 0);
+                controls.update();
+            });
+            
+            // Toggle animation button
+            const toggleBtn = document.getElementById('toggle-animation');
+            toggleBtn.addEventListener('click', () => {
+                animationPaused = !animationPaused;
+                toggleBtn.textContent = animationPaused ? 'Resume Animation' : 'Pause Animation';
+            });
+            
+            // Keyboard controls
+            document.addEventListener('keydown', (e) => {
+                switch (e.code) {
+                    case 'Space':
+                        e.preventDefault();
+                        toggleBtn.click();
+                        break;
+                }
+            });
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (!animationPaused) {
+                // Calculate camera movement for parallax
+                const currentCameraPosition = camera.position.clone();
+                const cameraMovement = currentCameraPosition.clone().sub(previousCameraPosition);
+                
+                // Update parallax effect
+                deepSpace.updateParallax(cameraMovement);
+                
+                // Store current position for next frame
+                previousCameraPosition.copy(currentCameraPosition);
+            }
+            
+            // Update controls
+            controls.update();
+            
+            // Render
+            renderer.render(scene, camera);
+        }
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // Initialize when page loads
+        init();
+    </script>
+</body>
+</html>

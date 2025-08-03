@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nebula System with Custom Shaders Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            z-index: 100;
+            max-width: 350px;
+            border: 1px solid #333;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #ccc;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        
+        button {
+            background: #4fc3f7;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+        
+        button:hover {
+            background: #29b6f6;
+        }
+        
+        #info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            max-width: 400px;
+            border: 1px solid #333;
+        }
+        
+        .value-display {
+            color: #4fc3f7;
+            font-weight: bold;
+        }
+        
+        h3 {
+            margin-top: 0;
+            color: #4fc3f7;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    
+    <div id="controls">
+        <h3>🌌 Nebula System Test</h3>
+        
+        <div class="control-group">
+            <label for="intensity">Nebula Intensity: <span id="intensity-value" class="value-display">0.3</span></label>
+            <input type="range" id="intensity" min="0" max="1" step="0.05" value="0.3">
+        </div>
+        
+        <div class="control-group">
+            <label for="drift-speed">Drift Speed: <span id="drift-speed-value" class="value-display">0.001</span></label>
+            <input type="range" id="drift-speed" min="0" max="0.01" step="0.0005" value="0.001">
+        </div>
+        
+        <div class="control-group">
+            <label for="turbulence">Turbulence: <span id="turbulence-value" class="value-display">0.1</span></label>
+            <input type="range" id="turbulence" min="0" max="0.5" step="0.01" value="0.1">
+        </div>
+        
+        <div class="control-group">
+            <label for="layers">Layer Count: <span id="layers-value" class="value-display">3</span></label>
+            <input type="range" id="layers" min="1" max="6" step="1" value="3">
+        </div>
+        
+        <div class="control-group">
+            <button id="reset-camera">Reset Camera</button>
+            <button id="toggle-animation">Pause Animation</button>
+        </div>
+        
+        <div class="control-group">
+            <button id="color-palette-1">Deep Space</button>
+            <button id="color-palette-2">Purple Haze</button>
+            <button id="color-palette-3">Teal Dream</button>
+        </div>
+    </div>
+    
+    <div id="info">
+        <strong>🌫️ Custom Shader Features:</strong><br>
+        ✓ Procedural noise generation<br>
+        ✓ Fractal Brownian Motion (FBM)<br>
+        ✓ Multi-layer depth rendering<br>
+        ✓ Animated drift and turbulence<br>
+        ✓ Dynamic color blending<br>
+        ✓ Smooth opacity falloff<br>
+        <br>
+        <strong>Controls:</strong><br>
+        • Mouse: Look around<br>
+        • Mouse Wheel: Zoom in/out<br>
+        • Space: Pause animation<br>
+        <br>
+        <strong>Shader Uniforms:</strong><br>
+        • time: Animated time value<br>
+        • intensity: Overall nebula brightness<br>
+        • driftSpeed: Animation speed<br>
+        • turbulence: Noise distortion<br>
+        • color1/2/3: Layer color palette
+    </div>
+
+    <script type="module">
+        import * as THREE from './node_modules/three/build/three.module.js';
+        import { OrbitControls } from './node_modules/three/examples/jsm/controls/OrbitControls.js';
+        
+        // Simplified NebulaShaderMaterial for testing
+        const nebulaVertexShader = `
+          varying vec2 vUv;
+          varying vec3 vPosition;
+          varying vec3 vNormal;
+          
+          void main() {
+            vUv = uv;
+            vPosition = position;
+            vNormal = normalize(normalMatrix * normal);
+            
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `;
+
+        const nebulaFragmentShader = `
+          uniform float time;
+          uniform float intensity;
+          uniform vec3 color1;
+          uniform vec3 color2;
+          uniform vec3 color3;
+          uniform float driftSpeed;
+          uniform float turbulence;
+          uniform float layerIndex;
+          
+          varying vec2 vUv;
+          varying vec3 vPosition;
+          varying vec3 vNormal;
+          
+          float random(vec2 st) {
+            return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+          }
+          
+          float noise(vec2 st) {
+            vec2 i = floor(st);
+            vec2 f = fract(st);
+            
+            float a = random(i);
+            float b = random(i + vec2(1.0, 0.0));
+            float c = random(i + vec2(0.0, 1.0));
+            float d = random(i + vec2(1.0, 1.0));
+            
+            vec2 u = f * f * (3.0 - 2.0 * f);
+            
+            return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+          }
+          
+          float fbm(vec2 st) {
+            float value = 0.0;
+            float amplitude = 0.5;
+            
+            for (int i = 0; i < 4; i++) {
+              value += amplitude * noise(st);
+              st *= 2.0;
+              amplitude *= 0.5;
+            }
+            return value;
+          }
+          
+          void main() {
+            vec2 st = vUv;
+            
+            vec2 driftOffset = vec2(
+              time * driftSpeed * 0.1,
+              time * driftSpeed * 0.05
+            );
+            
+            vec2 turbulentSt = st + driftOffset;
+            turbulentSt += vec2(
+              fbm(st * 2.0 + time * 0.01) * turbulence,
+              fbm(st * 2.0 + time * 0.015) * turbulence
+            );
+            
+            float noise1 = fbm(turbulentSt * 3.0);
+            float noise2 = fbm(turbulentSt * 6.0 + vec2(100.0));
+            float noise3 = fbm(turbulentSt * 12.0 + vec2(200.0));
+            
+            float combinedNoise = noise1 * 0.5 + noise2 * 0.3 + noise3 * 0.2;
+            
+            vec3 finalColor = mix(color1, color2, combinedNoise);
+            finalColor = mix(finalColor, color3, noise2);
+            
+            float layerVariation = sin(layerIndex * 2.0 + time * 0.1) * 0.1 + 0.9;
+            finalColor *= layerVariation;
+            
+            float distanceFromCenter = length(vUv - 0.5);
+            float opacity = intensity * (1.0 - smoothstep(0.2, 0.8, distanceFromCenter));
+            
+            opacity *= (0.5 + combinedNoise * 0.5);
+            opacity = max(opacity, intensity * 0.1);
+            
+            gl_FragColor = vec4(finalColor, opacity);
+          }
+        `;
+        
+        class NebulaShaderMaterial extends THREE.ShaderMaterial {
+            constructor(config = {}) {
+                const {
+                    intensity = 0.3,
+                    colors = [
+                        new THREE.Color(0x000033),
+                        new THREE.Color(0x001122),
+                        new THREE.Color(0x000011)
+                    ],
+                    driftSpeed = 0.001,
+                    turbulence = 0.1,
+                    layerIndex = 0
+                } = config;
+
+                super({
+                    vertexShader: nebulaVertexShader,
+                    fragmentShader: nebulaFragmentShader,
+                    uniforms: {
+                        time: { value: 0.0 },
+                        intensity: { value: intensity },
+                        color1: { value: colors[0] || new THREE.Color(0x000033) },
+                        color2: { value: colors[1] || new THREE.Color(0x001122) },
+                        color3: { value: colors[2] || new THREE.Color(0x000011) },
+                        driftSpeed: { value: driftSpeed },
+                        turbulence: { value: turbulence },
+                        layerIndex: { value: layerIndex }
+                    },
+                    transparent: true,
+                    side: THREE.DoubleSide,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+            }
+
+            updateTime(time) {
+                this.uniforms.time.value = time;
+            }
+
+            setIntensity(intensity) {
+                this.uniforms.intensity.value = Math.max(0, Math.min(1, intensity));
+            }
+
+            setColors(colors) {
+                if (colors.length >= 1) this.uniforms.color1.value = colors[0];
+                if (colors.length >= 2) this.uniforms.color2.value = colors[1];
+                if (colors.length >= 3) this.uniforms.color3.value = colors[2];
+            }
+
+            setDriftSpeed(speed) {
+                this.uniforms.driftSpeed.value = speed;
+            }
+
+            setTurbulence(turbulence) {
+                this.uniforms.turbulence.value = turbulence;
+            }
+
+            setLayerIndex(index) {
+                this.uniforms.layerIndex.value = index;
+            }
+        }
+        
+        class NebulaSystem {
+            constructor(config = {}) {
+                this.nebulaGroup = new THREE.Group();
+                this.clock = new THREE.Clock();
+                this.nebulaLayers = [];
+                this.nebulaMaterials = [];
+                
+                this.config = {
+                    intensity: 0.3,
+                    colorPalette: [
+                        new THREE.Color(0x000033),
+                        new THREE.Color(0x001122),
+                        new THREE.Color(0x000011),
+                        new THREE.Color(0x110022),
+                        new THREE.Color(0x001133)
+                    ],
+                    density: 0.5,
+                    driftSpeed: 0.001,
+                    turbulence: 0.1,
+                    layerCount: 3,
+                    layerSeparation: 25,
+                    ...config
+                };
+            }
+            
+            initialize(scene, camera) {
+                console.log('🌫️ Initializing Nebula System...');
+                
+                this.scene = scene;
+                this.camera = camera;
+                
+                this.createMultiLayerNebula();
+                this.scene.add(this.nebulaGroup);
+                
+                this.initialized = true;
+                console.log(`✅ Nebula System initialized with ${this.config.layerCount} layers`);
+            }
+            
+            createMultiLayerNebula() {
+                this.clearLayers();
+                
+                for (let i = 0; i < this.config.layerCount; i++) {
+                    const layer = this.createNebulaLayer(i);
+                    this.nebulaLayers.push(layer);
+                    this.nebulaGroup.add(layer);
+                }
+                
+                console.log(`🌌 Created ${this.config.layerCount} nebula layers with custom shaders`);
+            }
+            
+            createNebulaLayer(layerIndex) {
+                const size = 150 + layerIndex * 50;
+                const geometry = new THREE.PlaneGeometry(size, size, 64, 64);
+                
+                const positions = geometry.attributes.position.array;
+                for (let i = 0; i < positions.length; i += 3) {
+                    const x = positions[i];
+                    const y = positions[i + 1];
+                    
+                    const displacement = (Math.sin(x * 0.01) + Math.cos(y * 0.01)) * 2;
+                    positions[i + 2] += displacement;
+                }
+                geometry.attributes.position.needsUpdate = true;
+                geometry.computeVertexNormals();
+                
+                const colors = this.getLayerColors(layerIndex);
+                const material = new NebulaShaderMaterial({
+                    intensity: this.config.intensity * (1.0 - layerIndex * 0.15),
+                    colors: colors,
+                    driftSpeed: this.config.driftSpeed * (1 + layerIndex * 0.3),
+                    turbulence: this.config.turbulence * (1 + layerIndex * 0.2),
+                    layerIndex: layerIndex
+                });
+                
+                this.nebulaMaterials.push(material);
+                
+                const nebulaMesh = new THREE.Mesh(geometry, material);
+                
+                const distance = 60 + layerIndex * this.config.layerSeparation;
+                nebulaMesh.position.z = -distance;
+                
+                nebulaMesh.rotation.z = (layerIndex * Math.PI) / 6;
+                nebulaMesh.rotation.x = Math.sin(layerIndex) * 0.1;
+                nebulaMesh.rotation.y = Math.cos(layerIndex) * 0.1;
+                
+                nebulaMesh.userData = {
+                    isNebulaLayer: true,
+                    layerIndex: layerIndex,
+                    baseRotationSpeed: this.config.driftSpeed * (0.5 + layerIndex * 0.2),
+                    originalPosition: nebulaMesh.position.clone()
+                };
+                
+                return nebulaMesh;
+            }
+            
+            getLayerColors(layerIndex) {
+                const palette = this.config.colorPalette;
+                const colors = [];
+                
+                for (let i = 0; i < 3; i++) {
+                    const colorIndex = (layerIndex + i) % palette.length;
+                    colors.push(palette[colorIndex].clone());
+                }
+                
+                const brightness = 1.0 - layerIndex * 0.1;
+                colors.forEach(color => {
+                    color.multiplyScalar(brightness);
+                });
+                
+                return colors;
+            }
+            
+            update(deltaTime) {
+                if (!this.initialized) return;
+                
+                const elapsedTime = this.clock.getElapsedTime();
+                
+                this.nebulaMaterials.forEach(material => {
+                    material.updateTime(elapsedTime);
+                });
+                
+                this.nebulaLayers.forEach((layer, index) => {
+                    const userData = layer.userData;
+                    
+                    layer.rotation.z += userData.baseRotationSpeed * deltaTime;
+                    
+                    const driftAmount = 0.1;
+                    layer.position.x = userData.originalPosition.x + Math.sin(elapsedTime * 0.1 + index) * driftAmount;
+                    layer.position.y = userData.originalPosition.y + Math.cos(elapsedTime * 0.15 + index) * driftAmount;
+                });
+            }
+            
+            setIntensity(intensity) {
+                this.config.intensity = Math.max(0, Math.min(1, intensity));
+                
+                this.nebulaMaterials.forEach((material, index) => {
+                    const layerIntensity = this.config.intensity * (1.0 - index * 0.15);
+                    material.setIntensity(layerIntensity);
+                });
+            }
+            
+            setDriftSpeed(speed) {
+                this.config.driftSpeed = speed;
+                
+                this.nebulaMaterials.forEach((material, index) => {
+                    const layerSpeed = speed * (1 + index * 0.3);
+                    material.setDriftSpeed(layerSpeed);
+                });
+                
+                this.nebulaLayers.forEach((layer, index) => {
+                    layer.userData.baseRotationSpeed = speed * (0.5 + index * 0.2);
+                });
+            }
+            
+            setTurbulence(turbulence) {
+                this.config.turbulence = turbulence;
+                
+                this.nebulaMaterials.forEach((material, index) => {
+                    const layerTurbulence = turbulence * (1 + index * 0.2);
+                    material.setTurbulence(layerTurbulence);
+                });
+            }
+            
+            setLayerCount(count) {
+                this.config.layerCount = Math.max(1, Math.min(8, count));
+                this.createMultiLayerNebula();
+            }
+            
+            setColorPalette(colors) {
+                this.config.colorPalette = [...colors];
+                
+                this.nebulaMaterials.forEach((material, index) => {
+                    const layerColors = this.getLayerColors(index);
+                    material.setColors(layerColors);
+                });
+            }
+            
+            clearLayers() {
+                this.nebulaLayers.forEach(layer => {
+                    this.nebulaGroup.remove(layer);
+                    layer.geometry.dispose();
+                });
+                
+                this.nebulaMaterials.forEach(material => {
+                    material.dispose();
+                });
+                
+                this.nebulaLayers = [];
+                this.nebulaMaterials = [];
+            }
+        }
+        
+        // Test setup
+        let scene, camera, renderer, controls, nebulaSystem;
+        let animationPaused = false;
+        
+        function init() {
+            const container = document.getElementById('canvas-container');
+            
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000008);
+            scene.fog = new THREE.Fog(0x000011, 100, 300);
+            
+            // Camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 0, 80);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+            
+            // Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 300;
+            controls.minDistance = 20;
+            
+            // Initialize Nebula System
+            nebulaSystem = new NebulaSystem();
+            nebulaSystem.initialize(scene, camera);
+            
+            // Setup controls
+            setupControls();
+            
+            // Start animation
+            animate();
+            
+            console.log('🚀 Nebula System test initialized');
+        }
+        
+        function setupControls() {
+            // Intensity control
+            const intensitySlider = document.getElementById('intensity');
+            const intensityValue = document.getElementById('intensity-value');
+            
+            intensitySlider.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                intensityValue.textContent = value.toFixed(2);
+                nebulaSystem.setIntensity(value);
+            });
+            
+            // Drift speed control
+            const driftSpeedSlider = document.getElementById('drift-speed');
+            const driftSpeedValue = document.getElementById('drift-speed-value');
+            
+            driftSpeedSlider.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                driftSpeedValue.textContent = value.toFixed(4);
+                nebulaSystem.setDriftSpeed(value);
+            });
+            
+            // Turbulence control
+            const turbulenceSlider = document.getElementById('turbulence');
+            const turbulenceValue = document.getElementById('turbulence-value');
+            
+            turbulenceSlider.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                turbulenceValue.textContent = value.toFixed(2);
+                nebulaSystem.setTurbulence(value);
+            });
+            
+            // Layer count control
+            const layersSlider = document.getElementById('layers');
+            const layersValue = document.getElementById('layers-value');
+            
+            layersSlider.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                layersValue.textContent = value;
+                nebulaSystem.setLayerCount(value);
+            });
+            
+            // Color palette buttons
+            document.getElementById('color-palette-1').addEventListener('click', () => {
+                nebulaSystem.setColorPalette([
+                    new THREE.Color(0x000033),
+                    new THREE.Color(0x001122),
+                    new THREE.Color(0x000011),
+                    new THREE.Color(0x110022)
+                ]);
+            });
+            
+            document.getElementById('color-palette-2').addEventListener('click', () => {
+                nebulaSystem.setColorPalette([
+                    new THREE.Color(0x330033),
+                    new THREE.Color(0x220044),
+                    new THREE.Color(0x110022),
+                    new THREE.Color(0x440055)
+                ]);
+            });
+            
+            document.getElementById('color-palette-3').addEventListener('click', () => {
+                nebulaSystem.setColorPalette([
+                    new THREE.Color(0x003333),
+                    new THREE.Color(0x004444),
+                    new THREE.Color(0x002222),
+                    new THREE.Color(0x005555)
+                ]);
+            });
+            
+            // Reset camera button
+            document.getElementById('reset-camera').addEventListener('click', () => {
+                camera.position.set(0, 0, 80);
+                controls.target.set(0, 0, 0);
+                controls.update();
+            });
+            
+            // Toggle animation button
+            const toggleBtn = document.getElementById('toggle-animation');
+            toggleBtn.addEventListener('click', () => {
+                animationPaused = !animationPaused;
+                toggleBtn.textContent = animationPaused ? 'Resume Animation' : 'Pause Animation';
+            });
+            
+            // Keyboard controls
+            document.addEventListener('keydown', (e) => {
+                switch (e.code) {
+                    case 'Space':
+                        e.preventDefault();
+                        toggleBtn.click();
+                        break;
+                }
+            });
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (!animationPaused) {
+                // Update nebula system
+                nebulaSystem.update(16); // ~60 FPS
+            }
+            
+            // Update controls
+            controls.update();
+            
+            // Render
+            renderer.render(scene, camera);
+        }
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // Initialize when page loads
+        init();
+    </script>
+</body>
+</html>

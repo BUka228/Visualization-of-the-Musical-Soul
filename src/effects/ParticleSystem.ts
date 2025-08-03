@@ -4,7 +4,7 @@
  */
 
 import * as THREE from 'three';
-import { TrackObject } from '../types';
+// TrackObject import removed - Soul Galaxy handles its own particle effects
 
 export class ParticleSystem {
   private scene?: THREE.Scene;
@@ -21,7 +21,7 @@ export class ParticleSystem {
   private selectionGeometry?: THREE.BufferGeometry;
   private selectionMaterial?: THREE.PointsMaterial;
   private selectionParticleCount: number = 100;
-  private selectedTrack?: TrackObject;
+  private selectedTrackId?: string;
   
   // Анимационные параметры
   private time: number = 0;
@@ -160,48 +160,15 @@ export class ParticleSystem {
   /**
    * Активирует частицы вокруг выбранного объекта
    */
-  activateSelectionParticles(trackObject: TrackObject): void {
+  activateSelectionParticles(trackId: string): void {
     if (!this.selectionGeometry || !this.selectionMaterial) return;
 
-    this.selectedTrack = trackObject;
-    const positions = this.selectionGeometry.attributes.position as THREE.BufferAttribute;
-    const velocities = this.selectionGeometry.attributes.velocity as THREE.BufferAttribute;
+    this.selectedTrackId = trackId;
 
-    // Размещаем частицы вокруг выбранного объекта
-    for (let i = 0; i < this.selectionParticleCount; i++) {
-      const i3 = i * 3;
-      
-      // Сферическое распределение вокруг объекта
-      const radius = 3 + Math.random() * 2;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-      
-      const x = radius * Math.sin(phi) * Math.cos(theta);
-      const y = radius * Math.sin(phi) * Math.sin(theta);
-      const z = radius * Math.cos(phi);
-      
-      positions.setXYZ(i, 
-        trackObject.position.x + x,
-        trackObject.position.y + y,
-        trackObject.position.z + z
-      );
-      
-      // Обновляем скорости для орбитального движения
-      const speed = 0.01 + Math.random() * 0.01;
-      velocities.setXYZ(i,
-        -y * speed, // Тангенциальная скорость
-        x * speed,
-        (Math.random() - 0.5) * speed * 0.5
-      );
-    }
+    // Soul Galaxy renderer handles its own particle effects
+    // Classic track object particle effects are no longer needed
 
-    positions.needsUpdate = true;
-    velocities.needsUpdate = true;
-
-    // Делаем частицы видимыми
-    this.selectionMaterial.opacity = 0.8;
-
-    console.log(`✨ Активированы частицы вокруг трека: ${trackObject.trackData.name}`);
+    console.log(`✨ Активированы частицы вокруг трека: ${trackId}`);
   }
 
   /**
@@ -210,7 +177,7 @@ export class ParticleSystem {
   deactivateSelectionParticles(): void {
     if (!this.selectionMaterial) return;
 
-    this.selectedTrack = undefined;
+    this.selectedTrackId = undefined;
     this.selectionMaterial.opacity = 0.0;
 
     console.log('✨ Частицы выбора деактивированы');
@@ -246,7 +213,7 @@ export class ParticleSystem {
    * Обновляет частицы вокруг выбранного объекта
    */
   private updateSelectionParticles(deltaTime: number): void {
-    if (!this.selectedTrack || !this.selectionGeometry || !this.selectionMaterial) return;
+    if (!this.selectedTrackId || !this.selectionGeometry || !this.selectionMaterial) return;
 
     const positions = this.selectionGeometry.attributes.position as THREE.BufferAttribute;
     const velocities = this.selectionGeometry.attributes.velocity as THREE.BufferAttribute;
@@ -269,15 +236,8 @@ export class ParticleSystem {
         velocities.getZ(i)
       );
 
-      // Вычисляем направление к центру объекта
-      const toCenter = this.selectedTrack.position.clone().sub(pos);
-      const distance = toCenter.length();
-
-      // Орбитальное движение с притяжением к центру
-      if (distance > 0.1) {
-        const attraction = toCenter.normalize().multiplyScalar(0.001);
-        vel.add(attraction);
-      }
+      // Soul Galaxy renderer handles its own particle movement
+      // Classic track object particle movement is no longer needed
 
       // Обновляем позицию
       pos.add(vel);
@@ -412,7 +372,7 @@ export class ParticleSystem {
    * Проверяет, активны ли частицы выбора
    */
   isSelectionParticlesActive(): boolean {
-    return this.selectedTrack !== undefined;
+    return this.selectedTrackId !== undefined;
   }
 
   /**
@@ -448,7 +408,7 @@ export class ParticleSystem {
     this.camera = undefined;
     this.starField = undefined;
     this.selectionParticles = undefined;
-    this.selectedTrack = undefined;
+    this.selectedTrackId = undefined;
 
     console.log('✅ Ресурсы ParticleSystem освобождены');
   }

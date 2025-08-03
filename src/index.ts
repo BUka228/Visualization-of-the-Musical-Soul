@@ -85,18 +85,10 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
       this.uiManager = new UIManager();
       this.uiManager.initialize();
       this.uiManager.createDataCollectionButton();
-      this.uiManager.createVisualModeSwitcher();
       
       // Инициализация 3D-сцены
       this.sceneManager = new SceneManager(container, this.config.scene);
       this.sceneManager.initializeScene();
-      
-      // Подключение обработчика переключения режимов визуализации
-      this.uiManager.setOnVisualModeChange((mode) => {
-        if (this.sceneManager) {
-          this.sceneManager.setVisualMode(mode);
-        }
-      });
       
       // Загрузка данных треков
       await this.loadMusicData();

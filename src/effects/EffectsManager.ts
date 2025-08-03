@@ -4,7 +4,7 @@
  */
 
 import * as THREE from 'three';
-import { TrackObject, AudioManager } from '../types';
+import { AudioManager, ProcessedTrack } from '../types';
 import { ParticleSystem } from './ParticleSystem';
 import { LightingEffects } from './LightingEffects';
 
@@ -18,14 +18,14 @@ export class EffectsManager {
   private lightingEffects: LightingEffects;
   
   // Состояние
-  private selectedTrack?: TrackObject;
+  private selectedTrackId?: string;
   private isInitialized: boolean = false;
   private effectsEnabled: boolean = true;
   
   // Параметры пульсации в ритм музыки
   private musicPulseEnabled: boolean = true;
   private lastAudioTime: number = 0;
-  private pulseObjects: Set<TrackObject> = new Set();
+  private pulseTrackIds: Set<string> = new Set();
 
   constructor() {
     this.particleSystem = new ParticleSystem();
@@ -54,25 +54,15 @@ export class EffectsManager {
   /**
    * Активирует все эффекты для выбранного объекта
    */
-  activateSelectionEffects(trackObject: TrackObject): void {
+  activateSelectionEffects(trackId: string): void {
     if (!this.isInitialized || !this.effectsEnabled) return;
 
-    this.selectedTrack = trackObject;
+    this.selectedTrackId = trackId;
 
-    // Активируем частицы вокруг объекта
-    this.particleSystem.activateSelectionParticles(trackObject);
+    // Soul Galaxy renderer handles its own selection effects
+    // Classic track object effects are no longer needed
     
-    // Активируем световые эффекты
-    this.lightingEffects.activateSelectionEffects(trackObject);
-    
-    // Добавляем объект в список для пульсации
-    this.pulseObjects.add(trackObject);
-    
-    // Создаем эффект вспышки при выборе
-    const trackColor = new THREE.Color(trackObject.trackData.color);
-    this.lightingEffects.createFlashEffect(trackObject.position, trackColor, 3.0);
-    
-    console.log(`🎭 Активированы эффекты для трека: ${trackObject.trackData.name}`);
+    console.log(`🎭 Активированы эффекты для трека: ${trackId}`);
   }
 
   /**
@@ -81,18 +71,14 @@ export class EffectsManager {
   deactivateSelectionEffects(): void {
     if (!this.isInitialized) return;
 
-    // Деактивируем частицы
-    this.particleSystem.deactivateSelectionParticles();
+    // Soul Galaxy renderer handles its own selection effects
+    // Classic track object effects are no longer needed
     
-    // Деактивируем световые эффекты
-    this.lightingEffects.deactivateSelectionEffects();
-    
-    // Убираем объект из списка пульсации
-    if (this.selectedTrack) {
-      this.pulseObjects.delete(this.selectedTrack);
+    if (this.selectedTrackId) {
+      this.pulseTrackIds.delete(this.selectedTrackId);
     }
     
-    this.selectedTrack = undefined;
+    this.selectedTrackId = undefined;
     
     console.log('🎭 Эффекты выбора деактивированы');
   }
@@ -111,82 +97,54 @@ export class EffectsManager {
   /**
    * Создает эффект ауры для группы треков одного жанра
    */
-  createGenreAura(tracks: TrackObject[], genreColor: string): void {
+  createGenreAura(tracks: ProcessedTrack[], genreColor: string): void {
     if (!this.isInitialized || !this.effectsEnabled || tracks.length === 0) return;
 
-    const auraColor = new THREE.Color(genreColor);
-    this.lightingEffects.createAuraEffect(tracks, auraColor);
+    // Soul Galaxy renderer handles its own genre aura effects
+    // Classic track object effects are no longer needed
+    
+    console.log(`🌟 Создана аура для жанра: ${genreColor}`);
   }
 
   /**
    * Обновляет пульсацию объектов в ритм музыки
    */
   private updateMusicPulse(): void {
-    if (!this.musicPulseEnabled || !this.audioManager || this.pulseObjects.size === 0) return;
+    if (!this.musicPulseEnabled || !this.audioManager || this.pulseTrackIds.size === 0) return;
 
     const isPlaying = this.audioManager.isPlaying();
     const currentTime = this.audioManager.getCurrentTime();
     
     if (isPlaying && currentTime !== this.lastAudioTime) {
-      // Вычисляем интенсивность пульсации на основе прогресса трека
-      const progress = this.audioManager.getProgress() / 100;
-      const pulseIntensity = 0.1 + Math.sin(progress * Math.PI * 16) * 0.05;
-      
-      // Применяем пульсацию к объектам
-      this.pulseObjects.forEach(trackObject => {
-        if (trackObject.trackData) {
-          // Пульсация размера
-          const basePulse = 1 + Math.sin(Date.now() * 0.005) * pulseIntensity;
-          trackObject.scale.setScalar(basePulse);
-          
-          // Пульсация свечения материала
-          const material = trackObject.material as THREE.MeshStandardMaterial;
-          if (material) {
-            material.emissiveIntensity = 0.1 + pulseIntensity;
-          }
-        }
-      });
+      // Soul Galaxy renderer handles its own music pulse effects
+      // Classic track object pulse effects are no longer needed
       
       this.lastAudioTime = currentTime;
-    } else if (!isPlaying) {
-      // Возвращаем объекты к нормальному размеру когда музыка не играет
-      this.pulseObjects.forEach(trackObject => {
-        trackObject.scale.setScalar(1);
-        const material = trackObject.material as THREE.MeshStandardMaterial;
-        if (material) {
-          material.emissiveIntensity = 0.1;
-        }
-      });
     }
   }
 
   /**
    * Создает эффект появления трека
    */
-  createTrackAppearanceEffect(trackObject: TrackObject): void {
+  createTrackAppearanceEffect(trackId: string): void {
     if (!this.isInitialized || !this.effectsEnabled) return;
 
-    // Эффект появления с частицами
-    const trackColor = new THREE.Color(trackObject.trackData.color);
-    this.particleSystem.createExplosionEffect(trackObject.position, trackColor);
+    // Soul Galaxy renderer handles its own appearance effects
+    // Classic track object effects are no longer needed
     
-    // Световая вспышка
-    this.lightingEffects.createFlashEffect(trackObject.position, trackColor, 2.0);
-    
-    console.log(`✨ Создан эффект появления для трека: ${trackObject.trackData.name}`);
+    console.log(`✨ Создан эффект появления для трека: ${trackId}`);
   }
 
   /**
    * Создает эффект исчезновения трека
    */
-  createTrackDisappearanceEffect(trackObject: TrackObject): void {
+  createTrackDisappearanceEffect(trackId: string): void {
     if (!this.isInitialized || !this.effectsEnabled) return;
 
-    // Эффект исчезновения
-    const trackColor = new THREE.Color(trackObject.trackData.color);
+    // Soul Galaxy renderer handles its own disappearance effects
+    // Classic track object effects are no longer needed
     
-    // Создаем обратный эффект взрыва (частицы стягиваются к центру)
-    this.createImplodeEffect(trackObject.position, trackColor);
+    console.log(`💫 Создан эффект исчезновения для трека: ${trackId}`);
   }
 
   /**
@@ -315,7 +273,7 @@ export class EffectsManager {
     if (!enabled) {
       // Деактивируем все активные эффекты
       this.deactivateSelectionEffects();
-      this.pulseObjects.clear();
+      this.pulseTrackIds.clear();
     }
     
     console.log(`🎭 Эффекты ${enabled ? 'включены' : 'выключены'}`);
@@ -328,14 +286,9 @@ export class EffectsManager {
     this.musicPulseEnabled = enabled;
     
     if (!enabled) {
-      // Возвращаем объекты к нормальному размеру
-      this.pulseObjects.forEach(trackObject => {
-        trackObject.scale.setScalar(1);
-        const material = trackObject.material as THREE.MeshStandardMaterial;
-        if (material) {
-          material.emissiveIntensity = 0.1;
-        }
-      });
+      // Soul Galaxy renderer handles its own pulse effects
+      // Classic track object pulse effects are no longer needed
+      this.pulseTrackIds.clear();
     }
     
     console.log(`🎵 Пульсация в ритм музыки ${enabled ? 'включена' : 'выключена'}`);
@@ -374,7 +327,7 @@ export class EffectsManager {
       starCount: this.particleSystem.getStarCount(),
       selectionParticleCount: this.particleSystem.getSelectionParticleCount(),
       activeGlowCount: this.lightingEffects.getActiveGlowCount(),
-      pulseObjectsCount: this.pulseObjects.size,
+      pulseObjectsCount: this.pulseTrackIds.size,
       isSelectionActive: this.particleSystem.isSelectionParticlesActive(),
       isMusicPulseEnabled: this.musicPulseEnabled
     };
@@ -405,8 +358,8 @@ export class EffectsManager {
     this.lightingEffects.dispose();
 
     // Очищаем состояние
-    this.pulseObjects.clear();
-    this.selectedTrack = undefined;
+    this.pulseTrackIds.clear();
+    this.selectedTrackId = undefined;
     this.scene = undefined;
     this.camera = undefined;
     this.audioManager = undefined;

@@ -1,13 +1,11 @@
 import * as THREE from 'three';
-import { SceneManager as ISceneManager, ProcessedTrack, TrackObject as ITrackObject, SceneConfig } from '../types';
+import { SceneManager as ISceneManager, ProcessedTrack, SceneConfig } from '../types';
 import { InteractionManager } from '../interaction/InteractionManager';
 import { AnimationManager } from '../animation/AnimationManager';
 import { EffectsManager } from '../effects/EffectsManager';
-import { TrackObject } from './TrackObject';
 import { PerformanceOptimizer } from '../performance/PerformanceOptimizer';
 import { PerformanceWarning } from '../performance/PerformanceMonitor';
 import { SoulGalaxyRenderer } from '../soul-galaxy/core/SoulGalaxyRenderer';
-import { VisualMode } from '../soul-galaxy/types';
 
 export class SceneManager implements ISceneManager {
   private scene: THREE.Scene;
@@ -23,8 +21,7 @@ export class SceneManager implements ISceneManager {
   // Тестовый объект
   private testObject?: THREE.Mesh;
   
-  // Массив объектов треков
-  private trackObjects: TrackObject[] = [];
+  // Classic track objects removed - Soul Galaxy handles visualization
   
   // Менеджер взаимодействия
   private interactionManager: InteractionManager;
@@ -40,7 +37,6 @@ export class SceneManager implements ISceneManager {
 
   // Soul Galaxy система
   private soulGalaxyRenderer: SoulGalaxyRenderer;
-  private currentVisualMode: VisualMode = VisualMode.CLASSIC;
 
   constructor(container: HTMLElement, config: SceneConfig) {
     this.container = container;
@@ -98,7 +94,7 @@ export class SceneManager implements ISceneManager {
     // Инициализация менеджера эффектов
     this.effectsManager.initialize(this.scene, this.camera, this.interactionManager.getAudioManager());
     
-    // Инициализация Soul Galaxy рендерера
+    // Инициализация Soul Galaxy рендерера (единственный режим)
     this.soulGalaxyRenderer.initialize(this.scene, this.camera);
     
     // Запуск цикла рендеринга
@@ -240,7 +236,7 @@ export class SceneManager implements ISceneManager {
   }
 
   createTrackObjects(tracks: ProcessedTrack[]): void {
-    console.log(`🎵 Создание ${tracks.length} объектов треков...`);
+    console.log(`🌌 Создание ${tracks.length} кристаллических треков в Soul Galaxy режиме...`);
     
     // Очистка существующих объектов
     this.clearTrackObjects();
@@ -256,61 +252,23 @@ export class SceneManager implements ISceneManager {
       console.log('🗑️ Тестовый объект удален');
     }
     
-    // Инициализация оптимизации производительности для треков
-    console.log('🚀 Инициализация оптимизации производительности...');
-    this.performanceOptimizer.initializeOptimization(tracks);
+    // Создаем кристаллический кластер через Soul Galaxy рендерер
+    this.soulGalaxyRenderer.createCrystalCluster(tracks);
     
-    // Настройка коллбэков для мониторинга производительности
-    this.performanceOptimizer.setOnWarning((warning: PerformanceWarning) => {
-      console.warn(`⚠️ Предупреждение о производительности: ${warning.message}`);
-    });
-    
-    this.performanceOptimizer.setOnStatsUpdate((stats) => {
-      // Можно добавить обновление UI с информацией о производительности
-      if (stats.currentFps < 30) {
-        console.warn(`⚠️ Низкий FPS: ${stats.currentFps}`);
-      }
-    });
-    
-    // Создание обычных объектов треков для совместимости с существующим кодом
-    // (PerformanceOptimizer создает оптимизированные версии внутри себя)
-    tracks.forEach((track, index) => {
-      const trackObject = new TrackObject(track);
-      this.trackObjects.push(trackObject);
-      
-      // Не добавляем в сцену напрямую - PerformanceOptimizer управляет рендерингом
-      // this.scene.add(trackObject);
-      
-      // Логирование для отладки (только для первых 5 объектов)
-      if (index < 5) {
-        console.log(`🎶 Создан объект: ${track.name} (${track.genre}) - позиция: ${track.position.x.toFixed(1)}, ${track.position.y.toFixed(1)}, ${track.position.z.toFixed(1)}`);
-      }
-    });
-    
-    console.log(`✅ Создано ${this.trackObjects.length} объектов треков с оптимизацией`);
+    console.log(`✅ Создан кристаллический кластер из ${tracks.length} треков`);
     this.logGenreDistribution(tracks);
     
     // Запускаем анимации после создания объектов
     this.animationManager.startAnimation();
-    console.log('🎬 Анимации запущены для объектов треков');
-    
-    // Выводим отчет об оптимизации
-    console.log('📊 Отчет об оптимизации производительности:');
-    const stats = this.performanceOptimizer.getStats();
-    console.log(`- Инстансированных объектов: ${stats.instancedObjects}/${stats.totalObjects}`);
-    console.log(`- Сокращено draw calls: ${stats.drawCallsReduced}`);
-    console.log(`- Переиспользованных ресурсов: ${stats.reusedResources}`);
+    console.log('🎬 Анимации Soul Galaxy запущены');
   }
 
   /**
-   * Очищает все объекты треков из сцены
+   * Очищает все объекты треков из сцены (теперь через Soul Galaxy рендерер)
    */
   private clearTrackObjects(): void {
-    this.trackObjects.forEach(obj => {
-      this.scene.remove(obj);
-      obj.dispose(); // Используем метод dispose из TrackObject
-    });
-    this.trackObjects = [];
+    // Soul Galaxy рендерер управляет очисткой своих объектов
+    // Классические TrackObject больше не используются
   }
 
   /**
@@ -400,10 +358,7 @@ export class SceneManager implements ISceneManager {
     return this.renderer;
   }
 
-  // Дополнительные методы для управления сценой
-  getTrackObjects(): TrackObject[] {
-    return this.trackObjects;
-  }
+  // Classic track objects removed - Soul Galaxy handles visualization
 
   getTestObject(): THREE.Mesh | undefined {
     return this.testObject;
@@ -425,24 +380,7 @@ export class SceneManager implements ISceneManager {
     return this.performanceOptimizer;
   }
 
-  // Visual mode switching methods
-  setVisualMode(mode: string): void {
-    const visualMode = mode as VisualMode;
-    console.log(`🔄 Switching visual mode to: ${visualMode}`);
-    
-    this.currentVisualMode = visualMode;
-    this.soulGalaxyRenderer.setVisualMode(visualMode);
-    
-    // If switching to Soul Galaxy mode and we have tracks, create crystal cluster
-    if (visualMode === VisualMode.SOUL_GALAXY && this.trackObjects.length > 0) {
-      const tracks = this.trackObjects.map(obj => obj.trackData);
-      this.soulGalaxyRenderer.createCrystalCluster(tracks);
-    }
-  }
-
-  getCurrentMode(): string {
-    return this.currentVisualMode;
-  }
+  // Soul Galaxy is now the only mode - no mode switching needed
 
   getSoulGalaxyRenderer(): SoulGalaxyRenderer {
     return this.soulGalaxyRenderer;

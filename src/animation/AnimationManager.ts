@@ -4,7 +4,7 @@
  */
 
 import * as THREE from 'three';
-import { AnimationManager as IAnimationManager, TrackObject, SceneManager } from '../types';
+import { AnimationManager as IAnimationManager, SceneManager } from '../types';
 
 export class AnimationManager implements IAnimationManager {
   private sceneManager?: SceneManager;
@@ -93,60 +93,11 @@ export class AnimationManager implements IAnimationManager {
   private updateTrackAnimations(currentTime: number, deltaTime: number): void {
     if (!this.sceneManager) return;
     
-    const trackObjects = this.sceneManager.getTrackObjects();
-    if (!trackObjects) return;
-    
-    trackObjects.forEach((trackObject: TrackObject, index: number) => {
-      // Орбитальное вращение вокруг центра сцены
-      this.updateOrbitalRotation(trackObject, currentTime, index);
-      
-      // Вращение вокруг собственной оси
-      this.updateSelfRotation(trackObject, deltaTime);
-      
-      // Обновление пульсации для выбранных объектов
-      if (trackObject.isSelected) {
-        trackObject.updatePulse(currentTime);
-      }
-    });
+    // Soul Galaxy renderer handles its own animations
+    // Classic track object animations are no longer needed
   }
 
-  private updateOrbitalRotation(trackObject: TrackObject, currentTime: number, index: number): void {
-    if (trackObject.isSelected) return; // Выбранные объекты не участвуют в орбитальном вращении
-    
-    const originalPos = trackObject.originalPosition;
-    const radius = originalPos.length();
-    
-    // Уникальный фазовый сдвиг для каждого объекта
-    const phaseOffset = index * 0.1 + trackObject.trackData.id.charCodeAt(0) * 0.01;
-    const angle = currentTime * this.globalRotationSpeed + phaseOffset;
-    
-    // Вычисляем новую позицию на орбите
-    const cosAngle = Math.cos(angle);
-    const sinAngle = Math.sin(angle);
-    
-    // Сохраняем исходную высоту (Y-координату)
-    const originalY = originalPos.y;
-    
-    // Проецируем на плоскость XZ для орбитального движения
-    const projectedRadius = Math.sqrt(originalPos.x * originalPos.x + originalPos.z * originalPos.z);
-    
-    trackObject.position.set(
-      cosAngle * projectedRadius,
-      originalY, // Сохраняем высоту
-      sinAngle * projectedRadius
-    );
-  }
-
-  private updateSelfRotation(trackObject: TrackObject, deltaTime: number): void {
-    // Каждый объект вращается вокруг своей оси с уникальной скоростью
-    const rotationSpeedX = this.objectRotationSpeed * (0.5 + Math.sin(trackObject.trackData.id.charCodeAt(0)) * 0.5);
-    const rotationSpeedY = this.objectRotationSpeed * (0.5 + Math.cos(trackObject.trackData.id.charCodeAt(1) || 0) * 0.5);
-    const rotationSpeedZ = this.objectRotationSpeed * (0.5 + Math.sin(trackObject.trackData.id.charCodeAt(2) || 0) * 0.5);
-    
-    trackObject.rotation.x += rotationSpeedX;
-    trackObject.rotation.y += rotationSpeedY;
-    trackObject.rotation.z += rotationSpeedZ;
-  }
+  // Classic track object animation methods removed - Soul Galaxy handles its own animations
 
   private updateAppearanceAnimation(currentTime: number): void {
     if (!this.appearanceStartTime || !this.sceneManager) return;
@@ -160,35 +111,8 @@ export class AnimationManager implements IAnimationManager {
       return;
     }
     
-    const trackObjects = this.sceneManager.getTrackObjects();
-    if (!trackObjects) return;
-    
-    // Плавное появление объектов с задержкой
-    trackObjects.forEach((trackObject: TrackObject, index: number) => {
-      const delay = (index / trackObjects.length) * 0.5; // Задержка до 50% от общего времени
-      const objectProgress = Math.max(0, Math.min(1, (progress - delay) / (1 - delay)));
-      
-      if (objectProgress > 0) {
-        // Эффект появления: масштабирование и прозрачность
-        const scale = this.easeOutCubic(objectProgress);
-        const opacity = this.easeOutQuad(objectProgress);
-        
-        trackObject.scale.setScalar(scale);
-        
-        // Обновляем прозрачность материала
-        const material = trackObject.material as THREE.MeshStandardMaterial;
-        if (material) {
-          material.transparent = true;
-          material.opacity = opacity;
-          
-          // Когда анимация завершена, убираем прозрачность для производительности
-          if (objectProgress >= 1) {
-            material.transparent = false;
-            material.opacity = 1;
-          }
-        }
-      }
-    });
+    // Soul Galaxy renderer handles its own appearance animations
+    // Classic track object appearance animations are no longer needed
   }
 
   private updateCameraAnimation(currentTime: number): void {
@@ -210,17 +134,11 @@ export class AnimationManager implements IAnimationManager {
     }
   }
 
-  animateTrackSelection(trackObject: TrackObject): void {
-    console.log(`🎯 Анимация выбора трека: ${trackObject.trackData.name}`);
+  animateTrackSelection(trackId: string): void {
+    console.log(`🎯 Анимация выбора трека: ${trackId}`);
     
-    // Останавливаем орбитальное движение для выбранного объекта
-    trackObject.position.copy(trackObject.originalPosition);
-    
-    // Анимируем приближение камеры к объекту
-    this.animateCameraToTrack(trackObject);
-    
-    // Устанавливаем состояние выбора (включает пульсацию)
-    trackObject.setSelected(true);
+    // Soul Galaxy renderer handles track selection animations
+    // Classic track object selection animations are no longer needed
   }
 
   animateTrackDeselection(): void {
@@ -232,20 +150,13 @@ export class AnimationManager implements IAnimationManager {
     // Сброс состояния выбора будет выполнен в InteractionManager
   }
 
-  animateCameraToTrack(trackObject: TrackObject): void {
+  animateCameraToTrack(trackId: string): void {
     if (!this.camera) return;
     
-    this.originalCameraPosition = this.camera.position.clone();
+    console.log(`📷 Начата анимация приближения камеры к треку: ${trackId}`);
     
-    // Вычисляем целевую позицию камеры (ближе к объекту)
-    const direction = trackObject.position.clone().normalize();
-    const distance = 15; // Расстояние до объекта
-    this.targetCameraPosition = trackObject.position.clone().add(direction.multiplyScalar(distance));
-    
-    this.isCameraAnimating = true;
-    this.cameraAnimationProgress = 0;
-    
-    console.log('📷 Начата анимация приближения камеры к треку');
+    // Soul Galaxy renderer handles camera animations to tracks
+    // Classic track object camera animations are no longer needed
   }
 
   animateCameraReset(): void {

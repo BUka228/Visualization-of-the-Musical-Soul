@@ -76,29 +76,7 @@ export interface DataProcessor {
   getGenreColor(genre: string): string;
 }
 
-// Интерфейсы для 3D-сцены
-export interface TrackObject extends Mesh {
-  trackData: ProcessedTrack;
-  originalPosition: Vector3;
-  isSelected: boolean;
-  isHovered: boolean;
-  
-  // Методы для управления состоянием
-  setHovered(hovered: boolean): void;
-  setSelected(selected: boolean): void;
-  updateAnimation(deltaTime: number, globalTime: number): void;
-  updatePulse(globalTime: number): void;
-  getTrackInfo(): {
-    name: string;
-    artist: string;
-    album: string;
-    genre: string;
-    duration: string;
-    popularity: number;
-  };
-  dispose(): void;
-  getDistanceToCamera(camera: THREE.Camera): number;
-}
+// Classic TrackObject interface removed - Soul Galaxy handles visualization
 
 export interface SceneManager {
   initializeScene(): void;
@@ -109,13 +87,10 @@ export interface SceneManager {
   getCamera(): THREE.Camera;
   getRenderer(): THREE.WebGLRenderer;
   getAnimationManager(): AnimationManager;
-  getTrackObjects(): TrackObject[];
   getTestObject(): THREE.Mesh | undefined;
   getInteractionManager(): InteractionManager;
   getEffectsManager(): EffectsManager;
   getPerformanceOptimizer(): any; // PerformanceOptimizer type will be imported separately
-  setVisualMode(mode: string): void;
-  getCurrentMode(): string;
 }
 
 // Интерфейсы для взаимодействия
@@ -125,7 +100,7 @@ export interface InteractionManager {
   handleClick(event: MouseEvent): void;
   handleWheel(event: WheelEvent): void;
   handleKeyDown(event: KeyboardEvent): void;
-  selectTrack(trackObject: TrackObject): void;
+  selectTrack(trackId: string): void;
   deselectTrack(): void;
   resetCamera(): void;
   toggleAnimation(): void;
@@ -156,9 +131,9 @@ export interface AnimationManager {
   startAnimation(): void;
   stopAnimation(): void;
   toggleAnimation(): void;
-  animateTrackSelection(trackObject: TrackObject): void;
+  animateTrackSelection(trackId: string): void;
   animateTrackDeselection(): void;
-  animateCameraToTrack(trackObject: TrackObject): void;
+  animateCameraToTrack(trackId: string): void;
   animateCameraReset(): void;
   isAnimating(): boolean;
 }
@@ -166,12 +141,12 @@ export interface AnimationManager {
 // Интерфейсы для эффектов
 export interface EffectsManager {
   initialize(scene: THREE.Scene, camera: THREE.Camera, audioManager?: AudioManager): void;
-  activateSelectionEffects(trackObject: TrackObject): void;
+  activateSelectionEffects(trackId: string): void;
   deactivateSelectionEffects(): void;
   createTrackChangeExplosion(position: THREE.Vector3, color: string): void;
-  createGenreAura(tracks: TrackObject[], genreColor: string): void;
-  createTrackAppearanceEffect(trackObject: TrackObject): void;
-  createTrackDisappearanceEffect(trackObject: TrackObject): void;
+  createGenreAura(tracks: ProcessedTrack[], genreColor: string): void;
+  createTrackAppearanceEffect(trackId: string): void;
+  createTrackDisappearanceEffect(trackId: string): void;
   update(deltaTime: number): void;
   setEffectsEnabled(enabled: boolean): void;
   setMusicPulseEnabled(enabled: boolean): void;
@@ -226,8 +201,8 @@ export interface AppState {
   isLoading: boolean;
   isAuthenticated: boolean;
   currentTrack?: ProcessedTrack;
-  selectedTrack?: TrackObject;
-  hoveredTrack?: TrackObject;
+  selectedTrackId?: string;
+  hoveredTrackId?: string;
   tracks: ProcessedTrack[];
   genreStats: GenreStats;
   animationPaused: boolean;

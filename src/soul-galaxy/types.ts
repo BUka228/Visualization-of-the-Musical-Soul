@@ -1,11 +1,7 @@
 import * as THREE from 'three';
 import { ProcessedTrack } from '../types';
 
-// Visual modes for the application
-export enum VisualMode {
-  CLASSIC = 'classic',
-  SOUL_GALAXY = 'soul_galaxy'
-}
+// Soul Galaxy is now the only visual mode
 
 // Soul Galaxy specific interfaces
 export interface SoulGalaxyRenderer {
@@ -13,8 +9,6 @@ export interface SoulGalaxyRenderer {
   createCrystalCluster(tracks: ProcessedTrack[]): void;
   updateScene(deltaTime: number): void;
   dispose(): void;
-  setVisualMode(mode: VisualMode): void;
-  getCurrentMode(): VisualMode;
 }
 
 export interface DeepSpaceEnvironment {
@@ -77,7 +71,4 @@ export interface GenreColorPalette {
   default: THREE.Color;
 }
 
-export interface SceneManager {
-  setVisualMode(mode: VisualMode): void;
-  getCurrentMode(): VisualMode;
-}
+// SceneManager interface moved to main types - no mode switching needed

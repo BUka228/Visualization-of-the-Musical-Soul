@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parallax Particles System Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            z-index: 100;
+            max-width: 350px;
+            border: 1px solid #333;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #ccc;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        
+        button {
+            background: #4fc3f7;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+        
+        button:hover {
+            background: #29b6f6;
+        }
+        
+        #info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            max-width: 400px;
+            border: 1px solid #333;
+        }
+        
+        .value-display {
+            color: #4fc3f7;
+            font-weight: bold;
+        }
+        
+        h3 {
+            margin-top: 0;
+            color: #4fc3f7;
+        }
+        
+        #stats {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            border: 1px solid #333;
+            min-width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    
+    <div id="controls">
+        <h3>✨ Parallax Particles Test</h3>
+        
+        <div class="control-group">
+            <label for="particle-count">Particles per Layer: <span id="particle-count-value" class="value-display">300</span></label>
+            <input type="range" id="particle-count" min="50" max="800" step="50" value="300">
+        </div>
+        
+        <div class="control-group">
+            <label for="layer-count">Layer Count: <span id="layer-count-value" class="value-display">4</span></label>
+            <input type="range" id="layer-count" min="2" max="8" step="1" value="4">
+        </div>
+        
+        <div class="control-group">
+            <label for="parallax-strength">Parallax Strength: <span id="parallax-strength-value" class="value-display">1.0</span></label>
+            <input type="range" id="parallax-strength" min="0" max="2" step="0.1" value="1.0">
+        </div>
+        
+        <div class="control-group">
+            <label for="opacity">Opacity: <span id="opacity-value" class="value-display">0.7</span></label>
+            <input type="range" id="opacity" min="0.1" max="1.0" step="0.05" value="0.7">
+        </div>
+        
+        <div class="control-group">
+            <button id="reset-camera">Reset Camera</button>
+            <button id="reset-particles">Reset Particles</button>
+        </div>
+        
+        <div class="control-group">
+            <button id="color-palette-1">Blue Space</button>
+            <button id="color-palette-2">Rainbow</button>
+            <button id="color-palette-3">Warm</button>
+        </div>
+    </div>
+    
+    <div id="stats">
+        <h4>📊 System Stats</h4>
+        <div id="stats-content">
+            <div>Total Particles: <span id="total-particles">0</span></div>
+            <div>Active Layers: <span id="active-layers">0</span></div>
+            <div>FPS: <span id="fps">60</span></div>
+            <div>Camera Position: <span id="camera-pos">0, 0, 0</span></div>
+        </div>
+    </div>
+    
+    <div id="info">
+        <strong>🌟 Multi-Layer Parallax Features:</strong><br>
+        ✓ Instanced rendering optimization<br>
+        ✓ Multi-layer depth system<br>
+        ✓ Camera movement tracking<br>
+        ✓ Dynamic parallax speeds<br>
+        ✓ Spherical particle distribution<br>
+        ✓ Distance-based brightness<br>
+        ✓ Smooth drift animation<br>
+        <br>
+        <strong>Controls:</strong><br>
+        • Mouse: Look around (notice parallax!)<br>
+        • Mouse Wheel: Zoom in/out<br>
+        • WASD: Move camera<br>
+        <br>
+        <strong>Parallax Effect:</strong><br>
+        Closer particles move faster than distant ones,<br>
+        creating a realistic depth perception effect.
+    </div>
+
+    <script type="module">
+        import * as THREE from './node_modules/three/build/three.module.js';
+        import { OrbitControls } from './node_modules/three/examples/jsm/controls/OrbitControls.js';
+        
+        // Simplified ParallaxParticles for testing
+        class ParallaxParticles {
+            constructor(config = {}) {
+                this.particleGroup = new THREE.Group();
+                this.previousCameraPosition = new THREE.Vector3();
+                this.previousCameraRotation = new THREE.Euler();
+                this.particleLayers = [];
+                
+                this.config = {
+                    layerCount: 4,
+                    particlesPerLayer: 300,
+                    minDistance: 50,
+                    maxDistance: 250,
+                    minSize: 0.5,
+                    maxSize: 2.0,
+                    colors: [
+                        new THREE.Color(0x4444ff),
+                        new THREE.Color(0x44ffff),
+                        new THREE.Color(0xffffff),
+                        new THREE.Color(0x8888ff),
+                        new THREE.Color(0x44ff44)
+                    ],
+                    opacity: 0.7,
+                    parallaxStrength: 1.0,
+                    ...config
+                };
+            }
+            
+            initialize(scene, camera) {
+                console.log('✨ Initializing Parallax Particles...');
+                
+                this.scene = scene;
+                this.camera = camera;
+                
+                this.previousCameraPosition.copy(camera.position);
+                this.previousCameraRotation.copy(camera.rotation);
+                
+                this.createParticleLayers();
+                this.scene.add(this.particleGroup);
+                
+                this.initialized = true;
+                console.log(`✅ Parallax Particles initialized with ${this.config.layerCount} layers`);
+            }
+            
+            createParticleLayers() {
+                this.clearLayers();
+                
+                for (let layerIndex = 0; layerIndex < this.config.layerCount; layerIndex++) {
+                    const layer = this.createParticleLayer(layerIndex);
+                    this.particleLayers.push(layer);
+                    this.particleGroup.add(layer.particles);
+                }
+                
+                console.log(`🌟 Created ${this.config.layerCount} parallax particle layers`);
+            }
+            
+            createParticleLayer(layerIndex) {
+                const particleCount = this.config.particlesPerLayer;
+                
+                const geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(particleCount * 3);
+                const colors = new Float32Array(particleCount * 3);
+                const sizes = new Float32Array(particleCount);
+                
+                const layerProgress = layerIndex / (this.config.layerCount - 1);
+                const layerDistance = this.config.minDistance + 
+                    (this.config.maxDistance - this.config.minDistance) * layerProgress;
+                
+                for (let i = 0; i < particleCount; i++) {
+                    const i3 = i * 3;
+                    
+                    const radius = layerDistance + (Math.random() - 0.5) * 20;
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    
+                    positions[i3] = radius * Math.sin(phi) * Math.cos(theta);
+                    positions[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+                    positions[i3 + 2] = radius * Math.cos(phi);
+                    
+                    const colorIndex = Math.floor(Math.random() * this.config.colors.length);
+                    const baseColor = this.config.colors[colorIndex];
+                    const brightness = 1.0 - layerProgress * 0.5;
+                    
+                    colors[i3] = baseColor.r * brightness;
+                    colors[i3 + 1] = baseColor.g * brightness;
+                    colors[i3 + 2] = baseColor.b * brightness;
+                    
+                    const sizeRange = this.config.maxSize - this.config.minSize;
+                    sizes[i] = this.config.minSize + sizeRange * (1.0 - layerProgress * 0.7);
+                }
+                
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+                
+                const material = new THREE.PointsMaterial({
+                    size: 1.0,
+                    transparent: true,
+                    opacity: this.config.opacity * (1.0 - layerProgress * 0.3),
+                    vertexColors: true,
+                    blending: THREE.AdditiveBlending,
+                    sizeAttenuation: true,
+                    alphaTest: 0.01
+                });
+                
+                const particles = new THREE.Points(geometry, material);
+                const parallaxSpeed = (1.0 - layerProgress) * this.config.parallaxStrength;
+                
+                particles.userData = {
+                    isParallaxLayer: true,
+                    layerIndex: layerIndex,
+                    layerDistance: layerDistance,
+                    parallaxSpeed: parallaxSpeed
+                };
+                
+                return {
+                    particles: particles,
+                    speed: parallaxSpeed,
+                    distance: layerDistance,
+                    originalPositions: positions.slice()
+                };
+            }
+            
+            update(deltaTime) {
+                if (!this.initialized || !this.camera) return;
+                
+                const currentPosition = this.camera.position.clone();
+                const currentRotation = this.camera.rotation.clone();
+                
+                const positionDelta = currentPosition.clone().sub(this.previousCameraPosition);
+                const rotationDelta = new THREE.Vector3(
+                    currentRotation.x - this.previousCameraRotation.x,
+                    currentRotation.y - this.previousCameraRotation.y,
+                    currentRotation.z - this.previousCameraRotation.z
+                );
+                
+                this.particleLayers.forEach((layer, index) => {
+                    this.updateLayerParallax(layer, positionDelta, rotationDelta, deltaTime);
+                });
+                
+                this.previousCameraPosition.copy(currentPosition);
+                this.previousCameraRotation.copy(currentRotation);
+            }
+            
+            updateLayerParallax(layer, positionDelta, rotationDelta, deltaTime) {
+                const particles = layer.particles;
+                const speed = layer.speed;
+                
+                const parallaxOffset = positionDelta.clone().multiplyScalar(-speed * 0.1);
+                particles.position.add(parallaxOffset);
+                
+                const rotationParallax = rotationDelta.clone().multiplyScalar(-speed * 0.05);
+                particles.rotation.x += rotationParallax.x;
+                particles.rotation.y += rotationParallax.y;
+                
+                const time = Date.now() * 0.0001;
+                const driftAmount = 0.02 * speed;
+                particles.position.x += Math.sin(time + layer.distance * 0.01) * driftAmount;
+                particles.position.y += Math.cos(time * 1.1 + layer.distance * 0.01) * driftAmount;
+                
+                particles.rotation.z += speed * 0.0001 * deltaTime;
+            }
+            
+            setParticleCount(count) {
+                this.config.particlesPerLayer = Math.max(50, Math.min(1000, count));
+                this.createParticleLayers();
+            }
+            
+            setLayerCount(count) {
+                this.config.layerCount = Math.max(2, Math.min(8, count));
+                this.createParticleLayers();
+            }
+            
+            setParallaxStrength(strength) {
+                this.config.parallaxStrength = Math.max(0, Math.min(2, strength));
+                
+                this.particleLayers.forEach((layer, index) => {
+                    const layerProgress = index / (this.config.layerCount - 1);
+                    layer.speed = (1.0 - layerProgress) * this.config.parallaxStrength;
+                    layer.particles.userData.parallaxSpeed = layer.speed;
+                });
+            }
+            
+            setOpacity(opacity) {
+                this.config.opacity = Math.max(0, Math.min(1, opacity));
+                
+                this.particleLayers.forEach((layer, index) => {
+                    const layerProgress = index / (this.config.layerCount - 1);
+                    const material = layer.particles.material;
+                    material.opacity = this.config.opacity * (1.0 - layerProgress * 0.3);
+                });
+            }
+            
+            setColorPalette(colors) {
+                this.config.colors = [...colors];
+                this.createParticleLayers();
+            }
+            
+            resetParticlePositions() {
+                this.particleLayers.forEach(layer => {
+                    layer.particles.position.set(0, 0, 0);
+                    layer.particles.rotation.set(0, 0, 0);
+                });
+                
+                if (this.camera) {
+                    this.previousCameraPosition.copy(this.camera.position);
+                    this.previousCameraRotation.copy(this.camera.rotation);
+                }
+            }
+            
+            getTotalParticleCount() {
+                return this.particleLayers.length * this.config.particlesPerLayer;
+            }
+            
+            getLayerCount() {
+                return this.particleLayers.length;
+            }
+            
+            clearLayers() {
+                this.particleLayers.forEach(layer => {
+                    this.particleGroup.remove(layer.particles);
+                    layer.particles.geometry.dispose();
+                    if (layer.particles.material instanceof THREE.Material) {
+                        layer.particles.material.dispose();
+                    }
+                });
+                
+                this.particleLayers = [];
+            }
+        }
+        
+        // Test setup
+        let scene, camera, renderer, controls, parallaxParticles;
+        let frameCount = 0;
+        let lastTime = performance.now();
+        
+        function init() {
+            const container = document.getElementById('canvas-container');
+            
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000008);
+            scene.fog = new THREE.Fog(0x000011, 100, 400);
+            
+            // Camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 0, 100);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+            
+            // Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 400;
+            controls.minDistance = 20;
+            
+            // Initialize Parallax Particles
+            parallaxParticles = new ParallaxParticles();
+            parallaxParticles.initialize(scene, camera);
+            
+            // Setup controls
+            setupControls();
+            
+            // Start animation
+            animate();
+            
+            console.log('🚀 Parallax Particles test initialized');
+        }
+        
+        function setupControls() {
+            // Particle count control
+            const particleCountSlider = document.getElementById('particle-count');
+            const particleCountValue = document.getElementById('particle-count-value');
+            
+            particleCountSlider.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                particleCountValue.textContent = value;
+                parallaxParticles.setParticleCount(value);
+                updateStats();
+            });
+            
+            // Layer count control
+            const layerCountSlider = document.getElementById('layer-count');
+            const layerCountValue = document.getElementById('layer-count-value');
+            
+            layerCountSlider.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                layerCountValue.textContent = value;
+                parallaxParticles.setLayerCount(value);
+                updateStats();
+            });
+            
+            // Parallax strength control
+            const parallaxStrengthSlider = document.getElementById('parallax-strength');
+            const parallaxStrengthValue = document.getElementById('parallax-strength-value');
+            
+            parallaxStrengthSlider.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                parallaxStrengthValue.textContent = value.toFixed(1);
+                parallaxParticles.setParallaxStrength(value);
+            });
+            
+            // Opacity control
+            const opacitySlider = document.getElementById('opacity');
+            const opacityValue = document.getElementById('opacity-value');
+            
+            opacitySlider.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                opacityValue.textContent = value.toFixed(2);
+                parallaxParticles.setOpacity(value);
+            });
+            
+            // Color palette buttons
+            document.getElementById('color-palette-1').addEventListener('click', () => {
+                parallaxParticles.setColorPalette([
+                    new THREE.Color(0x4444ff),
+                    new THREE.Color(0x44ffff),
+                    new THREE.Color(0xffffff),
+                    new THREE.Color(0x8888ff),
+                    new THREE.Color(0x44ff44)
+                ]);
+            });
+            
+            document.getElementById('color-palette-2').addEventListener('click', () => {
+                parallaxParticles.setColorPalette([
+                    new THREE.Color(0xff4444),
+                    new THREE.Color(0xff8844),
+                    new THREE.Color(0xffff44),
+                    new THREE.Color(0x44ff44),
+                    new THREE.Color(0x4444ff),
+                    new THREE.Color(0x8844ff),
+                    new THREE.Color(0xff44ff)
+                ]);
+            });
+            
+            document.getElementById('color-palette-3').addEventListener('click', () => {
+                parallaxParticles.setColorPalette([
+                    new THREE.Color(0xff8844),
+                    new THREE.Color(0xffaa44),
+                    new THREE.Color(0xffcc44),
+                    new THREE.Color(0xff6644)
+                ]);
+            });
+            
+            // Reset camera button
+            document.getElementById('reset-camera').addEventListener('click', () => {
+                camera.position.set(0, 0, 100);
+                controls.target.set(0, 0, 0);
+                controls.update();
+            });
+            
+            // Reset particles button
+            document.getElementById('reset-particles').addEventListener('click', () => {
+                parallaxParticles.resetParticlePositions();
+            });
+        }
+        
+        function updateStats() {
+            document.getElementById('total-particles').textContent = parallaxParticles.getTotalParticleCount();
+            document.getElementById('active-layers').textContent = parallaxParticles.getLayerCount();
+            
+            const pos = camera.position;
+            document.getElementById('camera-pos').textContent = 
+                `${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}`;
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Update parallax particles
+            parallaxParticles.update(16); // ~60 FPS
+            
+            // Update controls
+            controls.update();
+            
+            // Update stats
+            frameCount++;
+            const currentTime = performance.now();
+            if (currentTime - lastTime >= 1000) {
+                document.getElementById('fps').textContent = frameCount;
+                frameCount = 0;
+                lastTime = currentTime;
+                updateStats();
+            }
+            
+            // Render
+            renderer.render(scene, camera);
+        }
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // Initialize when page loads
+        init();
+    </script>
+</body>
+</html>

@@ -4,7 +4,7 @@
  */
 
 import * as THREE from 'three';
-import { ProcessedTrack, TrackObject } from '../types';
+import { ProcessedTrack } from '../types';
 import { FrustumCullingManager } from './FrustumCullingManager';
 import { InstancedRenderingManager } from './InstancedRenderingManager';
 import { ResourceManager } from './ResourceManager';
