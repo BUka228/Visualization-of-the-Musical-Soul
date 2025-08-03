@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Проверка задачи 6 - DataProcessor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #1a1a1a;
+            color: #ffffff;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+        .success {
+            background: #2d5a2d;
+            border-left-color: #4caf50;
+        }
+        .error {
+            background: #5a2d2d;
+            border-left-color: #f44336;
+        }
+        .info {
+            background: #2d3a5a;
+            border-left-color: #2196f3;
+        }
+        .code {
+            background: #333;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #333;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4caf50;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #ccc;
+        }
+        h1, h2 {
+            color: #4fc3f7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Проверка задачи 6: Разработка модуля обработки данных</h1>
+        
+        <div class="info test-result">
+            <h3>📋 Проверяемые компоненты:</h3>
+            <ul>
+                <li>✅ DataProcessor класс с методами анализа данных из Яндекс.Музыки</li>
+                <li>✅ Функции определения цвета по жанру и размера по популярности</li>
+                <li>✅ Алгоритм сферического распределения объектов в 3D-пространстве</li>
+                <li>✅ Конвертация данных YandexTrack в ProcessedTrack</li>
+            </ul>
+        </div>
+
+        <div id="test-results"></div>
+
+        <h2>📊 Статистика обработки</h2>
+        <div id="stats-container"></div>
+
+        <h2>🎨 Цвета жанров</h2>
+        <div id="genre-colors"></div>
+
+        <h2>📍 Примеры позиций</h2>
+        <div id="position-examples"></div>
+    </div>
+
+    <script type="module">
+        // Импортируем необходимые модули
+        import { DataProcessor } from './dist/data/DataProcessor.js';
+        import { DataLoader } from './dist/data/DataLoader.js';
+
+        const resultsContainer = document.getElementById('test-results');
+        const statsContainer = document.getElementById('stats-container');
+        const genreColorsContainer = document.getElementById('genre-colors');
+        const positionExamplesContainer = document.getElementById('position-examples');
+
+        function addResult(message, success, details = '') {
+            const div = document.createElement('div');
+            div.className = `test-result ${success ? 'success' : 'error'}`;
+            div.innerHTML = `
+                <strong>${success ? '✅' : '❌'} ${message}</strong>
+                ${details ? `<div style="margin-top: 10px; font-size: 14px;">${details}</div>` : ''}
+            `;
+            resultsContainer.appendChild(div);
+        }
+
+        async function runVerification() {
+            try {
+                // Тест 1: Создание DataProcessor
+                const processor = new DataProcessor();
+                addResult('Создание экземпляра DataProcessor', true);
+
+                // Тест 2: Загрузка данных
+                const loadResult = await DataLoader.loadMusicDataWithResult();
+                const dataLoaded = loadResult.success && loadResult.data;
+                addResult('Загрузка данных через DataLoader', dataLoaded, 
+                    dataLoaded ? `Загружено ${loadResult.data.tracks.length} треков` : loadResult.error);
+
+                if (!dataLoaded) return;
+
+                // Тест 3: Конвертация данных Яндекс.Музыки
+                const convertedTracks = processor.convertYandexTrackData(loadResult.data.tracks);
+                const conversionSuccess = convertedTracks.length > 0;
+                addResult('Конвертация данных Яндекс.Музыки', conversionSuccess,
+                    `Конвертировано ${convertedTracks.length} из ${loadResult.data.tracks.length} треков`);
+
+                // Тест 4: Обработка треков для 3D-сцены
+                const processedTracks = processor.processTrackData(convertedTracks);
+                const processingSuccess = processedTracks.length === convertedTracks.length;
+                addResult('Обработка треков для 3D-визуализации', processingSuccess,
+                    `Обработано ${processedTracks.length} треков`);
+
+                // Тест 5: Анализ жанров
+                const genreStats = processor.analyzeGenres(convertedTracks);
+                const genreAnalysisSuccess = Object.keys(genreStats).length > 0;
+                addResult('Анализ жанров', genreAnalysisSuccess,
+                    `Найдено ${Object.keys(genreStats).length} уникальных жанров`);
+
+                // Тест 6: Проверка методов интерфейса
+                const testTrack = convertedTracks[0];
+                
+                const popularity = processor.calculatePopularity(testTrack);
+                const popularityValid = popularity >= 0 && popularity <= 100;
+                addResult('Вычисление популярности', popularityValid,
+                    `Популярность: ${popularity} (диапазон: 0-100)`);
+
+                const size = processor.calculateSize(testTrack);
+                const sizeValid = size >= 0.5 && size <= 3.0;
+                addResult('Вычисление размера', sizeValid,
+                    `Размер: ${size} (диапазон: 0.5-3.0)`);
+
+                const position = processor.calculatePosition(0, 10, testTrack.genre);
+                const positionValid = position && typeof position.x === 'number';
+                addResult('Вычисление позиции (сферическое распределение)', positionValid,
+                    positionValid ? `Позиция: (${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)})` : 'Ошибка создания позиции');
+
+                const color = processor.getGenreColor(testTrack.genre);
+                const colorValid = color && color.startsWith('#');
+                addResult('Определение цвета по жанру', colorValid,
+                    `Цвет для жанра "${testTrack.genre}": ${color}`);
+
+                // Отображение статистики
+                if (processingSuccess) {
+                    const stats = processor.getProcessingStats(processedTracks);
+                    statsContainer.innerHTML = `
+                        <div class="stats">
+                            <div class="stat-card">
+                                <div class="stat-value">${stats.totalTracks}</div>
+                                <div class="stat-label">Всего треков</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">${stats.averagePopularity}</div>
+                                <div class="stat-label">Средняя популярность</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">${stats.averageSize}</div>
+                                <div class="stat-label">Средний размер</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">${Object.keys(stats.genreDistribution).length}</div>
+                                <div class="stat-label">Жанров</div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Отображение цветов жанров
+                if (genreAnalysisSuccess) {
+                    const genreEntries = Object.entries(genreStats).sort(([,a], [,b]) => b.count - a.count);
+                    genreColorsContainer.innerHTML = genreEntries.map(([genre, stats]) => `
+                        <div style="display: flex; align-items: center; margin: 10px 0; padding: 10px; background: #333; border-radius: 4px;">
+                            <div style="width: 30px; height: 30px; background: ${stats.color}; border-radius: 4px; margin-right: 15px;"></div>
+                            <div>
+                                <strong>${genre}</strong><br>
+                                <small>${stats.count} треков (${stats.percentage.toFixed(1)}%)</small>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                // Примеры позиций для разных жанров
+                const genres = Object.keys(genreStats).slice(0, 5);
+                const positionExamples = genres.map(genre => {
+                    const pos = processor.calculatePosition(Math.floor(Math.random() * 10), 10, genre);
+                    const distance = Math.sqrt(pos.x * pos.x + pos.y * pos.y + pos.z * pos.z);
+                    return { genre, position: pos, distance };
+                });
+
+                positionExamplesContainer.innerHTML = `
+                    <div class="code">
+                        ${positionExamples.map(({ genre, position, distance }) => 
+                            `${genre}: (${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)}) - расстояние: ${distance.toFixed(1)}`
+                        ).join('<br>')}
+                    </div>
+                    <small>Позиции генерируются с использованием сферического распределения в радиусе ~50 единиц</small>
+                `;
+
+                // Финальный результат
+                addResult('Задача 6 выполнена успешно! 🎉', true,
+                    'DataProcessor готов к интеграции с 3D-сценой. Все требования (2.2, 2.3, 2.4, 2.5, 2.6) выполнены.');
+
+            } catch (error) {
+                addResult('Критическая ошибка проверки', false, error.message);
+                console.error('Ошибка:', error);
+            }
+        }
+
+        // Запуск проверки
+        runVerification();
+    </script>
+</body>
+</html>

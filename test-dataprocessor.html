@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест DataProcessor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #1a1a1a;
+            color: #ffffff;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #2a2a2a;
+            border-radius: 8px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background: #2d5a2d;
+            border-left: 4px solid #4caf50;
+        }
+        .error {
+            background: #5a2d2d;
+            border-left: 4px solid #f44336;
+        }
+        .info {
+            background: #2d3a5a;
+            border-left: 4px solid #2196f3;
+        }
+        .genre-color {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border-radius: 3px;
+            vertical-align: middle;
+        }
+        .track-item {
+            margin: 5px 0;
+            padding: 10px;
+            background: #3a3a3a;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .stat-card {
+            background: #3a3a3a;
+            padding: 15px;
+            border-radius: 6px;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4caf50;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #cccccc;
+        }
+        pre {
+            background: #1e1e1e;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Тест модуля DataProcessor</h1>
+        
+        <div class="test-section">
+            <h2>📊 Результаты тестирования</h2>
+            <div id="test-results"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🎵 Обработанные треки</h2>
+            <div id="processed-tracks"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📈 Статистика жанров</h2>
+            <div id="genre-stats"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔍 Детальная статистика</h2>
+            <div id="processing-stats"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { DataProcessor } from './src/data/DataProcessor.js';
+        import { Vector3 } from 'three';
+
+        // Создаем тестовые данные
+        const testTracks = [
+            {
+                id: '1',
+                name: 'Bohemian Rhapsody',
+                artist: 'Queen',
+                album: 'A Night at the Opera',
+                genre: 'rock',
+                duration: 355,
+                popularity: 95,
+                previewUrl: 'https://example.com/preview1.mp3'
+            },
+            {
+                id: '2',
+                name: 'Master of Puppets',
+                artist: 'Metallica',
+                album: 'Master of Puppets',
+                genre: 'metal',
+                duration: 515,
+                popularity: 88,
+                previewUrl: 'https://example.com/preview2.mp3'
+            },
+            {
+                id: '3',
+                name: 'Radioactive',
+                artist: 'Imagine Dragons',
+                album: 'Night Visions',
+                genre: 'indie',
+                duration: 187,
+                popularity: 92,
+                previewUrl: 'https://example.com/preview3.mp3'
+            },
+            {
+                id: '4',
+                name: 'Shape of You',
+                artist: 'Ed Sheeran',
+                album: '÷ (Divide)',
+                genre: 'pop',
+                duration: 233,
+                popularity: 96,
+                previewUrl: 'https://example.com/preview4.mp3'
+            },
+            {
+                id: '5',
+                name: 'Strobe',
+                artist: 'Deadmau5',
+                album: 'For Lack of a Better Name',
+                genre: 'electronic',
+                duration: 645,
+                popularity: 75,
+                previewUrl: 'https://example.com/preview5.mp3'
+            },
+            {
+                id: '6',
+                name: 'Take Five',
+                artist: 'Dave Brubeck',
+                album: 'Time Out',
+                genre: 'jazz',
+                duration: 324,
+                popularity: 70,
+                previewUrl: 'https://example.com/preview6.mp3'
+            }
+        ];
+
+        // Тестовые данные из Яндекс.Музыки
+        const yandexTestTracks = [
+            {
+                id: 'y1',
+                title: 'Группа крови',
+                artist: 'Кино',
+                album: 'Группа крови',
+                duration: 278,
+                genre: 'рок',
+                available: true,
+                cover_url: 'https://example.com/cover1.jpg',
+                preview_url: 'https://example.com/preview_y1.mp3'
+            },
+            {
+                id: 'y2',
+                title: 'Владимирский централ',
+                artist: 'Михаил Круг',
+                album: 'Владимирский централ',
+                duration: 245,
+                genre: 'шансон',
+                available: true,
+                cover_url: 'https://example.com/cover2.jpg',
+                preview_url: null
+            },
+            {
+                id: 'y3',
+                title: 'Недоступный трек',
+                artist: 'Неизвестный исполнитель',
+                album: 'Неизвестный альбом',
+                duration: 200,
+                genre: 'поп',
+                available: false
+            }
+        ];
+
+        function runTests() {
+            const resultsDiv = document.getElementById('test-results');
+            const tracksDiv = document.getElementById('processed-tracks');
+            const genreStatsDiv = document.getElementById('genre-stats');
+            const processingStatsDiv = document.getElementById('processing-stats');
+            
+            const processor = new DataProcessor();
+            let testsPassed = 0;
+            let totalTests = 0;
+
+            function addResult(message, success, details = '') {
+                totalTests++;
+                if (success) testsPassed++;
+                
+                const div = document.createElement('div');
+                div.className = `test-result ${success ? 'success' : 'error'}`;
+                div.innerHTML = `
+                    <strong>${success ? '✅' : '❌'} ${message}</strong>
+                    ${details ? `<br><small>${details}</small>` : ''}
+                `;
+                resultsDiv.appendChild(div);
+            }
+
+            function addInfo(message) {
+                const div = document.createElement('div');
+                div.className = 'test-result info';
+                div.innerHTML = `<strong>ℹ️ ${message}</strong>`;
+                resultsDiv.appendChild(div);
+            }
+
+            try {
+                addInfo('Начинаем тестирование DataProcessor...');
+
+                // Тест 1: Создание экземпляра
+                try {
+                    const testProcessor = new DataProcessor();
+                    addResult('Создание экземпляра DataProcessor', true);
+                } catch (error) {
+                    addResult('Создание экземпляра DataProcessor', false, error.message);
+                }
+
+                // Тест 2: Обработка треков
+                try {
+                    const processedTracks = processor.processTrackData(testTracks);
+                    const success = processedTracks.length === testTracks.length;
+                    addResult('Обработка треков', success, 
+                        `Обработано ${processedTracks.length} из ${testTracks.length} треков`);
+                    
+                    if (success) {
+                        // Отображаем обработанные треки
+                        tracksDiv.innerHTML = processedTracks.map(track => `
+                            <div class="track-item">
+                                <div style="display: flex; align-items: center; margin-bottom: 5px;">
+                                    <div class="genre-color" style="background-color: ${track.color}"></div>
+                                    <strong>${track.name}</strong> - ${track.artist}
+                                </div>
+                                <div style="font-size: 12px; color: #cccccc;">
+                                    Жанр: ${track.genre} | Популярность: ${track.popularity} | Размер: ${track.size} | 
+                                    Позиция: (${track.position.x.toFixed(1)}, ${track.position.y.toFixed(1)}, ${track.position.z.toFixed(1)})
+                                </div>
+                            </div>
+                        `).join('');
+                    }
+                } catch (error) {
+                    addResult('Обработка треков', false, error.message);
+                }
+
+                // Тест 3: Анализ жанров
+                try {
+                    const genreStats = processor.analyzeGenres(testTracks);
+                    const genreCount = Object.keys(genreStats).length;
+                    const success = genreCount > 0;
+                    addResult('Анализ жанров', success, 
+                        `Найдено ${genreCount} жанров`);
+                    
+                    if (success) {
+                        // Отображаем статистику жанров
+                        genreStatsDiv.innerHTML = Object.entries(genreStats).map(([genre, stats]) => `
+                            <div class="track-item">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <div style="display: flex; align-items: center;">
+                                        <div class="genre-color" style="background-color: ${stats.color}"></div>
+                                        <strong>${genre}</strong>
+                                    </div>
+                                    <div>
+                                        ${stats.count} треков (${stats.percentage}%)
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('');
+                    }
+                } catch (error) {
+                    addResult('Анализ жанров', false, error.message);
+                }
+
+                // Тест 4: Вычисление популярности
+                try {
+                    const popularity = processor.calculatePopularity(testTracks[0]);
+                    const success = popularity >= 0 && popularity <= 100;
+                    addResult('Вычисление популярности', success, 
+                        `Популярность: ${popularity}`);
+                } catch (error) {
+                    addResult('Вычисление популярности', false, error.message);
+                }
+
+                // Тест 5: Вычисление размера
+                try {
+                    const size = processor.calculateSize(testTracks[0]);
+                    const success = size >= 0.5 && size <= 3.0;
+                    addResult('Вычисление размера', success, 
+                        `Размер: ${size}`);
+                } catch (error) {
+                    addResult('Вычисление размера', false, error.message);
+                }
+
+                // Тест 6: Вычисление позиции
+                try {
+                    const position = processor.calculatePosition(0, 10, 'rock');
+                    const success = position instanceof Vector3;
+                    addResult('Вычисление позиции', success, 
+                        `Позиция: (${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)})`);
+                } catch (error) {
+                    addResult('Вычисление позиции', false, error.message);
+                }
+
+                // Тест 7: Получение цвета жанра
+                try {
+                    const color = processor.getGenreColor('rock');
+                    const success = color.startsWith('#') && color.length === 7;
+                    addResult('Получение цвета жанра', success, 
+                        `Цвет для rock: ${color}`);
+                } catch (error) {
+                    addResult('Получение цвета жанра', false, error.message);
+                }
+
+                // Тест 8: Конвертация данных Яндекс.Музыки
+                try {
+                    const convertedTracks = processor.convertYandexTrackData(yandexTestTracks);
+                    const success = convertedTracks.length === 2; // Только доступные треки
+                    addResult('Конвертация данных Яндекс.Музыки', success, 
+                        `Конвертировано ${convertedTracks.length} из ${yandexTestTracks.length} треков (исключены недоступные)`);
+                } catch (error) {
+                    addResult('Конвертация данных Яндекс.Музыки', false, error.message);
+                }
+
+                // Тест 9: Статистика обработки
+                try {
+                    const processedTracks = processor.processTrackData(testTracks);
+                    const stats = processor.getProcessingStats(processedTracks);
+                    const success = stats.totalTracks === testTracks.length;
+                    addResult('Статистика обработки', success, 
+                        `Общая статистика получена`);
+                    
+                    if (success) {
+                        // Отображаем детальную статистику
+                        processingStatsDiv.innerHTML = `
+                            <div class="stats-grid">
+                                <div class="stat-card">
+                                    <div class="stat-value">${stats.totalTracks}</div>
+                                    <div class="stat-label">Всего треков</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">${stats.averagePopularity}</div>
+                                    <div class="stat-label">Средняя популярность</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">${stats.averageSize}</div>
+                                    <div class="stat-label">Средний размер</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">${stats.sizeRange.min} - ${stats.sizeRange.max}</div>
+                                    <div class="stat-label">Диапазон размеров</div>
+                                </div>
+                            </div>
+                            <h4>Распределение по жанрам:</h4>
+                            <pre>${JSON.stringify(stats.genreDistribution, null, 2)}</pre>
+                        `;
+                    }
+                } catch (error) {
+                    addResult('Статистика обработки', false, error.message);
+                }
+
+                // Итоговый результат
+                addInfo(`Тестирование завершено: ${testsPassed}/${totalTests} тестов пройдено`);
+                
+                if (testsPassed === totalTests) {
+                    addResult('Все тесты пройдены успешно! 🎉', true);
+                } else {
+                    addResult(`Некоторые тесты не пройдены (${totalTests - testsPassed} ошибок)`, false);
+                }
+
+            } catch (error) {
+                addResult('Критическая ошибка тестирования', false, error.message);
+                console.error('Критическая ошибка:', error);
+            }
+        }
+
+        // Запускаем тесты после загрузки страницы
+        window.addEventListener('load', runTests);
+    </script>
+</body>
+</html>

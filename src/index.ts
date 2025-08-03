@@ -1,6 +1,7 @@
 import { MusicGalaxyApp, AppConfig, AppState, ProcessedTrack } from './types';
 import { SceneManager } from './scene/SceneManager';
 import { DataLoader } from './data/DataLoader';
+import { DataProcessor } from './data/DataProcessor';
 import { Vector3 } from 'three';
 
 // Импорт тестов в режиме разработки
@@ -118,14 +119,22 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
       // Загружаем данные
       const musicData = await DataLoader.loadMusicData();
       
+      // Создаем экземпляр DataProcessor
+      const dataProcessor = new DataProcessor();
+      
+      // Конвертируем данные Яндекс.Музыки в стандартный формат
+      const convertedTracks = dataProcessor.convertYandexTrackData(musicData.tracks);
+      
       // Обрабатываем треки для 3D-сцены
-      const processedTracks = this.processTracksForScene(musicData.tracks);
+      const processedTracks = dataProcessor.processTrackData(convertedTracks);
       
       // Загружаем треки в сцену
       this.loadTracks(processedTracks);
       
-      // Обновляем статистику
-      this.updateGenreStats(processedTracks);
+      // Обновляем статистику с помощью DataProcessor
+      const genreStats = dataProcessor.analyzeGenres(convertedTracks);
+      this.state.genreStats = genreStats;
+      this.updateStatsUI();
       
       console.log(`✅ Загружено ${processedTracks.length} треков`);
       
@@ -192,75 +201,7 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
     }
   }
 
-  private processTracksForScene(tracks: any[]): ProcessedTrack[] {
-    return tracks.map((track, index) => {
-      // Определяем цвет по жанру
-      const color = this.config.scene.genreColors[track.genre] || this.config.scene.genreColors.default;
-      
-      // Определяем размер (базовый размер + случайная вариация)
-      const baseSize = this.config.scene.objectMinSize;
-      const sizeRange = this.config.scene.objectMaxSize - this.config.scene.objectMinSize;
-      const size = baseSize + (track.duration / 600) * sizeRange; // Размер зависит от длительности
-      
-      // Генерируем случайную позицию в сфере
-      const position = this.generateSpherePosition(this.config.scene.galaxyRadius);
-      
-      return {
-        id: track.id,
-        name: track.title,
-        artist: track.artist,
-        album: track.album,
-        genre: track.genre,
-        duration: track.duration,
-        popularity: Math.random() * 100, // Заглушка для популярности
-        previewUrl: track.preview_url,
-        imageUrl: track.cover_url,
-        color,
-        size: Math.max(baseSize, Math.min(size, this.config.scene.objectMaxSize)),
-        position
-      };
-    });
-  }
 
-  private generateSpherePosition(radius: number): Vector3 {
-    // Генерируем случайную точку на поверхности сферы
-    const theta = Math.random() * Math.PI * 2; // Азимутальный угол
-    const phi = Math.acos(2 * Math.random() - 1); // Полярный угол
-    const r = radius * (0.5 + Math.random() * 0.5); // Радиус с вариацией
-    
-    return new Vector3(
-      r * Math.sin(phi) * Math.cos(theta),
-      r * Math.sin(phi) * Math.sin(theta),
-      r * Math.cos(phi)
-    );
-  }
-
-  private updateGenreStats(tracks: ProcessedTrack[]): void {
-    const stats: { [genre: string]: { count: number; percentage: number; color: string } } = {};
-    
-    // Подсчитываем треки по жанрам
-    tracks.forEach(track => {
-      if (!stats[track.genre]) {
-        stats[track.genre] = {
-          count: 0,
-          percentage: 0,
-          color: this.config.scene.genreColors[track.genre] || this.config.scene.genreColors.default
-        };
-      }
-      stats[track.genre].count++;
-    });
-    
-    // Вычисляем проценты
-    const totalTracks = tracks.length;
-    Object.keys(stats).forEach(genre => {
-      stats[genre].percentage = (stats[genre].count / totalTracks) * 100;
-    });
-    
-    this.state.genreStats = stats;
-    
-    // Обновляем UI статистики
-    this.updateStatsUI();
-  }
 
   private updateStatsUI(): void {
     const statsContainer = document.getElementById('genre-stats');
