@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Data Loading</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .stats {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .genre-stat {
+            display: inline-block;
+            margin: 5px;
+            padding: 5px 10px;
+            background: #3a3a3a;
+            border-radius: 4px;
+        }
+        .track-sample {
+            background: #2a2a2a;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border-left: 4px solid #4CAF50;
+        }
+        .error {
+            background: #f44336;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success {
+            background: #4CAF50;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 Test Data Loading from Yandex Music</h1>
+    <div id="status">🔄 Loading data...</div>
+    <div id="stats"></div>
+    <div id="samples"></div>
+
+    <script>
+        async function testDataLoading() {
+            const statusDiv = document.getElementById('status');
+            const statsDiv = document.getElementById('stats');
+            const samplesDiv = document.getElementById('samples');
+
+            try {
+                // Пробуем загрузить данные
+                const response = await fetch('/src/data/music_data.json');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                // Проверяем структуру данных
+                if (!data.metadata || !data.tracks || !Array.isArray(data.tracks)) {
+                    throw new Error('Invalid data structure');
+                }
+
+                statusDiv.innerHTML = `<div class="success">✅ Successfully loaded ${data.tracks.length} tracks!</div>`;
+
+                // Показываем статистику
+                const genreStats = {};
+                data.tracks.forEach(track => {
+                    const genre = track.genre || 'unknown';
+                    genreStats[genre] = (genreStats[genre] || 0) + 1;
+                });
+
+                const sortedGenres = Object.entries(genreStats)
+                    .sort(([,a], [,b]) => b - a)
+                    .slice(0, 10);
+
+                statsDiv.innerHTML = `
+                    <div class="stats">
+                        <h3>📊 Top 10 Genres:</h3>
+                        ${sortedGenres.map(([genre, count]) => 
+                            `<div class="genre-stat">${genre}: ${count}</div>`
+                        ).join('')}
+                    </div>
+                    <div class="stats">
+                        <h3>📈 Metadata:</h3>
+                        <p><strong>Total tracks:</strong> ${data.metadata.total_tracks}</p>
+                        <p><strong>Generated at:</strong> ${new Date(data.metadata.generated_at).toLocaleString()}</p>
+                        <p><strong>Source:</strong> ${data.metadata.source}</p>
+                    </div>
+                `;
+
+                // Показываем примеры треков
+                const sampleTracks = data.tracks.slice(0, 5);
+                samplesDiv.innerHTML = `
+                    <h3>🎵 Sample Tracks:</h3>
+                    ${sampleTracks.map(track => `
+                        <div class="track-sample">
+                            <strong>${track.title}</strong> by ${track.artist}<br>
+                            <small>Album: ${track.album} | Genre: ${track.genre} | Duration: ${Math.floor(track.duration / 60)}:${(track.duration % 60).toString().padStart(2, '0')}</small>
+                        </div>
+                    `).join('')}
+                `;
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+                statusDiv.innerHTML = `<div class="error">❌ Error loading data: ${error.message}</div>`;
+                
+                // Пробуем загрузить демо-данные
+                try {
+                    const demoResponse = await fetch('/src/data/demo_data.json');
+                    if (demoResponse.ok) {
+                        const demoData = await demoResponse.json();
+                        statusDiv.innerHTML += `<div class="success">✅ Demo data available: ${demoData.tracks.length} tracks</div>`;
+                    }
+                } catch (demoError) {
+                    statusDiv.innerHTML += `<div class="error">❌ Demo data also unavailable</div>`;
+                }
+            }
+        }
+
+        // Запускаем тест при загрузке страницы
+        testDataLoading();
+    </script>
+</body>
+</html>

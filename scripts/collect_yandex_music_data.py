@@ -1,0 +1,237 @@
+#!/usr/bin/env python3
+"""
+Скрипт для сбора данных из Яндекс.Музыки
+Использует неофициальное API через библиотеку yandex-music
+"""
+
+import json
+import os
+import sys
+from typing import List, Dict, Any, Optional
+from yandex_music import Client
+from yandex_music.exceptions import YandexMusicError
+
+
+def get_token_from_user() -> str:
+    """Получает токен от пользователя с инструкциями"""
+    print("=" * 60)
+    print("ПОЛУЧЕНИЕ ТОКЕНА ЯНДЕКС.МУЗЫКИ")
+    print("=" * 60)
+    print("1. Откройте music.yandex.ru в браузере")
+    print("2. Войдите в свой аккаунт")
+    print("3. Откройте DevTools (F12)")
+    print("4. Перейдите на вкладку Application → Cookies")
+    print("5. Найдите cookie с именем 'Session_id'")
+    print("6. Скопируйте его значение")
+    print("-" * 60)
+    
+    token = input("Введите токен Session_id: ").strip()
+    if not token:
+        print("❌ Токен не может быть пустым!")
+        sys.exit(1)
+    
+    return token
+
+
+def extract_genre(track) -> str:
+    """Извлекает жанр из данных трека"""
+    try:
+        # Пробуем получить жанр из исполнителя
+        if track.artists and len(track.artists) > 0:
+            artist = track.artists[0]
+            if hasattr(artist, 'genres') and artist.genres:
+                return artist.genres[0]
+        
+        # Пробуем получить жанр из альбома
+        if track.albums and len(track.albums) > 0:
+            album = track.albums[0]
+            if hasattr(album, 'genre') and album.genre:
+                return album.genre
+        
+        return "unknown"
+    except Exception:
+        return "unknown"
+
+
+def get_cover_url(track) -> Optional[str]:
+    """Получает URL обложки трека"""
+    try:
+        if track.cover_uri:
+            # Заменяем %% на размер изображения
+            return f"https://{track.cover_uri.replace('%%', '400x400')}"
+        
+        # Пробуем получить обложку из альбома
+        if track.albums and len(track.albums) > 0:
+            album = track.albums[0]
+            if hasattr(album, 'cover_uri') and album.cover_uri:
+                return f"https://{album.cover_uri.replace('%%', '400x400')}"
+        
+        return None
+    except Exception:
+        return None
+
+
+def get_preview_url(client: Client, track) -> Optional[str]:
+    """Получает URL превью трека"""
+    try:
+        # Получаем информацию о загрузке
+        download_info = client.tracks_download_info(track.id)
+        if download_info:
+            # Ищем превью (обычно это самое низкое качество)
+            for info in download_info:
+                if info.codec == 'mp3' and info.bitrate_in_kbps <= 128:
+                    download_url = info.get_direct_link()
+                    return download_url
+        
+        return None
+    except Exception as e:
+        print(f"⚠️  Не удалось получить превью для трека {track.title}: {e}")
+        return None
+
+
+def process_track(client: Client, track) -> Dict[str, Any]:
+    """Обрабатывает один трек и возвращает данные для JSON"""
+    try:
+        # Основная информация
+        track_data = {
+            "id": str(track.id),
+            "title": track.title,
+            "artist": track.artists[0].name if track.artists else "Unknown Artist",
+            "album": track.albums[0].title if track.albums else "Unknown Album",
+            "duration": track.duration_ms // 1000 if track.duration_ms else 0,
+            "genre": extract_genre(track),
+            "cover_url": get_cover_url(track),
+            "preview_url": None,  # Будем получать отдельно
+            "available": track.available if hasattr(track, 'available') else True
+        }
+        
+        # Получаем превью только для доступных треков
+        if track_data["available"]:
+            track_data["preview_url"] = get_preview_url(client, track)
+        
+        return track_data
+    
+    except Exception as e:
+        print(f"❌ Ошибка обработки трека: {e}")
+        return None
+
+
+def collect_liked_tracks(token: str) -> List[Dict[str, Any]]:
+    """Собирает данные о лайкнутых треках"""
+    try:
+        print("🔄 Подключение к Яндекс.Музыке...")
+        client = Client(token).init()
+        
+        print("✅ Успешное подключение!")
+        print("🔄 Получение лайкнутых треков...")
+        
+        # Получаем лайкнутые треки
+        liked_tracks = client.users_likes_tracks()
+        if not liked_tracks or not liked_tracks.tracks:
+            print("❌ Не найдено лайкнутых треков")
+            return []
+        
+        tracks_data = []
+        total_tracks = len(liked_tracks.tracks)
+        
+        print(f"📊 Найдено {total_tracks} лайкнутых треков")
+        print("🔄 Обработка треков...")
+        
+        for i, track_short in enumerate(liked_tracks.tracks, 1):
+            try:
+                # Получаем полную информацию о треке
+                track = client.tracks([track_short.id])[0]
+                
+                print(f"[{i}/{total_tracks}] Обработка: {track.title} - {track.artists[0].name if track.artists else 'Unknown'}")
+                
+                track_data = process_track(client, track)
+                if track_data:
+                    tracks_data.append(track_data)
+                
+            except Exception as e:
+                print(f"⚠️  Пропуск трека {i}: {e}")
+                continue
+        
+        print(f"✅ Успешно обработано {len(tracks_data)} треков")
+        return tracks_data
+    
+    except YandexMusicError as e:
+        print(f"❌ Ошибка Яндекс.Музыки: {e}")
+        print("💡 Проверьте правильность токена")
+        sys.exit(1)
+    
+    except Exception as e:
+        print(f"❌ Неожиданная ошибка: {e}")
+        sys.exit(1)
+
+
+def save_data_to_json(tracks_data: List[Dict[str, Any]], output_file: str):
+    """Сохраняет данные в JSON файл"""
+    try:
+        # Создаем директорию если не существует
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        
+        # Добавляем метаданные
+        output_data = {
+            "metadata": {
+                "total_tracks": len(tracks_data),
+                "generated_at": __import__('datetime').datetime.now().isoformat(),
+                "source": "Yandex Music API"
+            },
+            "tracks": tracks_data
+        }
+        
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(output_data, f, ensure_ascii=False, indent=2)
+        
+        print(f"✅ Данные сохранены в {output_file}")
+        
+        # Статистика по жанрам
+        genres = {}
+        for track in tracks_data:
+            genre = track.get('genre', 'unknown')
+            genres[genre] = genres.get(genre, 0) + 1
+        
+        print("\n📊 Статистика по жанрам:")
+        for genre, count in sorted(genres.items(), key=lambda x: x[1], reverse=True):
+            print(f"  {genre}: {count} треков")
+    
+    except Exception as e:
+        print(f"❌ Ошибка сохранения: {e}")
+        sys.exit(1)
+
+
+def main():
+    """Основная функция"""
+    print("🎵 Сборщик данных Яндекс.Музыки для Music Galaxy 3D")
+    print("=" * 60)
+    
+    # Проверяем установку библиотеки
+    try:
+        import yandex_music
+        print("✅ Библиотека yandex-music найдена")
+    except ImportError:
+        print("❌ Библиотека yandex-music не установлена!")
+        print("💡 Установите её командой: pip install yandex-music")
+        sys.exit(1)
+    
+    # Получаем токен
+    token = get_token_from_user()
+    
+    # Собираем данные
+    tracks_data = collect_liked_tracks(token)
+    
+    if not tracks_data:
+        print("❌ Не удалось собрать данные о треках")
+        sys.exit(1)
+    
+    # Сохраняем в JSON
+    output_file = "src/data/music_data.json"
+    save_data_to_json(tracks_data, output_file)
+    
+    print("\n🎉 Готово! Теперь можно запускать веб-приложение")
+    print(f"📁 Данные сохранены в: {output_file}")
+
+
+if __name__ == "__main__":
+    main()

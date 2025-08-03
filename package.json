@@ -6,13 +6,21 @@
   "scripts": {
     "build": "webpack --mode production",
     "dev": "webpack serve --mode development",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "collect-data": "python scripts/collect_yandex_music_data.py",
+    "serve": "npx http-server dist -p 8080"
   },
-  "keywords": ["3d", "music", "visualization", "threejs"],
+  "keywords": [
+    "3d",
+    "music",
+    "visualization",
+    "threejs"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
     "@types/three": "^0.158.0",
+    "copy-webpack-plugin": "^13.0.0",
     "css-loader": "^6.8.1",
     "html-webpack-plugin": "^5.5.3",
     "style-loader": "^3.3.3",

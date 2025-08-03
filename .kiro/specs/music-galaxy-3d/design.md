@@ -26,29 +26,47 @@ graph TB
 
 ### Архитектура модулей
 
-- **AuthModule**: Управление авторизацией и API-запросами
-- **DataProcessor**: Обработка и анализ музыкальных данных
+- **YandexMusicModule**: Интеграция с неофициальным API Яндекс.Музыки
+- **DataProcessor**: Обработка и анализ музыкальных данных из Яндекс.Музыки
 - **SceneManager**: Управление 3D-сценой и объектами
 - **InteractionManager**: Обработка пользовательского ввода
-- **AudioManager**: Управление воспроизведением превью
+- **AudioManager**: Управление воспроизведением превью треков
 - **AnimationManager**: Управление анимациями и эффектами
 
 ## Компоненты и интерфейсы
 
-### 1. AuthModule
+### 1. YandexMusicModule
 
 ```typescript
-interface AuthModule {
-  authenticate(): Promise<AuthToken>;
-  refreshToken(): Promise<AuthToken>;
-  getUserPlaylists(): Promise<Playlist[]>;
-  getTrackData(trackId: string): Promise<Track>;
+interface YandexMusicModule {
+  validateToken(token: string): Promise<boolean>;
+  getLikedTracks(token: string): Promise<YandexTrack[]>;
+  getTrackInfo(token: string, trackId: string): Promise<YandexTrackInfo>;
+  getDownloadInfo(token: string, trackId: string): Promise<string>;
 }
 
-interface AuthToken {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
+interface YandexTrack {
+  id: string;
+  title: string;
+  artists: YandexArtist[];
+  albums: YandexAlbum[];
+  durationMs: number;
+  available: boolean;
+  coverUri?: string;
+}
+
+interface YandexArtist {
+  id: string;
+  name: string;
+  genres: string[];
+}
+
+interface YandexAlbum {
+  id: string;
+  title: string;
+  genre: string;
+  year?: number;
+  coverUri?: string;
 }
 ```
 
@@ -172,6 +190,40 @@ interface SceneConfig {
 
 ## Детали реализации
 
+### Интеграция с Яндекс.Музыкой
+
+**Неофициальное API:**
+- Используется имитация запросов веб-версии Яндекс.Музыки
+- Базовый URL: `https://api.music.yandex.net`
+- Требуется токен авторизации из браузера пользователя
+
+**Получение токена:**
+1. Пользователь заходит на music.yandex.ru в браузере
+2. Открывает DevTools → Application → Cookies
+3. Копирует значение cookie `Session_id`
+4. Вводит токен в приложение
+
+**Основные эндпоинты:**
+```typescript
+const YANDEX_API_ENDPOINTS = {
+  account: '/account/status',
+  likedTracks: '/users/{userId}/likes/tracks',
+  trackInfo: '/tracks/{trackId}',
+  downloadInfo: '/tracks/{trackId}/download-info'
+};
+```
+
+**Обработка данных треков:**
+- Извлечение жанра из данных исполнителя или альбома
+- Формирование URL обложки: `https://{coverUri.replace('%%', '400x400')}`
+- Получение 30-секундного превью через download-info API
+- Конвертация длительности из миллисекунд в секунды
+
+**Кэширование:**
+- Сохранение полученных данных в localStorage как `music_data.json`
+- Кэш действителен 24 часа для избежания частых запросов
+- Возможность принудительного обновления данных
+
 ### 3D-сцена и объекты
 
 **Геометрия объектов:**
@@ -236,11 +288,20 @@ const GENRE_COLORS = {
 
 ## Обработка ошибок
 
+### Ошибки Яндекс.Музыки API
+
+- **Невалидный токен**: Показ инструкций по получению нового токена из DevTools
+- **Истекший токен**: Автоматическое предложение обновить токен
+- **Блокировка API**: Использование кэшированных данных если доступны
+- **Недоступные треки**: Пропуск треков без превью или с ограниченным доступом
+- **CORS ошибки**: Инструкции по настройке браузера или использованию расширения
+
 ### Сетевые ошибки
 
-- Повторные попытки с экспоненциальной задержкой
-- Fallback на демо-данные при недоступности API
+- Повторные попытки с экспоненциальной задержкой (3 попытки)
+- Fallback на демо-данные при полной недоступности API
 - Уведомления пользователя о проблемах с подключением
+- Оффлайн режим с использованием кэшированных данных
 
 ### Ошибки WebGL
 
@@ -252,7 +313,7 @@ const GENRE_COLORS = {
 
 - Обработка недоступных превью треков
 - Автоматическое отключение звука при ошибках
-- Альтернативные источники аудио
+- Показ заглушки вместо воспроизведения
 
 ## Стратегия тестирования
 

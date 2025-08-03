@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест DataLoader - Music Galaxy 3D</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        .container {
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success { background-color: #2d5a2d; }
+        .error { background-color: #5a2d2d; }
+        .warning { background-color: #5a5a2d; }
+        .info { background-color: #2d2d5a; }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+        .data-display {
+            background-color: #1a1a1a;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .stat-card {
+            background-color: #3a3a3a;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .genre-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .genre-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #444;
+        }
+        .instructions {
+            background-color: #2d2d5a;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 Тест DataLoader - Music Galaxy 3D</h1>
+    
+    <div class="container">
+        <h2>Управление данными</h2>
+        <button onclick="loadData()">Загрузить данные</button>
+        <button onclick="checkFreshness()">Проверить свежесть</button>
+        <button onclick="getUpdateStatus()">Статус обновления</button>
+        <button onclick="getStatistics()">Получить статистику</button>
+        <button onclick="checkFileExists()">Проверить файл</button>
+        <button onclick="clearResults()">Очистить результаты</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script type="module">
+        import { DataLoader } from './src/data/DataLoader.js';
+
+        window.DataLoader = DataLoader;
+
+        window.loadData = async function() {
+            addResult('🔄 Загрузка данных...', 'info');
+            
+            try {
+                const result = await DataLoader.loadMusicDataWithResult();
+                
+                if (result.success && result.data) {
+                    addResult(`✅ Данные успешно загружены!`, 'success');
+                    addResult(`📊 Источник: ${result.data.metadata.source}`, 'info');
+                    addResult(`📈 Треков: ${result.data.tracks.length}`, 'info');
+                    addResult(`🕒 Создано: ${new Date(result.data.metadata.generated_at).toLocaleString('ru')}`, 'info');
+                    addResult(`🎭 Демо-данные: ${result.isDemo ? 'Да' : 'Нет'}`, 'info');
+                    addResult(`🔄 Свежесть: ${result.freshness}`, result.freshness === 'fresh' ? 'success' : 'warning');
+                    
+                    if (result.error) {
+                        addResult(`⚠️ Предупреждение: ${result.error}`, 'warning');
+                    }
+
+                    // Показываем первые несколько треков
+                    const sampleTracks = result.data.tracks.slice(0, 3);
+                    addResult('🎵 Примеры треков:', 'info');
+                    sampleTracks.forEach((track, index) => {
+                        addResult(`${index + 1}. ${track.title} - ${track.artist} (${track.genre})`, 'info');
+                    });
+                } else {
+                    addResult(`❌ Ошибка загрузки: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Критическая ошибка: ${error.message}`, 'error');
+            }
+        };
+
+        window.checkFreshness = async function() {
+            addResult('🔄 Проверка свежести данных...', 'info');
+            
+            try {
+                const isFresh = await DataLoader.checkDataFreshness();
+                addResult(`🕒 Данные ${isFresh ? 'свежие' : 'устарели'}`, isFresh ? 'success' : 'warning');
+            } catch (error) {
+                addResult(`❌ Ошибка проверки свежести: ${error.message}`, 'error');
+            }
+        };
+
+        window.getUpdateStatus = async function() {
+            addResult('🔄 Получение статуса обновления...', 'info');
+            
+            try {
+                const status = await DataLoader.getDataUpdateStatus();
+                
+                addResult('📋 Статус обновления:', 'info');
+                addResult(`🔄 Можно обновить: ${status.canUpdate ? 'Да' : 'Нет'}`, 'info');
+                
+                if (status.lastUpdate) {
+                    addResult(`🕒 Последнее обновление: ${status.lastUpdate.toLocaleString('ru')}`, 'info');
+                    addResult(`⏰ Возраст данных: ${status.hoursOld?.toFixed(1)} часов`, 
+                        status.hoursOld && status.hoursOld < 24 ? 'success' : 'warning');
+                }
+                
+                // Показываем инструкции в отдельном блоке
+                const instructionsDiv = document.createElement('div');
+                instructionsDiv.className = 'instructions';
+                instructionsDiv.innerHTML = `<h3>📝 Инструкции по обновлению:</h3><pre>${status.instructions}</pre>`;
+                document.getElementById('results').appendChild(instructionsDiv);
+                
+            } catch (error) {
+                addResult(`❌ Ошибка получения статуса: ${error.message}`, 'error');
+            }
+        };
+
+        window.getStatistics = async function() {
+            addResult('🔄 Получение статистики...', 'info');
+            
+            try {
+                const stats = await DataLoader.getDataStatistics();
+                
+                if (stats) {
+                    addResult('📊 Статистика данных:', 'success');
+                    
+                    // Создаем карточки со статистикой
+                    const statsDiv = document.createElement('div');
+                    statsDiv.className = 'stats-grid';
+                    
+                    // Общая статистика
+                    statsDiv.innerHTML = `
+                        <div class="stat-card">
+                            <div class="stat-value">${stats.totalTracks}</div>
+                            <div>Всего треков</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${Object.keys(stats.genres).length}</div>
+                            <div>Жанров</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${stats.isDemo ? 'Демо' : 'Реальные'}</div>
+                            <div>Тип данных</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${stats.source}</div>
+                            <div>Источник</div>
+                        </div>
+                    `;
+                    
+                    document.getElementById('results').appendChild(statsDiv);
+                    
+                    // Список жанров
+                    const genresDiv = document.createElement('div');
+                    genresDiv.className = 'container';
+                    genresDiv.innerHTML = '<h3>🎭 Распределение по жанрам:</h3>';
+                    
+                    const genresList = document.createElement('div');
+                    genresList.className = 'genre-list';
+                    
+                    // Сортируем жанры по количеству треков
+                    const sortedGenres = Object.entries(stats.genres)
+                        .sort(([,a], [,b]) => b - a);
+                    
+                    sortedGenres.forEach(([genre, count]) => {
+                        const percentage = ((count / stats.totalTracks) * 100).toFixed(1);
+                        const genreItem = document.createElement('div');
+                        genreItem.className = 'genre-item';
+                        genreItem.innerHTML = `
+                            <span>${genre}</span>
+                            <span>${count} треков (${percentage}%)</span>
+                        `;
+                        genresList.appendChild(genreItem);
+                    });
+                    
+                    genresDiv.appendChild(genresList);
+                    document.getElementById('results').appendChild(genresDiv);
+                    
+                } else {
+                    addResult('❌ Не удалось получить статистику', 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Ошибка получения статистики: ${error.message}`, 'error');
+            }
+        };
+
+        window.checkFileExists = async function() {
+            addResult('🔄 Проверка существования файла...', 'info');
+            
+            try {
+                const exists = await DataLoader.checkDataFileExists();
+                addResult(`📁 Файл с данными ${exists ? 'существует' : 'не найден'}`, 
+                    exists ? 'success' : 'warning');
+            } catch (error) {
+                addResult(`❌ Ошибка проверки файла: ${error.message}`, 'error');
+            }
+        };
+
+        window.clearResults = function() {
+            document.getElementById('results').innerHTML = '';
+        };
+
+        function addResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `status ${type}`;
+            resultDiv.textContent = message;
+            resultsDiv.appendChild(resultDiv);
+            
+            // Автоскролл к последнему результату
+            resultDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Автоматически загружаем данные при загрузке страницы
+        window.addEventListener('load', () => {
+            addResult('🚀 DataLoader тест готов к работе!', 'success');
+            addResult('💡 Нажмите "Загрузить данные" для начала тестирования', 'info');
+        });
+    </script>
+</body>
+</html>

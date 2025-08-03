@@ -1,0 +1,189 @@
+{
+  "metadata": {
+    "total_tracks": 20,
+    "generated_at": "2024-01-01T12:00:00.000Z",
+    "source": "Demo Data"
+  },
+  "tracks": [
+    {
+      "id": "1",
+      "title": "Bohemian Rhapsody",
+      "artist": "Queen",
+      "album": "A Night at the Opera",
+      "duration": 355,
+      "genre": "rock",
+      "available": true
+    },
+    {
+      "id": "2",
+      "title": "Stairway to Heaven",
+      "artist": "Led Zeppelin",
+      "album": "Led Zeppelin IV",
+      "duration": 482,
+      "genre": "rock",
+      "available": true
+    },
+    {
+      "id": "3",
+      "title": "Hotel California",
+      "artist": "Eagles",
+      "album": "Hotel California",
+      "duration": 391,
+      "genre": "rock",
+      "available": true
+    },
+    {
+      "id": "4",
+      "title": "Imagine",
+      "artist": "John Lennon",
+      "album": "Imagine",
+      "duration": 183,
+      "genre": "pop",
+      "available": true
+    },
+    {
+      "id": "5",
+      "title": "Smells Like Teen Spirit",
+      "artist": "Nirvana",
+      "album": "Nevermind",
+      "duration": 301,
+      "genre": "indie",
+      "available": true
+    },
+    {
+      "id": "6",
+      "title": "Master of Puppets",
+      "artist": "Metallica",
+      "album": "Master of Puppets",
+      "duration": 515,
+      "genre": "metal",
+      "available": true
+    },
+    {
+      "id": "7",
+      "title": "One More Time",
+      "artist": "Daft Punk",
+      "album": "Discovery",
+      "duration": 320,
+      "genre": "electronic",
+      "available": true
+    },
+    {
+      "id": "8",
+      "title": "Take Five",
+      "artist": "Dave Brubeck",
+      "album": "Time Out",
+      "duration": 324,
+      "genre": "jazz",
+      "available": true
+    },
+    {
+      "id": "9",
+      "title": "Lose Yourself",
+      "artist": "Eminem",
+      "album": "8 Mile Soundtrack",
+      "duration": 326,
+      "genre": "hip-hop",
+      "available": true
+    },
+    {
+      "id": "10",
+      "title": "Symphony No. 9",
+      "artist": "Ludwig van Beethoven",
+      "album": "Classical Masterpieces",
+      "duration": 1200,
+      "genre": "classical",
+      "available": true
+    },
+    {
+      "id": "11",
+      "title": "Paranoid",
+      "artist": "Black Sabbath",
+      "album": "Paranoid",
+      "duration": 170,
+      "genre": "metal",
+      "available": true
+    },
+    {
+      "id": "12",
+      "title": "Around the World",
+      "artist": "Daft Punk",
+      "album": "Homework",
+      "duration": 429,
+      "genre": "electronic",
+      "available": true
+    },
+    {
+      "id": "13",
+      "title": "The Girl from Ipanema",
+      "artist": "Stan Getz & João Gilberto",
+      "album": "Getz/Gilberto",
+      "duration": 317,
+      "genre": "jazz",
+      "available": true
+    },
+    {
+      "id": "14",
+      "title": "Billie Jean",
+      "artist": "Michael Jackson",
+      "album": "Thriller",
+      "duration": 294,
+      "genre": "pop",
+      "available": true
+    },
+    {
+      "id": "15",
+      "title": "Creep",
+      "artist": "Radiohead",
+      "album": "Pablo Honey",
+      "duration": 238,
+      "genre": "indie",
+      "available": true
+    },
+    {
+      "id": "16",
+      "title": "Juicy",
+      "artist": "The Notorious B.I.G.",
+      "album": "Ready to Die",
+      "duration": 305,
+      "genre": "hip-hop",
+      "available": true
+    },
+    {
+      "id": "17",
+      "title": "Iron Man",
+      "artist": "Black Sabbath",
+      "album": "Paranoid",
+      "duration": 356,
+      "genre": "metal",
+      "available": true
+    },
+    {
+      "id": "18",
+      "title": "Blue Monday",
+      "artist": "New Order",
+      "album": "Power, Corruption & Lies",
+      "duration": 448,
+      "genre": "electronic",
+      "available": true
+    },
+    {
+      "id": "19",
+      "title": "What a Wonderful World",
+      "artist": "Louis Armstrong",
+      "album": "What a Wonderful World",
+      "duration": 137,
+      "genre": "jazz",
+      "available": true
+    },
+    {
+      "id": "20",
+      "title": "Canon in D",
+      "artist": "Johann Pachelbel",
+      "album": "Classical Wedding Music",
+      "duration": 360,
+      "genre": "classical",
+      "available": true
+    }
+  ]
+}
