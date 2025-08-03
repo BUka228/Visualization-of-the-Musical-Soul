@@ -1,0 +1,131 @@
+import { SceneManager } from './SceneManager';
+import { ProcessedTrack } from '../types';
+import * as THREE from 'three';
+
+// Тестовая функция для проверки SceneManager
+export function testSceneManager(): void {
+  console.log('=== Тестирование SceneManager ===');
+  
+  // Создание тестового контейнера
+  const testContainer = document.createElement('div');
+  testContainer.style.width = '800px';
+  testContainer.style.height = '600px';
+  testContainer.style.position = 'absolute';
+  testContainer.style.top = '0';
+  testContainer.style.left = '0';
+  testContainer.style.background = 'black';
+  
+  // Конфигурация для тестирования
+  const testConfig = {
+    galaxyRadius: 50,
+    objectMinSize: 0.5,
+    objectMaxSize: 3.0,
+    animationSpeed: 0.001,
+    cameraDistance: 100,
+    genreColors: {
+      'metal': '#FF0000',
+      'rock': '#FF4500',
+      'indie': '#4169E1',
+      'pop': '#FFD700',
+      'electronic': '#9400D3',
+      'jazz': '#228B22',
+      'classical': '#F5F5DC',
+      'hip-hop': '#8B4513',
+      'default': '#FFFFFF'
+    }
+  };
+  
+  try {
+    // Создание SceneManager
+    const sceneManager = new SceneManager(testContainer, testConfig);
+    
+    // Инициализация сцены
+    sceneManager.initializeScene();
+    
+    // Проверка основных компонентов
+    const scene = sceneManager.getScene();
+    const camera = sceneManager.getCamera();
+    const renderer = sceneManager.getRenderer();
+    
+    console.log('✓ Scene создана:', scene instanceof THREE.Scene);
+    console.log('✓ Camera создана:', camera instanceof THREE.PerspectiveCamera);
+    console.log('✓ Renderer создан:', renderer instanceof THREE.WebGLRenderer);
+    
+    // Проверка тестового объекта
+    const testObject = sceneManager.getTestObject();
+    console.log('✓ Тестовый объект создан:', testObject instanceof THREE.Mesh);
+    
+    // Проверка освещения
+    const lights = scene.children.filter(child => 
+      child instanceof THREE.AmbientLight || child instanceof THREE.DirectionalLight
+    );
+    console.log('✓ Освещение настроено:', lights.length >= 2);
+    
+    // Создание тестовых треков
+    const testTracks: ProcessedTrack[] = [
+      {
+        id: 'test1',
+        name: 'Test Track 1',
+        artist: 'Test Artist',
+        album: 'Test Album',
+        genre: 'indie',
+        popularity: 80,
+        duration: 180,
+        color: '#4169E1',
+        size: 1.5,
+        position: new THREE.Vector3(10, 0, 0)
+      },
+      {
+        id: 'test2',
+        name: 'Test Track 2',
+        artist: 'Test Artist 2',
+        album: 'Test Album 2',
+        genre: 'metal',
+        popularity: 60,
+        duration: 240,
+        color: '#FF0000',
+        size: 2.0,
+        position: new THREE.Vector3(-10, 5, 0)
+      }
+    ];
+    
+    // Создание объектов треков
+    sceneManager.createTrackObjects(testTracks);
+    const trackObjects = sceneManager.getTrackObjects();
+    console.log('✓ Объекты треков созданы:', trackObjects.length === testTracks.length);
+    
+    // Проверка свойств объектов треков
+    trackObjects.forEach((trackObj, index) => {
+      console.log(`✓ Трек ${index + 1}:`, {
+        hasTrackData: !!trackObj.trackData,
+        hasOriginalPosition: !!trackObj.originalPosition,
+        isSelected: trackObj.isSelected === false,
+        isHovered: trackObj.isHovered === false
+      });
+    });
+    
+    // Тест обновления сцены
+    sceneManager.updateScene();
+    console.log('✓ Обновление сцены выполнено без ошибок');
+    
+    // Очистка ресурсов
+    setTimeout(() => {
+      sceneManager.dispose();
+      console.log('✓ Ресурсы освобождены');
+      console.log('=== Тестирование SceneManager завершено успешно ===');
+    }, 1000);
+    
+  } catch (error) {
+    console.error('✗ Ошибка при тестировании SceneManager:', error);
+  }
+}
+
+// Автоматический запуск теста при загрузке модуля в режиме разработки
+if (process.env.NODE_ENV === 'development') {
+  // Запуск теста после загрузки DOM
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', testSceneManager);
+  } else {
+    testSceneManager();
+  }
+}
