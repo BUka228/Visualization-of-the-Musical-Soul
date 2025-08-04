@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест с настоящим OAuth токеном</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+            line-height: 1.6;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .success {
+            background: #4caf50;
+            color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .warning {
+            background: #ff9800;
+            color: #000;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+        .error {
+            background: #f44336;
+            color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .log {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 600px;
+            overflow-y: auto;
+            margin-top: 10px;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .log .error { color: #f44; }
+        .log .success { color: #4f4; }
+        .log .info { color: #4af; }
+        .log .warning { color: #ff9; }
+        button {
+            background: #4fc3f7;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #29b6f6;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #4fc3f7;
+        }
+        .track-example {
+            background: #333;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            border-left: 4px solid #4fc3f7;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 Тест с настоящим OAuth токеном</h1>
+    
+    <div class="success">
+        ✅ Используем рабочий OAuth токен: y0_AgAAAAAj2vgeAAG8XgAAAAEJa-6RAAAdPHm_OlpI_4ludZXEeCSbWupQkA
+    </div>
+
+    <div class="container">
+        <h2>🚀 Тестирование</h2>
+        <button onclick="runFullTest()">🔬 Полный тест API</button>
+        <button onclick="testOurAPI()">🌐 Тест нашего Vercel API</button>
+        <button onclick="simulateProcessing()">⚙️ Симуляция обработки треков</button>
+        <button onclick="clearLog()">🗑️ Очистить лог</button>
+    </div>
+
+    <div class="container">
+        <h2>📊 Статистика</h2>
+        <div id="stats" class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalTracks">-</div>
+                <div>Всего треков</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="availableTracks">-</div>
+                <div>Доступных</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="processedTracks">-</div>
+                <div>После обработки</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="successRate">-</div>
+                <div>Успешность</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>🎼 Примеры треков</h2>
+        <div id="trackExamples">
+            <p>Запустите тест для просмотра примеров треков</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📝 Лог выполнения</h2>
+        <div id="log" class="log">Готов к тестированию с настоящим OAuth токеном...\n</div>
+    </div>
+
+    <script>
+        // Настоящий OAuth токен
+        const OAUTH_TOKEN = 'y0_AgAAAAAj2vgeAAG8XgAAAAEJa-6RAAAdPHm_OlpI_4ludZXEeCSbWupQkA';
+        
+        let globalTrackData = null;
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info';
+            logDiv.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = 'Лог очищен...\n';
+            updateStats(0, 0, 0);
+            document.getElementById('trackExamples').innerHTML = '<p>Запустите тест для просмотра примеров треков</p>';
+        }
+
+        function updateStats(total, available, processed) {
+            document.getElementById('totalTracks').textContent = total;
+            document.getElementById('availableTracks').textContent = available;
+            document.getElementById('processedTracks').textContent = processed;
+            document.getElementById('successRate').textContent = total > 0 ? Math.round((processed / total) * 100) + '%' : '-';
+        }
+
+        function showTrackExamples(tracks) {
+            const container = document.getElementById('trackExamples');
+            if (!tracks || tracks.length === 0) {
+                container.innerHTML = '<p>❌ Нет треков для отображения</p>';
+                return;
+            }
+
+            const examples = tracks.slice(0, 5).map((track, index) => `
+                <div class="track-example">
+                    <strong>${index + 1}. ${track.title || 'Без названия'}</strong><br>
+                    <small>
+                        👤 ${track.artists?.map(a => a.name).join(', ') || 'Неизвестный исполнитель'}<br>
+                        💿 ${track.albums?.[0]?.title || 'Неизвестный альбом'}<br>
+                        ⏱️ ${Math.floor((track.durationMs || 0) / 1000)}с | 
+                        ${track.available ? '✅ Доступен' : '❌ Недоступен'}
+                    </small>
+                </div>
+            `).join('');
+
+            container.innerHTML = `
+                <h4>Примеры треков (первые 5 из ${tracks.length}):</h4>
+                ${examples}
+            `;
+        }
+
+        async function runFullTest() {
+            log('🚀 Начинаем полный тест с настоящим OAuth токеном', 'success');
+            log(`Токен: ${OAUTH_TOKEN.substring(0, 20)}...`, 'info');
+
+            const headers = {
+                'Authorization': `OAuth ${OAUTH_TOKEN}`,
+                'User-Agent': 'Yandex-Music-API/1.0',
+                'Content-Type': 'application/json'
+            };
+
+            try {
+                // Тест 1: Аутентификация
+                log('📋 Шаг 1: Проверка аутентификации...', 'info');
+                const userResponse = await fetch('https://api.music.yandex.net/account/status', {
+                    method: 'GET',
+                    headers: headers
+                });
+
+                log(`Статус аутентификации: ${userResponse.status}`, userResponse.ok ? 'success' : 'error');
+
+                if (!userResponse.ok) {
+                    const errorData = await userResponse.json().catch(() => userResponse.text());
+                    log(`❌ Ошибка аутентификации: ${JSON.stringify(errorData)}`, 'error');
+                    return;
+                }
+
+                const userData = await userResponse.json();
+                const userId = userData.result?.account?.uid;
+                log(`✅ Успешная аутентификация! User ID: ${userId}`, 'success');
+                log(`Аккаунт: ${userData.result?.account?.login || 'Неизвестно'}`, 'info');
+
+                // Тест 2: Получение лайков
+                log('❤️ Шаг 2: Получение лайкнутых треков...', 'info');
+                const likesResponse = await fetch(`https://api.music.yandex.net/users/${userId}/likes/tracks`, {
+                    method: 'GET',
+                    headers: headers
+                });
+
+                log(`Статус получения лайков: ${likesResponse.status}`, likesResponse.ok ? 'success' : 'error');
+
+                if (!likesResponse.ok) {
+                    const errorData = await likesResponse.json().catch(() => likesResponse.text());
+                    log(`❌ Ошибка получения лайков: ${JSON.stringify(errorData)}`, 'error');
+                    return;
+                }
+
+                const likesData = await likesResponse.json();
+                const trackIds = likesData.result?.library?.tracks?.map(track => track.id) || [];
+                log(`✅ Найдено лайкнутых треков: ${trackIds.length}`, 'success');
+
+                if (trackIds.length === 0) {
+                    log('⚠️ У пользователя нет лайкнутых треков', 'warning');
+                    return;
+                }
+
+                // Тест 3: Получение информации о треках (батчами)
+                log('🎵 Шаг 3: Получение полной информации о треках...', 'info');
+                log('Загружаем треки батчами по 100...', 'info');
+
+                const batchSize = 100;
+                const allTracks = [];
+                const totalBatches = Math.ceil(trackIds.length / batchSize);
+
+                for (let i = 0; i < trackIds.length; i += batchSize) {
+                    const batch = trackIds.slice(i, i + batchSize);
+                    const batchNum = Math.floor(i / batchSize) + 1;
+                    
+                    log(`Обрабатываем батч ${batchNum}/${totalBatches} (треки ${i + 1}-${Math.min(i + batchSize, trackIds.length)})`, 'info');
+
+                    const tracksResponse = await fetch('https://api.music.yandex.net/tracks', {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify({
+                            'track-ids': batch,
+                            'with-positions': false
+                        })
+                    });
+
+                    if (tracksResponse.ok) {
+                        const tracksData = await tracksResponse.json();
+                        const batchTracks = tracksData.result || [];
+                        allTracks.push(...batchTracks);
+                        log(`✅ Батч ${batchNum}: получено ${batchTracks.length} треков`, 'success');
+                    } else {
+                        log(`❌ Ошибка в батче ${batchNum}: статус ${tracksResponse.status}`, 'error');
+                    }
+
+                    // Небольшая пауза между запросами
+                    if (i + batchSize < trackIds.length) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                }
+
+                globalTrackData = allTracks;
+                log(`🎉 Загрузка завершена! Получено ${allTracks.length} треков из ${trackIds.length} лайков`, 'success');
+
+                // Анализ треков
+                log('📊 Анализ полученных треков...', 'info');
+                const availableCount = allTracks.filter(t => t.available).length;
+                const unavailableCount = allTracks.filter(t => !t.available).length;
+                const withTitleCount = allTracks.filter(t => t.title).length;
+                const withArtistsCount = allTracks.filter(t => t.artists && t.artists.length > 0).length;
+
+                log(`Всего треков: ${allTracks.length}`, 'info');
+                log(`Доступных: ${availableCount} (${Math.round(availableCount/allTracks.length*100)}%)`, availableCount > 0 ? 'success' : 'warning');
+                log(`Недоступных: ${unavailableCount} (${Math.round(unavailableCount/allTracks.length*100)}%)`, 'info');
+                log(`С названием: ${withTitleCount}`, 'info');
+                log(`С исполнителями: ${withArtistsCount}`, 'info');
+
+                // Обновляем статистику
+                updateStats(allTracks.length, availableCount, 0);
+                showTrackExamples(allTracks);
+
+                // Тест обработки
+                log('⚙️ Шаг 4: Симуляция обработки треков (как в нашем API)...', 'info');
+                await simulateProcessingInternal(allTracks);
+
+            } catch (error) {
+                log(`❌ Критическая ошибка: ${error.message}`, 'error');
+                console.error('Полная ошибка:', error);
+            }
+        }
+
+        async function simulateProcessingInternal(tracks) {
+            if (!tracks) {
+                log('❌ Нет данных для обработки', 'error');
+                return;
+            }
+
+            log('🔄 Симулируем обработку треков как в нашем API...', 'info');
+
+            // Точно такая же логика, как в api/getYandexData.ts
+            const processedTracks = tracks
+                .map((track) => {
+                    const processed = {
+                        id: String(track.id),
+                        title: track.title || 'Unknown Title',
+                        artist: track.artists?.map((a) => a.name).join(', ') || 'Unknown Artist',
+                        album: track.albums?.[0]?.title || 'Unknown Album',
+                        duration: Math.floor((track.durationMs || 0) / 1000),
+                        genre: track.albums?.[0]?.genre || 'unknown',
+                        cover_url: track.coverUri ? `https://${track.coverUri.replace('%%', '400x400')}` : undefined,
+                        preview_url: undefined,
+                        available: track.available !== false,
+                    };
+                    return processed;
+                })
+                .filter((track) => track.title && track.artist);
+
+            log(`Результат обработки:`, 'info');
+            log(`  Исходных треков: ${tracks.length}`, 'info');
+            log(`  После обработки: ${processedTracks.length}`, processedTracks.length > 0 ? 'success' : 'error');
+            log(`  Отфильтровано: ${tracks.length - processedTracks.length}`, 'info');
+
+            // Обновляем статистику
+            const availableCount = tracks.filter(t => t.available).length;
+            updateStats(tracks.length, availableCount, processedTracks.length);
+
+            if (processedTracks.length === 0) {
+                log('❌ ПРОБЛЕМА: После обработки не осталось треков!', 'error');
+                log('Анализируем причины...', 'warning');
+                
+                const noTitle = tracks.filter(t => !t.title).length;
+                const noArtists = tracks.filter(t => !t.artists || t.artists.length === 0).length;
+                
+                log(`  Треков без названия: ${noTitle}`, 'warning');
+                log(`  Треков без исполнителей: ${noArtists}`, 'warning');
+                
+                if (tracks.length > 0) {
+                    log('Пример первого трека:', 'info');
+                    log(JSON.stringify(tracks[0], null, 2), 'info');
+                }
+            } else {
+                log('✅ Обработка успешна!', 'success');
+                log('Примеры обработанных треков:', 'info');
+                processedTracks.slice(0, 3).forEach((track, index) => {
+                    log(`  ${index + 1}. "${track.title}" - ${track.artist}`, 'info');
+                });
+            }
+
+            return processedTracks;
+        }
+
+        async function simulateProcessing() {
+            if (!globalTrackData) {
+                log('❌ Сначала запустите полный тест для получения данных', 'error');
+                return;
+            }
+
+            await simulateProcessingInternal(globalTrackData);
+        }
+
+        async function testOurAPI() {
+            log('🌐 Тестируем наш Vercel API с настоящим токеном...', 'info');
+
+            try {
+                const response = await fetch('/api/getYandexData', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ token: OAUTH_TOKEN })
+                });
+
+                log(`Статус нашего API: ${response.status}`, response.ok ? 'success' : 'error');
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    log(`❌ Ошибка нашего API: ${JSON.stringify(errorData, null, 2)}`, 'error');
+                    return;
+                }
+
+                const data = await response.json();
+                log('✅ Наш API работает!', 'success');
+                log(`Получено треков: ${data.tracks?.length || 0}`, 'success');
+                log(`Источник: ${data.metadata?.source}`, 'info');
+                log(`Время генерации: ${data.metadata?.generated_at}`, 'info');
+
+                if (data.tracks && data.tracks.length > 0) {
+                    log('Пример трека из нашего API:', 'info');
+                    log(JSON.stringify(data.tracks[0], null, 2), 'info');
+                    
+                    const tracksWithPreview = data.tracks.filter(t => t.preview_url).length;
+                    log(`Треков с превью: ${tracksWithPreview}`, 'info');
+                    
+                    updateStats(data.tracks.length, data.tracks.filter(t => t.available).length, data.tracks.length);
+                } else {
+                    log('❌ Наш API не вернул треков!', 'error');
+                }
+
+            } catch (error) {
+                log(`❌ Ошибка вызова нашего API: ${error.message}`, 'error');
+            }
+        }
+
+        // Автозапуск при загрузке
+        window.addEventListener('load', () => {
+            log('✅ Страница загружена с настоящим OAuth токеном', 'success');
+            log('Готов к тестированию!', 'info');
+        });
+    </script>
+</body>
+</html>
