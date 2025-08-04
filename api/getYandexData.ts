@@ -129,6 +129,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const availableCount = allTracks.filter(t => t.available).length;
       const unavailableCount = allTracks.filter(t => !t.available).length;
       console.log(`Available tracks: ${availableCount}, Unavailable: ${unavailableCount}`);
+    } else {
+      console.log('❌ No tracks fetched! Debugging batch requests...');
+      // Попробуем получить хотя бы один трек для отладки
+      if (trackIds.length > 0) {
+        const singleTrackId = trackIds[0];
+        console.log(`Trying to fetch single track: ${singleTrackId}`);
+        
+        try {
+          const singleTrackResponse = await fetch(`${baseURL}/tracks?track-ids=${singleTrackId}`, {
+            method: 'GET',
+            headers
+          });
+          
+          console.log(`Single track response status: ${singleTrackResponse.status}`);
+          
+          if (singleTrackResponse.ok) {
+            const singleTrackData = await singleTrackResponse.json();
+            console.log('Single track data:', JSON.stringify(singleTrackData, null, 2));
+          } else {
+            const errorText = await singleTrackResponse.text();
+            console.log('Single track error:', errorText);
+          }
+        } catch (singleTrackError) {
+          console.log('Single track fetch error:', singleTrackError.message);
+        }
+      }
     }
 
     // Обрабатываем треки (убираем фильтрацию по available)

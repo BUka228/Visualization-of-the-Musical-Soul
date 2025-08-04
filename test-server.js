@@ -1,186 +1,107 @@
-const express = require('express');
-const path = require('path');
-const cors = require('cors');
+/**
+ * Тест исправленного API с настоящим OAuth токеном
+ * Запускается в Node.js для тестирования Vercel API
+ */
 
-const app = express();
-const PORT = 3001;
+const https = require('https');
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.static('.'));
+const OAUTH_TOKEN = 'y0_AgAAAAAj2vgeAAG8XgAAAAEJa-6RAAAdPHm_OlpI_4ludZXEeCSbWupQkA';
 
-// Функция для обработки API Яндекс.Музыки (копия из TypeScript файла)
-async function handleYandexMusicAPI(req, res) {
-  // Обработка CORS для локальной разработки и preflight-запросов
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  // Принимаем только POST-запросы
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
-  }
-
-  try {
-    const { token } = req.body;
-
-    if (!token) {
-      return res.status(400).json({ error: 'Session_id token is required' });
-    }
-
-    console.log('Session_id received, length:', token.length);
-    console.log('Получение данных из Яндекс.Музыки...');
-
-    // Базовые настройки для запросов к API
-    const baseURL = 'https://api.music.yandex.net';
-    const headers = {
-      'Authorization': `OAuth ${token}`,
-      'User-Agent': 'Yandex-Music-API/1.0',
-      'Content-Type': 'application/json'
-    };
-
-    // Получаем информацию о пользователе для проверки токена
-    console.log('Checking user authentication...');
-    const userResponse = await fetch(`${baseURL}/account/status`, {
-      method: 'GET',
-      headers
+function makeRequest(url, options = {}) {
+    return new Promise((resolve, reject) => {
+        const req = https.request(url, options, (res) => {
+            let data = '';
+            
+            res.on('data', (chunk) => {
+                data += chunk;
+            });
+            
+            res.on('end', () => {
+                try {
+                    const jsonData = JSON.parse(data);
+                    resolve({ status: res.statusCode, data: jsonData, headers: res.headers });
+                } catch (error) {
+                    resolve({ status: res.statusCode, data: data, headers: res.headers });
+                }
+            });
+        });
+        
+        req.on('error', (error) => {
+            reject(error);
+        });
+        
+        if (options.body) {
+            req.write(options.body);
+        }
+        
+        req.end();
     });
-
-    if (!userResponse.ok) {
-      throw new Error(`Authentication failed: ${userResponse.status} ${userResponse.statusText}`);
-    }
-
-    const userData = await userResponse.json();
-    const userId = userData.result.account.uid;
-    console.log(`Authenticated as user: ${userId}`);
-
-    // Получаем лайкнутые треки
-    console.log('Fetching liked tracks...');
-    const likesResponse = await fetch(`${baseURL}/users/${userId}/likes/tracks`, {
-      method: 'GET',
-      headers
-    });
-
-    if (!likesResponse.ok) {
-      throw new Error(`Failed to fetch liked tracks: ${likesResponse.status} ${likesResponse.statusText}`);
-    }
-
-    const likesData = await likesResponse.json();
-    const trackIds = likesData.result.library.tracks.map(track => track.id);
-
-    if (trackIds.length === 0) {
-      console.log('No liked tracks found.');
-      return res.status(200).json({
-        metadata: { 
-          total_tracks: 0, 
-          generated_at: new Date().toISOString(),
-          source: 'Yandex Music API (Direct HTTP)'
-        },
-        tracks: []
-      });
-    }
-
-    console.log(`Found ${trackIds.length} liked tracks.`);
-
-    // Получаем полную информацию о треках (батчами по 100)
-    const batchSize = 100;
-    const allTracks = [];
-
-    for (let i = 0; i < trackIds.length; i += batchSize) {
-      const batch = trackIds.slice(i, i + batchSize);
-      const tracksResponse = await fetch(`${baseURL}/tracks`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          'track-ids': batch,
-          'with-positions': false
-        })
-      });
-
-      if (tracksResponse.ok) {
-        const tracksData = await tracksResponse.json();
-        allTracks.push(...tracksData.result);
-      }
-    }
-
-    console.log(`Fetched full info for ${allTracks.length} tracks.`);
-
-    // Обрабатываем треки
-    const processedTracks = allTracks
-      .filter(track => track.available)
-      .map(track => {
-        return {
-          id: String(track.id),
-          title: track.title || 'Unknown Title',
-          artist: track.artists?.map(a => a.name).join(', ') || 'Unknown Artist',
-          album: track.albums?.[0]?.title || 'Unknown Album',
-          duration: Math.floor((track.durationMs || 0) / 1000),
-          genre: track.albums?.[0]?.genre || 'unknown',
-          cover_url: track.coverUri ? `https://${track.coverUri.replace('%%', '400x400')}` : undefined,
-          preview_url: undefined, // Превью требуют дополнительных запросов
-          available: track.available,
-        };
-      });
-
-    console.log(`Processed ${processedTracks.length} available tracks.`);
-
-    // Формируем и отправляем успешный ответ
-    const result = {
-      metadata: {
-        total_tracks: processedTracks.length,
-        generated_at: new Date().toISOString(),
-        source: 'Yandex Music API (Direct HTTP)'
-      },
-      tracks: processedTracks,
-    };
-
-    return res.status(200).json(result);
-
-  } catch (error) {
-    console.error('Yandex Music API Error:', error);
-    
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-
-    // Возвращаем более понятную ошибку, если проблема в авторизации
-    if (errorMessage.toLowerCase().includes('auth') || 
-        errorMessage.toLowerCase().includes('401') ||
-        errorMessage.toLowerCase().includes('unauthorized')) {
-      return res.status(401).json({
-        error: 'Authorization failed. Your Session_id is likely invalid or expired. Please update it.',
-        details: errorMessage
-      });
-    }
-
-    // Общая ошибка сервера
-    return res.status(500).json({
-      error: 'Failed to fetch data from Yandex Music.',
-      details: errorMessage
-    });
-  }
 }
 
-// API route - реализуем функцию напрямую для тестирования
-app.post('/api/getYandexData', async (req, res) => {
-  try {
-    // Реализуем API функцию напрямую для локального тестирования
-    await handleYandexMusicAPI(req, res);
-  } catch (error) {
-    console.error('API Error:', error);
-    res.status(500).json({ error: 'Internal server error', details: error.message });
-  }
-});
+async function testFixedAPI() {
+    console.log('🚀 Тестирование исправленного API');
+    console.log('================================');
+    console.log(`OAuth токен: ${OAUTH_TOKEN.substring(0, 20)}...`);
+    console.log('');
 
-// Serve test page
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'test-api.html'));
-});
+    try {
+        // Тест нашего исправленного API
+        console.log('🌐 Тестируем наш исправленный Vercel API...');
+        
+        const apiResponse = await makeRequest('https://visualization-of-the-musical-soul.vercel.app/api/getYandexData', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token: OAUTH_TOKEN })
+        });
 
-app.listen(PORT, () => {
-  console.log(`Test server running at http://localhost:${PORT}`);
-  console.log('Open this URL in your browser to test the API');
+        console.log(`Статус API: ${apiResponse.status}`);
+        
+        if (apiResponse.status === 200) {
+            const data = apiResponse.data;
+            console.log('✅ API работает успешно!');
+            console.log(`📊 Статистика:`);
+            console.log(`   Всего треков: ${data.tracks?.length || 0}`);
+            console.log(`   Источник: ${data.metadata?.source}`);
+            console.log(`   Время генерации: ${data.metadata?.generated_at}`);
+            
+            if (data.tracks && data.tracks.length > 0) {
+                const availableCount = data.tracks.filter(t => t.available).length;
+                const withPreviewCount = data.tracks.filter(t => t.preview_url).length;
+                
+                console.log(`   Доступных треков: ${availableCount}`);
+                console.log(`   С превью: ${withPreviewCount}`);
+                console.log('');
+                console.log('🎵 Примеры треков:');
+                
+                data.tracks.slice(0, 5).forEach((track, index) => {
+                    console.log(`   ${index + 1}. "${track.title}" - ${track.artist}`);
+                    console.log(`      Альбом: ${track.album}`);
+                    console.log(`      Жанр: ${track.genre}`);
+                    console.log(`      Доступен: ${track.available ? '✅' : '❌'}`);
+                    console.log('');
+                });
+                
+                console.log('🎉 УСПЕХ! Проблема решена!');
+                console.log(`🎯 Ожидаемый результат в приложении: ${data.tracks.length} треков`);
+            } else {
+                console.log('❌ API не вернул треков');
+            }
+        } else {
+            console.log(`❌ Ошибка API: ${apiResponse.status}`);
+            console.log('Детали ошибки:', JSON.stringify(apiResponse.data, null, 2));
+        }
+
+    } catch (error) {
+        console.log(`❌ Ошибка тестирования: ${error.message}`);
+    }
+}
+
+// Запускаем тест
+testFixedAPI().then(() => {
+    console.log('');
+    console.log('✅ Тестирование завершено');
+}).catch((error) => {
+    console.log(`❌ Критическая ошибка: ${error.message}`);
 });
