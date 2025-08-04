@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crystal Track System Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            max-width: 300px;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+        }
+        
+        button {
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 8px 12px;
+            margin: 2px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background: #555;
+        }
+        
+        .status {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        
+        .error {
+            color: #f44336;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div id="info">
+        <h3>🔮 Crystal Track System Test</h3>
+        <div id="status">Initializing...</div>
+        <div id="stats"></div>
+    </div>
+    
+    <div id="controls">
+        <button onclick="toggleRotation()">Toggle Rotation</button>
+        <button onclick="regenerateCluster()">Regenerate Cluster</button>
+        <button onclick="togglePulsation()">Toggle Pulsation</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+        import { CrystalTrackSystem } from './src/soul-galaxy/core/CrystalTrackSystem.js';
+
+        // Test data
+        const testTracks = [
+            {
+                id: '1',
+                name: 'Master of Puppets',
+                artist: 'Metallica',
+                album: 'Master of Puppets',
+                genre: 'metal',
+                popularity: 95,
+                duration: 515,
+                color: '#FF0000',
+                size: 2.5,
+                position: new THREE.Vector3(0, 0, 0)
+            },
+            {
+                id: '2',
+                name: 'Bohemian Rhapsody',
+                artist: 'Queen',
+                album: 'A Night at the Opera',
+                genre: 'rock',
+                popularity: 98,
+                duration: 355,
+                color: '#FF4500',
+                size: 2.8,
+                position: new THREE.Vector3(0, 0, 0)
+            },
+            {
+                id: '3',
+                name: 'Smells Like Teen Spirit',
+                artist: 'Nirvana',
+                album: 'Nevermind',
+                genre: 'rock',
+                popularity: 92,
+                duration: 301,
+                color: '#FF4500',
+                size: 2.3,
+                position: new THREE.Vector3(0, 0, 0)
+            },
+            {
+                id: '4',
+                name: 'Billie Jean',
+                artist: 'Michael Jackson',
+                album: 'Thriller',
+                genre: 'pop',
+                popularity: 96,
+                duration: 294,
+                color: '#FFD700',
+                size: 2.6,
+                position: new THREE.Vector3(0, 0, 0)
+            },
+            {
+                id: '5',
+                name: 'Creep',
+                artist: 'Radiohead',
+                album: 'Pablo Honey',
+                genre: 'indie',
+                popularity: 88,
+                duration: 238,
+                color: '#4169E1',
+                size: 2.1,
+                position: new THREE.Vector3(0, 0, 0)
+            },
+            {
+                id: '6',
+                name: 'Around the World',
+                artist: 'Daft Punk',
+                album: 'Homework',
+                genre: 'electronic',
+                popularity: 85,
+                duration: 428,
+                color: '#9400D3',
+                size: 2.0,
+                position: new THREE.Vector3(0, 0, 0)
+            },
+            {
+                id: '7',
+                name: 'Take Five',
+                artist: 'Dave Brubeck',
+                album: 'Time Out',
+                genre: 'jazz',
+                popularity: 78,
+                duration: 324,
+                color: '#228B22',
+                size: 1.8,
+                position: new THREE.Vector3(0, 0, 0)
+            },
+            {
+                id: '8',
+                name: 'Anarchy in the U.K.',
+                artist: 'Sex Pistols',
+                album: 'Never Mind the Bollocks',
+                genre: 'punk',
+                popularity: 82,
+                duration: 213,
+                color: '#FF0000',
+                size: 1.9,
+                position: new THREE.Vector3(0, 0, 0)
+            }
+        ];
+
+        // Scene setup
+        let scene, camera, renderer, controls;
+        let crystalTrackSystem;
+        let rotationEnabled = true;
+        let pulsationEnabled = true;
+
+        function init() {
+            const container = document.getElementById('container');
+            
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000011);
+            scene.fog = new THREE.Fog(0x000011, 50, 200);
+            
+            // Camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 20, 50);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+            
+            // Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            directionalLight.position.set(50, 50, 50);
+            directionalLight.castShadow = true;
+            scene.add(directionalLight);
+            
+            // Initialize Crystal Track System
+            crystalTrackSystem = new CrystalTrackSystem();
+            crystalTrackSystem.initialize(scene, camera);
+            
+            // Create crystal cluster
+            crystalTrackSystem.createCrystalCluster(testTracks);
+            
+            // Set BPM for some tracks (testing BPM-based pulsation)
+            crystalTrackSystem.setPulsationFromBPM(testTracks[0], 120); // Master of Puppets
+            crystalTrackSystem.setPulsationFromBPM(testTracks[1], 72);  // Bohemian Rhapsody
+            crystalTrackSystem.setPulsationFromBPM(testTracks[3], 117); // Billie Jean
+            
+            updateStatus('✅ Crystal Track System initialized successfully!');
+            updateStats();
+            
+            // Handle window resize
+            window.addEventListener('resize', onWindowResize);
+            
+            // Start animation loop
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            controls.update();
+            
+            if (rotationEnabled) {
+                crystalTrackSystem.rotateCluster(16); // ~60 FPS
+            }
+            
+            if (pulsationEnabled) {
+                crystalTrackSystem.updatePulsation(16); // ~60 FPS
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function updateStatus(message) {
+            const statusEl = document.getElementById('status');
+            statusEl.innerHTML = message;
+            statusEl.className = message.includes('✅') ? 'status' : 
+                               message.includes('❌') ? 'error' : '';
+        }
+
+        function updateStats() {
+            const crystalTracks = crystalTrackSystem.getCrystalTracks();
+            const cluster = crystalTrackSystem.getCrystalCluster();
+            
+            const genreCount = {};
+            crystalTracks.forEach(track => {
+                genreCount[track.genre] = (genreCount[track.genre] || 0) + 1;
+            });
+            
+            let statsHtml = `
+                <strong>Cluster Statistics:</strong><br>
+                • Total crystals: ${crystalTracks.length}<br>
+                • Cluster children: ${cluster ? cluster.children.length : 0}<br>
+                • Rotation speed: ${crystalTrackSystem.getClusterRotationSpeed().toFixed(4)}<br>
+                <br><strong>Genre Distribution:</strong><br>
+            `;
+            
+            Object.entries(genreCount)
+                .sort(([,a], [,b]) => b - a)
+                .forEach(([genre, count]) => {
+                    statsHtml += `• ${genre}: ${count}<br>`;
+                });
+            
+            document.getElementById('stats').innerHTML = statsHtml;
+        }
+
+        // Control functions
+        window.toggleRotation = function() {
+            rotationEnabled = !rotationEnabled;
+            updateStatus(rotationEnabled ? '🔄 Rotation enabled' : '⏸️ Rotation paused');
+        };
+
+        window.regenerateCluster = function() {
+            updateStatus('🔄 Regenerating cluster...');
+            crystalTrackSystem.createCrystalCluster(testTracks);
+            updateStats();
+            updateStatus('✅ Cluster regenerated!');
+        };
+
+        window.togglePulsation = function() {
+            pulsationEnabled = !pulsationEnabled;
+            updateStatus(pulsationEnabled ? '💓 Pulsation enabled' : '⏸️ Pulsation paused');
+        };
+
+        // Initialize when page loads
+        init();
+    </script>
+</body>
+</html>

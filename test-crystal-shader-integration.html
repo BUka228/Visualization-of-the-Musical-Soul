@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crystal Shader Integration Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 100;
+            max-width: 350px;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 100;
+            max-width: 250px;
+        }
+        
+        .control-group {
+            margin-bottom: 10px;
+        }
+        
+        label {
+            display: inline-block;
+            width: 100px;
+            font-size: 11px;
+        }
+        
+        input[type="range"] {
+            width: 80px;
+        }
+        
+        button {
+            margin: 2px;
+            padding: 5px 8px;
+            font-size: 10px;
+            cursor: pointer;
+        }
+        
+        select {
+            width: 120px;
+            font-size: 11px;
+        }
+        
+        .genre-metal { color: #FF0040; }
+        .genre-rock { color: #0080FF; }
+        .genre-punk { color: #00FF40; }
+        .genre-electronic { color: #8000FF; }
+        .genre-jazz { color: #FFD700; }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>Crystal Shader Integration Test</h3>
+        <p>Testing CrystalShaderMaterial integration with CrystalTrackSystem</p>
+        <div id="stats"></div>
+        <div id="crystalInfo"></div>
+    </div>
+    
+    <div id="controls">
+        <div class="control-group">
+            <label>Global Speed:</label>
+            <input type="range" id="globalSpeed" min="0.1" max="3" step="0.1" value="1.0">
+            <span id="globalSpeedValue">1.0</span>
+        </div>
+        
+        <div class="control-group">
+            <label>Global Amplitude:</label>
+            <input type="range" id="globalAmplitude" min="0.1" max="2" step="0.1" value="1.0">
+            <span id="globalAmplitudeValue">1.0</span>
+        </div>
+        
+        <div class="control-group">
+            <button id="focusBtn">Focus Random</button>
+            <button id="resetBtn">Reset Focus</button>
+        </div>
+        
+        <div class="control-group">
+            <button id="rotateBtn">Toggle Rotation</button>
+            <button id="pulseBtn">Toggle Pulse</button>
+        </div>
+        
+        <div class="control-group">
+            <label>Filter Genre:</label>
+            <select id="genreFilter">
+                <option value="all">All Genres</option>
+                <option value="metal">Metal</option>
+                <option value="rock">Rock</option>
+                <option value="punk">Punk</option>
+                <option value="electronic">Electronic</option>
+                <option value="jazz">Jazz</option>
+            </select>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from './node_modules/three/build/three.module.js';
+        import { CrystalTrackSystem } from './src/soul-galaxy/core/CrystalTrackSystem.js';
+        import { CrystalShaderMaterial } from './src/soul-galaxy/materials/CrystalShaderMaterial.js';
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000011);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        // Store camera reference in scene for pulse system
+        scene.userData.camera = camera;
+
+        // Create test track data
+        const testTracks = [
+            {
+                id: 'track1',
+                name: 'Thunderstorm',
+                artist: 'Metal Band',
+                album: 'Heavy Thunder',
+                genre: 'metal',
+                popularity: 85,
+                duration: 240,
+                color: '#FF0040',
+                size: 1.2,
+                position: new THREE.Vector3(-8, 2, 0)
+            },
+            {
+                id: 'track2',
+                name: 'Blue Highway',
+                artist: 'Rock Group',
+                album: 'Road Songs',
+                genre: 'rock',
+                popularity: 70,
+                duration: 210,
+                color: '#0080FF',
+                size: 1.0,
+                position: new THREE.Vector3(-4, -1, 3)
+            },
+            {
+                id: 'track3',
+                name: 'Anarchy Rising',
+                artist: 'Punk Collective',
+                album: 'Rebellion',
+                genre: 'punk',
+                popularity: 60,
+                duration: 180,
+                color: '#00FF40',
+                size: 0.9,
+                position: new THREE.Vector3(0, 3, -2)
+            },
+            {
+                id: 'track4',
+                name: 'Digital Dreams',
+                artist: 'Synth Master',
+                album: 'Cyber World',
+                genre: 'electronic',
+                popularity: 90,
+                duration: 300,
+                color: '#8000FF',
+                size: 1.3,
+                position: new THREE.Vector3(4, -2, 1)
+            },
+            {
+                id: 'track5',
+                name: 'Midnight Blues',
+                artist: 'Jazz Quartet',
+                album: 'Late Night',
+                genre: 'jazz',
+                popularity: 75,
+                duration: 270,
+                color: '#FFD700',
+                size: 1.1,
+                position: new THREE.Vector3(8, 1, -3)
+            }
+        ];
+
+        // Initialize crystal track system
+        const crystalSystem = new CrystalTrackSystem();
+        crystalSystem.initialize(scene, camera);
+        crystalSystem.createCrystalCluster(testTracks);
+
+        // Add lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.2);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(10, 10, 5);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        scene.add(directionalLight);
+
+        // Add point lights for dramatic effect
+        const pointLight1 = new THREE.PointLight(0xFF0040, 0.5, 20);
+        pointLight1.position.set(-10, 5, 0);
+        scene.add(pointLight1);
+
+        const pointLight2 = new THREE.PointLight(0x0080FF, 0.5, 20);
+        pointLight2.position.set(10, -5, 0);
+        scene.add(pointLight2);
+
+        // Position camera
+        camera.position.set(0, 5, 15);
+        camera.lookAt(0, 0, 0);
+
+        // Animation state
+        let time = 0;
+        let rotationEnabled = true;
+        let pulseEnabled = true;
+        let focusedCrystal = null;
+        let globalSpeedMultiplier = 1.0;
+        let globalAmplitudeMultiplier = 1.0;
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const deltaTime = 16; // ~60fps
+            time += 0.016;
+            
+            // Update crystal system
+            if (pulseEnabled) {
+                crystalSystem.updatePulsation(deltaTime);
+            }
+            
+            if (rotationEnabled) {
+                crystalSystem.rotateCluster(deltaTime);
+            }
+            
+            // Update all crystal materials with time
+            const cluster = crystalSystem.getCrystalCluster();
+            if (cluster) {
+                cluster.children.forEach(child => {
+                    if (child instanceof THREE.Mesh && child.material && 'updateTime' in child.material) {
+                        const material = child.material;
+                        material.updateTime(time);
+                        material.updateCameraPosition(camera.position);
+                    }
+                });
+            }
+            
+            // Animate lights
+            pointLight1.position.x = Math.sin(time * 0.5) * 10;
+            pointLight2.position.z = Math.cos(time * 0.3) * 10;
+            
+            renderer.render(scene, camera);
+            updateStats();
+        }
+
+        function updateStats() {
+            const crystalTracks = crystalSystem.getCrystalTracks();
+            const cluster = crystalSystem.getCrystalCluster();
+            
+            const stats = document.getElementById('stats');
+            stats.innerHTML = `
+                <strong>Crystals:</strong> ${crystalTracks.length}<br>
+                <strong>Time:</strong> ${time.toFixed(2)}s<br>
+                <strong>Rotation:</strong> ${rotationEnabled ? 'ON' : 'OFF'}<br>
+                <strong>Pulse:</strong> ${pulseEnabled ? 'ON' : 'OFF'}<br>
+                <strong>Focused:</strong> ${focusedCrystal ? focusedCrystal.userData.trackName : 'None'}
+            `;
+            
+            // Update crystal info
+            const crystalInfo = document.getElementById('crystalInfo');
+            let infoHtml = '<strong>Genre Distribution:</strong><br>';
+            const genreCount = {};
+            
+            crystalTracks.forEach(crystal => {
+                genreCount[crystal.genre] = (genreCount[crystal.genre] || 0) + 1;
+            });
+            
+            Object.entries(genreCount).forEach(([genre, count]) => {
+                infoHtml += `<span class="genre-${genre}">${genre}: ${count}</span><br>`;
+            });
+            
+            crystalInfo.innerHTML = infoHtml;
+        }
+
+        // Controls
+        const globalSpeedSlider = document.getElementById('globalSpeed');
+        const globalAmplitudeSlider = document.getElementById('globalAmplitude');
+        const focusBtn = document.getElementById('focusBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const rotateBtn = document.getElementById('rotateBtn');
+        const pulseBtn = document.getElementById('pulseBtn');
+        const genreFilter = document.getElementById('genreFilter');
+
+        globalSpeedSlider.addEventListener('input', (e) => {
+            globalSpeedMultiplier = parseFloat(e.target.value);
+            document.getElementById('globalSpeedValue').textContent = globalSpeedMultiplier;
+            
+            // Apply to all crystals
+            const cluster = crystalSystem.getCrystalCluster();
+            if (cluster) {
+                cluster.children.forEach(child => {
+                    if (child instanceof THREE.Mesh && child.material && 'setPulsationParams' in child.material) {
+                        const material = child.material;
+                        const currentAmplitude = material.uniforms.pulseAmplitude.value;
+                        const currentSharpness = material.uniforms.sharpness.value;
+                        material.setPulsationParams(currentAmplitude, globalSpeedMultiplier, currentSharpness);
+                    }
+                });
+            }
+        });
+
+        globalAmplitudeSlider.addEventListener('input', (e) => {
+            globalAmplitudeMultiplier = parseFloat(e.target.value);
+            document.getElementById('globalAmplitudeValue').textContent = globalAmplitudeMultiplier;
+            
+            // Apply to all crystals
+            const cluster = crystalSystem.getCrystalCluster();
+            if (cluster) {
+                cluster.children.forEach(child => {
+                    if (child instanceof THREE.Mesh && child.material && 'setPulsationParams' in child.material) {
+                        const material = child.material;
+                        const currentSpeed = material.uniforms.pulseSpeed.value;
+                        const currentSharpness = material.uniforms.sharpness.value;
+                        material.setPulsationParams(globalAmplitudeMultiplier * 0.15, currentSpeed, currentSharpness);
+                    }
+                });
+            }
+        });
+
+        focusBtn.addEventListener('click', () => {
+            const crystalTracks = crystalSystem.getCrystalTracks();
+            if (crystalTracks.length > 0) {
+                // Reset previous focus
+                if (focusedCrystal) {
+                    if (focusedCrystal.material && 'setFocused' in focusedCrystal.material) {
+                        focusedCrystal.material.setFocused(false);
+                    }
+                }
+                
+                // Focus on random crystal
+                const randomIndex = Math.floor(Math.random() * crystalTracks.length);
+                const randomCrystal = crystalTracks[randomIndex];
+                crystalSystem.focusOnCrystal(randomCrystal);
+                
+                // Find the mesh
+                const cluster = crystalSystem.getCrystalCluster();
+                if (cluster) {
+                    focusedCrystal = cluster.children.find(child => 
+                        child.userData.trackId === randomCrystal.id
+                    );
+                }
+                
+                console.log('Focused on:', randomCrystal.name, 'by', randomCrystal.artist);
+            }
+        });
+
+        resetBtn.addEventListener('click', () => {
+            if (focusedCrystal && focusedCrystal.material && 'setFocused' in focusedCrystal.material) {
+                focusedCrystal.material.setFocused(false);
+                focusedCrystal = null;
+            }
+            
+            // Reset all crystals
+            const crystalTracks = crystalSystem.getCrystalTracks();
+            crystalTracks.forEach(crystal => {
+                crystal.isFocused = false;
+            });
+        });
+
+        rotateBtn.addEventListener('click', () => {
+            rotationEnabled = !rotationEnabled;
+        });
+
+        pulseBtn.addEventListener('click', () => {
+            pulseEnabled = !pulseEnabled;
+        });
+
+        genreFilter.addEventListener('change', (e) => {
+            const selectedGenre = e.target.value;
+            const cluster = crystalSystem.getCrystalCluster();
+            
+            if (cluster) {
+                cluster.children.forEach(child => {
+                    if (child instanceof THREE.Mesh) {
+                        if (selectedGenre === 'all' || child.userData.genre === selectedGenre) {
+                            child.visible = true;
+                        } else {
+                            child.visible = false;
+                        }
+                    }
+                });
+            }
+        });
+
+        // Mouse interaction
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        renderer.domElement.addEventListener('click', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            
+            const cluster = crystalSystem.getCrystalCluster();
+            if (cluster) {
+                const intersects = raycaster.intersectObjects(cluster.children);
+
+                if (intersects.length > 0) {
+                    const clickedMesh = intersects[0].object;
+                    
+                    // Reset previous focus
+                    if (focusedCrystal && focusedCrystal.material && 'setFocused' in focusedCrystal.material) {
+                        focusedCrystal.material.setFocused(false);
+                    }
+                    
+                    // Focus on clicked crystal
+                    if (clickedMesh.material && 'setFocused' in clickedMesh.material) {
+                        clickedMesh.material.setFocused(true);
+                        focusedCrystal = clickedMesh;
+                        
+                        console.log('Clicked on:', clickedMesh.userData.trackName, 'by', clickedMesh.userData.artist);
+                    }
+                }
+            }
+        });
+
+        // Mouse hover
+        renderer.domElement.addEventListener('mousemove', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            
+            const cluster = crystalSystem.getCrystalCluster();
+            if (cluster) {
+                const intersects = raycaster.intersectObjects(cluster.children);
+
+                // Reset all hover states
+                cluster.children.forEach(child => {
+                    if (child instanceof THREE.Mesh && child.material && 'setHovered' in child.material) {
+                        child.material.setHovered(false);
+                    }
+                });
+
+                // Set hover on intersected object
+                if (intersects.length > 0) {
+                    const hoveredMesh = intersects[0].object;
+                    if (hoveredMesh.material && 'setHovered' in hoveredMesh.material) {
+                        hoveredMesh.material.setHovered(true);
+                    }
+                }
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Start animation
+        animate();
+
+        console.log('Crystal Shader Integration test initialized');
+        console.log('Crystal tracks:', crystalSystem.getCrystalTracks());
+    </script>
+</body>
+</html>

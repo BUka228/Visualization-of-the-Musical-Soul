@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crystal Shader Material Verification</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #000;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        
+        #console {
+            background: #111;
+            border: 1px solid #333;
+            padding: 20px;
+            border-radius: 5px;
+            height: 80vh;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        .success { color: #0f0; }
+        .error { color: #f00; }
+        .info { color: #0ff; }
+        .warning { color: #ff0; }
+    </style>
+</head>
+<body>
+    <h1>Crystal Shader Material Verification</h1>
+    <div id="console"></div>
+
+    <script type="module">
+        // Capture console output
+        const consoleDiv = document.getElementById('console');
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        function addToConsole(message, type = 'info') {
+            const span = document.createElement('span');
+            span.className = type;
+            span.textContent = message + '\n';
+            consoleDiv.appendChild(span);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+        
+        console.log = (...args) => {
+            const message = args.join(' ');
+            addToConsole(message, message.includes('✅') ? 'success' : 
+                                 message.includes('❌') ? 'error' : 
+                                 message.includes('🎉') ? 'success' : 'info');
+            originalLog(...args);
+        };
+        
+        console.error = (...args) => {
+            const message = args.join(' ');
+            addToConsole(message, 'error');
+            originalError(...args);
+        };
+        
+        console.warn = (...args) => {
+            const message = args.join(' ');
+            addToConsole(message, 'warning');
+            originalWarn(...args);
+        };
+        
+        // Import and run verification
+        import('./verify-crystal-shader-material.js');
+    </script>
+</body>
+</html>

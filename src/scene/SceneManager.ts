@@ -235,7 +235,7 @@ export class SceneManager implements ISceneManager {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   }
 
-  createTrackObjects(tracks: ProcessedTrack[]): void {
+  async createTrackObjects(tracks: ProcessedTrack[]): Promise<void> {
     console.log(`🌌 Создание ${tracks.length} кристаллических треков в Soul Galaxy режиме...`);
     
     // Очистка существующих объектов
@@ -253,7 +253,7 @@ export class SceneManager implements ISceneManager {
     }
     
     // Создаем кристаллический кластер через Soul Galaxy рендерер
-    this.soulGalaxyRenderer.createCrystalCluster(tracks);
+    await this.soulGalaxyRenderer.createCrystalCluster(tracks);
     
     console.log(`✅ Создан кристаллический кластер из ${tracks.length} треков`);
     this.logGenreDistribution(tracks);

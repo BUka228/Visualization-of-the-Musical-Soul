@@ -155,14 +155,14 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
     }
   }
 
-  loadTracks(tracks: ProcessedTrack[]): void {
+  async loadTracks(tracks: ProcessedTrack[]): Promise<void> {
     console.log(`Загрузка ${tracks.length} треков в 3D-сцену...`);
     
     this.state.tracks = tracks;
     
     if (this.sceneManager) {
       // Создаем 3D-объекты для треков
-      this.sceneManager.createTrackObjects(tracks);
+      await this.sceneManager.createTrackObjects(tracks);
       console.log('3D-объекты треков созданы и анимации запущены');
     }
   }

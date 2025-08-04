@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Crystal Pulse Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            color: white;
+            z-index: 100;
+            max-width: 300px;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        
+        .control-group input[type="range"] {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        
+        .control-group span {
+            font-size: 12px;
+            color: #ccc;
+        }
+        
+        .info {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            color: white;
+            z-index: 100;
+            font-size: 14px;
+        }
+        
+        .genre-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 10px;
+        }
+        
+        .genre-btn {
+            padding: 5px 10px;
+            background: #333;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .genre-btn:hover {
+            background: #555;
+        }
+        
+        .genre-btn.active {
+            background: #0080ff;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div class="controls">
+        <h3>🎵 Enhanced Pulse Controls</h3>
+        
+        <div class="control-group">
+            <label>Pulse Amplitude:</label>
+            <input type="range" id="pulseAmplitude" min="0" max="1.0" step="0.05" value="0.35">
+            <span id="pulseAmplitudeValue">0.35</span>
+        </div>
+        
+        <div class="control-group">
+            <label>Pulse Speed:</label>
+            <input type="range" id="pulseSpeed" min="0.1" max="5" step="0.1" value="1.5">
+            <span id="pulseSpeedValue">1.5</span>
+        </div>
+        
+        <div class="control-group">
+            <label>Sharpness:</label>
+            <input type="range" id="sharpness" min="0.1" max="5" step="0.1" value="1.0">
+            <span id="sharpnessValue">1.0</span>
+        </div>
+        
+        <div class="control-group">
+            <label>Emissive Intensity:</label>
+            <input type="range" id="emissive" min="0" max="2" step="0.1" value="0.5">
+            <span id="emissiveValue">0.5</span>
+        </div>
+        
+        <div class="control-group">
+            <label>Genre:</label>
+            <div class="genre-buttons">
+                <button class="genre-btn active" data-genre="metal">Metal</button>
+                <button class="genre-btn" data-genre="electronic">Electronic</button>
+                <button class="genre-btn" data-genre="rock">Rock</button>
+                <button class="genre-btn" data-genre="jazz">Jazz</button>
+                <button class="genre-btn" data-genre="pop">Pop</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="info">
+        <h4>🔥 Enhanced Pulsation Features:</h4>
+        <ul>
+            <li>Increased default amplitude: 0.35</li>
+            <li>Faster default speed: 1.5</li>
+            <li>Additional harmonic wave</li>
+            <li>More dramatic emissive glow</li>
+            <li>Enhanced opacity pulsation</li>
+        </ul>
+        <p><strong>Click crystals to focus them!</strong></p>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
+        import { CrystalShaderMaterial } from './src/soul-galaxy/materials/CrystalShaderMaterial.js';
+        import { CrystalGeometryGenerator } from './src/soul-galaxy/core/CrystalGeometryGenerator.js';
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000011, 1);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        
+        document.getElementById('container').appendChild(renderer.domElement);
+
+        // Camera position
+        camera.position.set(0, 0, 10);
+
+        // Create crystals with different genres
+        const crystals = [];
+        const genres = ['metal', 'electronic', 'rock', 'jazz', 'pop'];
+        
+        for (let i = 0; i < 5; i++) {
+            const geometry = CrystalGeometryGenerator.generateCrystal({
+                complexity: 'medium',
+                size: 1.0,
+                asymmetry: 0.3
+            });
+            
+            const material = CrystalShaderMaterial.createForGenre(genres[i], {
+                emissiveIntensity: 0.5,
+                pulseAmplitude: 0.35,
+                pulseSpeed: 1.5 + i * 0.2,
+                sharpness: 1.0 + (i === 0 ? 0.5 : 0)
+            });
+            
+            const crystal = new THREE.Mesh(geometry, material);
+            crystal.position.x = (i - 2) * 3;
+            crystal.position.y = Math.sin(i) * 2;
+            crystal.userData = { genre: genres[i] };
+            
+            scene.add(crystal);
+            crystals.push(crystal);
+        }
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.3);
+        scene.add(ambientLight);
+
+        const pointLight = new THREE.PointLight(0xffffff, 1, 100);
+        pointLight.position.set(10, 10, 10);
+        scene.add(pointLight);
+
+        // Controls
+        const pulseAmplitudeSlider = document.getElementById('pulseAmplitude');
+        const pulseSpeedSlider = document.getElementById('pulseSpeed');
+        const sharpnessSlider = document.getElementById('sharpness');
+        const emissiveSlider = document.getElementById('emissive');
+        const genreButtons = document.querySelectorAll('.genre-btn');
+
+        let selectedCrystal = crystals[0];
+        let currentGenre = 'metal';
+
+        // Update controls
+        function updateControls() {
+            document.getElementById('pulseAmplitudeValue').textContent = pulseAmplitudeSlider.value;
+            document.getElementById('pulseSpeedValue').textContent = pulseSpeedSlider.value;
+            document.getElementById('sharpnessValue').textContent = sharpnessSlider.value;
+            document.getElementById('emissiveValue').textContent = emissiveSlider.value;
+        }
+
+        pulseAmplitudeSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            selectedCrystal.material.setPulsationParams(
+                value,
+                parseFloat(pulseSpeedSlider.value),
+                parseFloat(sharpnessSlider.value)
+            );
+            updateControls();
+        });
+
+        pulseSpeedSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            selectedCrystal.material.setPulsationParams(
+                parseFloat(pulseAmplitudeSlider.value),
+                value,
+                parseFloat(sharpnessSlider.value)
+            );
+            updateControls();
+        });
+
+        sharpnessSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            selectedCrystal.material.setPulsationParams(
+                parseFloat(pulseAmplitudeSlider.value),
+                parseFloat(pulseSpeedSlider.value),
+                value
+            );
+            updateControls();
+        });
+
+        emissiveSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            selectedCrystal.material.setEmissiveIntensity(value);
+            updateControls();
+        });
+
+        // Genre selection
+        genreButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                genreButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                const genre = btn.dataset.genre;
+                currentGenre = genre;
+                
+                const crystal = crystals.find(c => c.userData.genre === genre);
+                if (crystal) {
+                    selectedCrystal = crystal;
+                    
+                    // Update sliders to match selected crystal
+                    pulseAmplitudeSlider.value = crystal.material.uniforms.pulseAmplitude.value;
+                    pulseSpeedSlider.value = crystal.material.uniforms.pulseSpeed.value;
+                    sharpnessSlider.value = crystal.material.uniforms.sharpness.value;
+                    emissiveSlider.value = crystal.material.uniforms.emissiveIntensity.value;
+                    updateControls();
+                }
+            });
+        });
+
+        // Mouse interaction
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function onMouseClick(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(crystals);
+
+            if (intersects.length > 0) {
+                const clickedCrystal = intersects[0].object;
+                
+                // Reset all crystals
+                crystals.forEach(crystal => {
+                    crystal.material.setFocused(false);
+                });
+                
+                // Focus clicked crystal
+                clickedCrystal.material.setFocused(true);
+                selectedCrystal = clickedCrystal;
+                currentGenre = clickedCrystal.userData.genre;
+                
+                // Update UI
+                genreButtons.forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.genre === currentGenre);
+                });
+                
+                // Update sliders
+                pulseAmplitudeSlider.value = clickedCrystal.material.uniforms.pulseAmplitude.value;
+                pulseSpeedSlider.value = clickedCrystal.material.uniforms.pulseSpeed.value;
+                sharpnessSlider.value = clickedCrystal.material.uniforms.sharpness.value;
+                emissiveSlider.value = clickedCrystal.material.uniforms.emissiveIntensity.value;
+                updateControls();
+            }
+        }
+
+        window.addEventListener('click', onMouseClick);
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = Date.now() * 0.001;
+
+            // Update all crystal materials
+            crystals.forEach((crystal, index) => {
+                crystal.material.updateTime(time);
+                crystal.material.updateCameraPosition(camera.position);
+                
+                // Rotate crystals slowly
+                crystal.rotation.x += 0.005;
+                crystal.rotation.y += 0.01;
+            });
+
+            // Auto-rotate camera
+            camera.position.x = Math.cos(time * 0.1) * 15;
+            camera.position.z = Math.sin(time * 0.1) * 15;
+            camera.lookAt(0, 0, 0);
+
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Initialize
+        updateControls();
+        animate();
+
+        console.log('🎵 Enhanced Crystal Pulse Test loaded!');
+        console.log('✨ Features:');
+        console.log('  - Increased pulse amplitude: 0.35 (was 0.15)');
+        console.log('  - Faster pulse speed: 1.5 (was 1.0)');
+        console.log('  - Additional harmonic wave for breathing effect');
+        console.log('  - More dramatic emissive glow (1.2x multiplier)');
+        console.log('  - Enhanced opacity pulsation (0.4 range)');
+    </script>
+</body>
+</html>

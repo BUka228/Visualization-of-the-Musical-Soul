@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Crystal Geometry Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            max-width: 350px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 5px;
+        }
+        
+        button {
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 8px 12px;
+            margin: 2px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        
+        button:hover {
+            background: #555;
+        }
+        
+        button.active {
+            background: #4CAF50;
+        }
+        
+        .status {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        
+        .error {
+            color: #f44336;
+            font-weight: bold;
+        }
+        
+        .genre-section {
+            margin: 10px 0;
+            padding: 8px;
+            border-left: 3px solid #555;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .geometry-stats {
+            font-size: 10px;
+            color: #aaa;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div id="info">
+        <h3>🔮 Advanced Crystal Geometry Test</h3>
+        <div id="status">Initializing...</div>
+        <div id="stats"></div>
+    </div>
+    
+    <div id="controls">
+        <button onclick="showGenre('all')" class="active">All Genres</button>
+        <button onclick="showGenre('metal')">Metal</button>
+        <button onclick="showGenre('rock')">Rock</button>
+        <button onclick="showGenre('punk')">Punk</button>
+        <button onclick="showGenre('electronic')">Electronic</button>
+        <button onclick="showGenre('jazz')">Jazz</button>
+        <button onclick="showGenre('pop')">Pop</button>
+        <br>
+        <button onclick="toggleWireframe()">Toggle Wireframe</button>
+        <button onclick="regenerateGeometry()">Regenerate</button>
+        <button onclick="toggleRotation()">Toggle Rotation</button>
+        <button onclick="showLODTest()">LOD Test</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+        import { CrystalGeometryGenerator } from './src/soul-galaxy/core/CrystalGeometryGenerator.js';
+
+        // Enhanced test data with different characteristics
+        const testTracks = [
+            // Metal - should be sharp and rough
+            {
+                id: 'metal1',
+                name: 'Master of Puppets',
+                artist: 'Metallica',
+                album: 'Master of Puppets',
+                genre: 'metal',
+                popularity: 95,
+                duration: 515,
+                color: '#FF0000',
+                size: 2.5,
+                position: new THREE.Vector3(0, 0, 0)
+            },
+            {
+                id: 'metal2',
+                name: 'Paranoid',
+                artist: 'Black Sabbath',
+                album: 'Paranoid',
+                genre: 'metal',
+                popularity: 88,
+                duration: 170,
+                color: '#FF0000',
+                size: 2.2,
+                position: new THREE.Vector3(0, 0, 0)
+            },
+            // Rock - moderate sharpness
+            {
+                id: 'rock1',
+                name: 'Bohemian Rhapsody',
+                artist: 'Queen',
+                album: 'A Night at the Opera',
+                genre: 'rock',
+                popularity: 98,
+                duration: 355,
+                color: '#FF4500',
+                size: 2.8,
+                position: new THREE.Vector3(0, 0, 0)
+            },
+            {
+                id: 'rock2',
+                name: 'Stairway to Heaven',
+                artist: 'Led Zeppelin',
+                album: 'Led Zeppelin IV',
+                genre: 'rock',
+                popularity: 96,
+                duration: 482,
+                color: '#FF4500',
+                size: 2.7,
+                position: new THREE.Vector3(0, 0, 0)
+            },
+            // Punk - very sharp and rough
+            {
+                id: 'punk1',
+                name: 'Anarchy in the U.K.',
+                artist: 'Sex Pistols',
+                album: 'Never Mind the Bollocks',
+                genre: 'punk',
+                popularity: 82,
+                duration: 213,
+                color: '#FF0000',
+                size: 1.9,
+                position: new THREE.Vector3(0, 0, 0)
+            },
+            {
+                id: 'punk2',
+                name: 'Blitzkrieg Bop',
+                artist: 'Ramones',
+                album: 'Ramones',
+                genre: 'punk',
+                popularity: 79,
+                duration: 130,
+                color: '#FF0000',
+                size: 1.8,
+                position: new THREE.Vector3(0, 0, 0)
+            },
+            // Electronic - elongated and smooth
+            {
+                id: 'electronic1',
+                name: 'Around the World',
+                artist: 'Daft Punk',
+                album: 'Homework',
+                genre: 'electronic',
+                popularity: 85,
+                duration: 428,
+                color: '#9400D3',
+                size: 2.0,
+                position: new THREE.Vector3(0, 0, 0)
+            },
+            {
+                id: 'electronic2',
+                name: 'Strobe',
+                artist: 'Deadmau5',
+                album: 'For Lack of a Better Name',
+                genre: 'electronic',
+                popularity: 83,
+                duration: 645,
+                color: '#9400D3',
+                size: 2.1,
+                position: new THREE.Vector3(0, 0, 0)
+            },
+            // Jazz - smooth and moderate
+            {
+                id: 'jazz1',
+                name: 'Take Five',
+                artist: 'Dave Brubeck',
+                album: 'Time Out',
+                genre: 'jazz',
+                popularity: 78,
+                duration: 324,
+                color: '#228B22',
+                size: 1.8,
+                position: new THREE.Vector3(0, 0, 0)
+            },
+            {
+                id: 'jazz2',
+                name: 'So What',
+                artist: 'Miles Davis',
+                album: 'Kind of Blue',
+                genre: 'jazz',
+                popularity: 81,
+                duration: 562,
+                color: '#228B22',
+                size: 1.9,
+                position: new THREE.Vector3(0, 0, 0)
+            },
+            // Pop - balanced characteristics
+            {
+                id: 'pop1',
+                name: 'Billie Jean',
+                artist: 'Michael Jackson',
+                album: 'Thriller',
+                genre: 'pop',
+                popularity: 96,
+                duration: 294,
+                color: '#FFD700',
+                size: 2.6,
+                position: new THREE.Vector3(0, 0, 0)
+            },
+            {
+                id: 'pop2',
+                name: 'Like a Prayer',
+                artist: 'Madonna',
+                album: 'Like a Prayer',
+                genre: 'pop',
+                popularity: 89,
+                duration: 339,
+                color: '#FFD700',
+                size: 2.3,
+                position: new THREE.Vector3(0, 0, 0)
+            }
+        ];
+
+        // Scene setup
+        let scene, camera, renderer, controls;
+        let crystalMeshes = [];
+        let currentGenreFilter = 'all';
+        let wireframeMode = false;
+        let rotationEnabled = true;
+        let lodTestMode = false;
+
+        function init() {
+            const container = document.getElementById('container');
+            
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000011);
+            scene.fog = new THREE.Fog(0x000011, 50, 200);
+            
+            // Camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 10, 25);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+            
+            // Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            directionalLight.position.set(50, 50, 50);
+            directionalLight.castShadow = true;
+            scene.add(directionalLight);
+            
+            // Create crystals
+            createCrystals();
+            
+            updateStatus('✅ Advanced Crystal Geometry System initialized!');
+            updateStats();
+            
+            // Handle window resize
+            window.addEventListener('resize', onWindowResize);
+            
+            // Start animation loop
+            animate();
+        }
+
+        function createCrystals() {
+            // Clear existing crystals
+            crystalMeshes.forEach(mesh => {
+                scene.remove(mesh);
+                mesh.geometry.dispose();
+                if (mesh.material instanceof THREE.Material) {
+                    mesh.material.dispose();
+                }
+            });
+            crystalMeshes = [];
+
+            // Position crystals in a grid for comparison
+            const gridSize = Math.ceil(Math.sqrt(testTracks.length));
+            const spacing = 8;
+            
+            testTracks.forEach((track, index) => {
+                const row = Math.floor(index / gridSize);
+                const col = index % gridSize;
+                
+                // Generate advanced crystal geometry
+                const crystalData = CrystalGeometryGenerator.createAdvancedCrystalGeometry(track);
+                const geometry = crystalData.geometry;
+                
+                // Create material
+                const material = new THREE.MeshStandardMaterial({
+                    color: new THREE.Color(track.color),
+                    emissive: new THREE.Color(track.color).multiplyScalar(0.2),
+                    emissiveIntensity: 0.3,
+                    metalness: 0.8,
+                    roughness: crystalData.roughnessLevel,
+                    wireframe: wireframeMode
+                });
+                
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.set(
+                    (col - gridSize / 2) * spacing,
+                    0,
+                    (row - gridSize / 2) * spacing
+                );
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                
+                // Store metadata
+                mesh.userData = {
+                    track: track,
+                    crystalData: crystalData,
+                    originalPosition: mesh.position.clone()
+                };
+                
+                scene.add(mesh);
+                crystalMeshes.push(mesh);
+            });
+        }
+
+        function createLODCrystals() {
+            // Clear existing crystals
+            crystalMeshes.forEach(mesh => {
+                scene.remove(mesh);
+                mesh.geometry.dispose();
+                if (mesh.material instanceof THREE.Material) {
+                    mesh.material.dispose();
+                }
+            });
+            crystalMeshes = [];
+
+            // Create LOD test with one track at different detail levels
+            const testTrack = testTracks[0]; // Use metal track for testing
+            const lodLevels = [0, 1, 2, 3]; // Different LOD levels
+            
+            lodLevels.forEach((lodLevel, index) => {
+                const geometry = lodLevel === 0 
+                    ? CrystalGeometryGenerator.generateCrystalGeometry(testTrack)
+                    : CrystalGeometryGenerator.createLODGeometry(testTrack, lodLevel);
+                
+                const material = new THREE.MeshStandardMaterial({
+                    color: new THREE.Color(testTrack.color),
+                    emissive: new THREE.Color(testTrack.color).multiplyScalar(0.2),
+                    emissiveIntensity: 0.3,
+                    metalness: 0.8,
+                    roughness: 0.3,
+                    wireframe: wireframeMode
+                });
+                
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.set((index - 1.5) * 8, 0, 0);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                
+                // Store metadata
+                mesh.userData = {
+                    track: testTrack,
+                    lodLevel: lodLevel,
+                    originalPosition: mesh.position.clone()
+                };
+                
+                scene.add(mesh);
+                crystalMeshes.push(mesh);
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            controls.update();
+            
+            if (rotationEnabled) {
+                crystalMeshes.forEach((mesh, index) => {
+                    mesh.rotation.x += 0.005;
+                    mesh.rotation.y += 0.01;
+                    
+                    // Add slight floating animation
+                    const time = Date.now() * 0.001;
+                    mesh.position.y = mesh.userData.originalPosition.y + Math.sin(time + index) * 0.5;
+                });
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function updateStatus(message) {
+            const statusEl = document.getElementById('status');
+            statusEl.innerHTML = message;
+            statusEl.className = message.includes('✅') ? 'status' : 
+                               message.includes('❌') ? 'error' : '';
+        }
+
+        function updateStats() {
+            let statsHtml = '<strong>Crystal Geometry Statistics:</strong><br>';
+            
+            if (lodTestMode) {
+                statsHtml += '<div class="genre-section"><strong>LOD Test Mode</strong><br>';
+                crystalMeshes.forEach((mesh, index) => {
+                    const stats = CrystalGeometryGenerator.getGeometryStats(mesh.geometry);
+                    statsHtml += `LOD ${mesh.userData.lodLevel}: ${stats.vertexCount}v, ${stats.faceCount}f, ${(stats.memoryUsage/1024).toFixed(1)}KB<br>`;
+                });
+                statsHtml += '</div>';
+            } else {
+                const genreStats = {};
+                let totalVertices = 0;
+                let totalFaces = 0;
+                let totalMemory = 0;
+                
+                crystalMeshes.forEach(mesh => {
+                    const track = mesh.userData.track;
+                    const crystalData = mesh.userData.crystalData;
+                    const geometryStats = CrystalGeometryGenerator.getGeometryStats(mesh.geometry);
+                    
+                    if (!genreStats[track.genre]) {
+                        genreStats[track.genre] = {
+                            count: 0,
+                            totalVertices: 0,
+                            totalFaces: 0,
+                            totalMemory: 0,
+                            tracks: []
+                        };
+                    }
+                    
+                    genreStats[track.genre].count++;
+                    genreStats[track.genre].totalVertices += geometryStats.vertexCount;
+                    genreStats[track.genre].totalFaces += geometryStats.faceCount;
+                    genreStats[track.genre].totalMemory += geometryStats.memoryUsage;
+                    genreStats[track.genre].tracks.push({
+                        name: track.name,
+                        artist: track.artist,
+                        facetCount: crystalData.facetCount,
+                        roughness: crystalData.roughnessLevel.toFixed(2),
+                        vertices: geometryStats.vertexCount,
+                        faces: geometryStats.faceCount,
+                        memory: geometryStats.memoryUsage
+                    });
+                    
+                    totalVertices += geometryStats.vertexCount;
+                    totalFaces += geometryStats.faceCount;
+                    totalMemory += geometryStats.memoryUsage;
+                });
+                
+                statsHtml += `<strong>Total:</strong> ${crystalMeshes.length} crystals, ${totalVertices} vertices, ${totalFaces} faces, ${(totalMemory/1024).toFixed(1)}KB<br><br>`;
+                
+                Object.entries(genreStats).forEach(([genre, stats]) => {
+                    if (currentGenreFilter === 'all' || currentGenreFilter === genre) {
+                        statsHtml += `<div class="genre-section">`;
+                        statsHtml += `<strong>${genre.toUpperCase()}</strong> (${stats.count} crystals)<br>`;
+                        statsHtml += `Avg: ${Math.round(stats.totalVertices/stats.count)}v, ${Math.round(stats.totalFaces/stats.count)}f<br>`;
+                        
+                        stats.tracks.forEach(track => {
+                            statsHtml += `<div class="geometry-stats">`;
+                            statsHtml += `${track.name} - ${track.artist}<br>`;
+                            statsHtml += `Facets: ${track.facetCount}, Roughness: ${track.roughness}<br>`;
+                            statsHtml += `Geometry: ${track.vertices}v, ${track.faces}f, ${(track.memory/1024).toFixed(1)}KB`;
+                            statsHtml += `</div>`;
+                        });
+                        
+                        statsHtml += `</div>`;
+                    }
+                });
+            }
+            
+            document.getElementById('stats').innerHTML = statsHtml;
+        }
+
+        // Control functions
+        window.showGenre = function(genre) {
+            currentGenreFilter = genre;
+            
+            // Update button states
+            document.querySelectorAll('#controls button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Show/hide crystals
+            crystalMeshes.forEach(mesh => {
+                const trackGenre = mesh.userData.track ? mesh.userData.track.genre : 'unknown';
+                mesh.visible = (genre === 'all' || trackGenre === genre);
+            });
+            
+            updateStats();
+            updateStatus(`🎵 Showing ${genre === 'all' ? 'all genres' : genre + ' crystals'}`);
+        };
+
+        window.toggleWireframe = function() {
+            wireframeMode = !wireframeMode;
+            crystalMeshes.forEach(mesh => {
+                if (mesh.material instanceof THREE.Material) {
+                    mesh.material.wireframe = wireframeMode;
+                }
+            });
+            updateStatus(wireframeMode ? '🔲 Wireframe mode enabled' : '🔳 Solid mode enabled');
+        };
+
+        window.regenerateGeometry = function() {
+            updateStatus('🔄 Regenerating crystal geometry...');
+            if (lodTestMode) {
+                createLODCrystals();
+            } else {
+                createCrystals();
+            }
+            updateStats();
+            updateStatus('✅ Crystal geometry regenerated!');
+        };
+
+        window.toggleRotation = function() {
+            rotationEnabled = !rotationEnabled;
+            updateStatus(rotationEnabled ? '🔄 Rotation enabled' : '⏸️ Rotation paused');
+        };
+
+        window.showLODTest = function() {
+            lodTestMode = !lodTestMode;
+            if (lodTestMode) {
+                createLODCrystals();
+                updateStatus('🔍 LOD Test Mode - showing different detail levels');
+            } else {
+                createCrystals();
+                updateStatus('🔮 Normal Mode - showing all genre crystals');
+            }
+            updateStats();
+        };
+
+        // Initialize when page loads
+        init();
+    </script>
+</body>
+</html>

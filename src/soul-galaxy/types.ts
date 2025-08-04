@@ -6,7 +6,7 @@ import { ProcessedTrack } from '../types';
 // Soul Galaxy specific interfaces
 export interface SoulGalaxyRenderer {
   initialize(scene: THREE.Scene, camera: THREE.Camera): void;
-  createCrystalCluster(tracks: ProcessedTrack[]): void;
+  createCrystalCluster(tracks: ProcessedTrack[]): Promise<void>;
   updateScene(deltaTime: number): void;
   dispose(): void;
 }
@@ -23,9 +23,9 @@ export interface DeepSpaceEnvironment {
 }
 
 export interface CrystalTrackSystem {
-  createCrystalCluster(tracks: ProcessedTrack[]): void;
+  createCrystalCluster(tracks: ProcessedTrack[]): Promise<void>;
   generateCrystalGeometry(track: ProcessedTrack): THREE.BufferGeometry;
-  createCrystalMaterial(track: ProcessedTrack): THREE.ShaderMaterial;
+  createCrystalMaterial(crystalTrack: CrystalTrack): THREE.ShaderMaterial;
   updatePulsation(deltaTime: number): void;
   setPulsationFromBPM(track: ProcessedTrack, bpm?: number): void;
   rotateCluster(deltaTime: number): void;

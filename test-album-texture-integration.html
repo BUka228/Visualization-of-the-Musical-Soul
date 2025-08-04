@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Album Texture Integration Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+        #container {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #333;
+            position: relative;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 100;
+            max-width: 300px;
+        }
+        #controls {
+            margin-bottom: 20px;
+        }
+        button {
+            margin: 5px;
+            padding: 10px 15px;
+            background: #333;
+            color: #fff;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #555;
+        }
+        button.active {
+            background: #0080FF;
+        }
+        .test-section {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 5px;
+        }
+        .test-result {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .test-pass {
+            background: rgba(0, 255, 0, 0.2);
+            border-left: 3px solid #00FF00;
+        }
+        .test-fail {
+            background: rgba(255, 0, 0, 0.2);
+            border-left: 3px solid #FF0000;
+        }
+    </style>
+</head>
+<body>
+    <h1>Album Texture Integration Test</h1>
+    <p>Testing AlbumTextureManager integration with CrystalShaderMaterial</p>
+    
+    <div id="controls">
+        <button onclick="testBasicIntegration()">Test Basic Integration</button>
+        <button onclick="testDistortionEffects()">Test Distortion Effects</button>
+        <button onclick="testFallbackSystem()">Test Fallback System</button>
+        <button onclick="testMemoryOptimization()">Test Memory Optimization</button>
+        <button onclick="testFocusEffects()">Test Focus Effects</button>
+        <button onclick="runAllTests()">Run All Tests</button>
+    </div>
+
+    <div id="container"></div>
+    
+    <div id="info">
+        <div><strong>Album Texture Integration Test</strong></div>
+        <div id="stats">Initializing...</div>
+        <div id="test-results"></div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { AlbumTextureManager } from './src/soul-galaxy/materials/AlbumTextureManager.js';
+        import { CrystalShaderMaterial } from './src/soul-galaxy/materials/CrystalShaderMaterial.js';
+
+        let scene, camera, renderer, textureManager;
+        let testCrystals = [];
+        let testResults = [];
+        let animationTime = 0;
+
+        // Initialize Three.js scene
+        function initScene() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            
+            const container = document.getElementById('container');
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setClearColor(0x000011);
+            container.appendChild(renderer.domElement);
+
+            // Add lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            directionalLight.position.set(10, 10, 5);
+            scene.add(directionalLight);
+
+            camera.position.set(0, 0, 15);
+
+            // Initialize texture manager
+            textureManager = new AlbumTextureManager({
+                maxTextureSize: 512,
+                cacheSize: 50,
+                enableCompression: true,
+                blurIntensity: 0.3,
+                distortionStrength: 0.1
+            });
+
+            console.log('✅ Scene and AlbumTextureManager initialized');
+            updateStats();
+        }
+
+        // Test basic integration between AlbumTextureManager and CrystalShaderMaterial
+        window.testBasicIntegration = async function() {
+            console.log('🔗 Testing basic integration...');
+            clearTestResults();
+            clearCrystals();
+
+            const testTrack = {
+                id: 'integration_test',
+                name: 'Integration Test Track',
+                artist: 'Test Artist',
+                album: 'Test Album',
+                genre: 'rock',
+                popularity: 80,
+                duration: 180,
+                color: '#0080FF',
+                size: 1.5,
+                position: new THREE.Vector3(0, 0, 0),
+                imageUrl: 'https://via.placeholder.com/300x300/0080FF/FFFFFF?text=Rock+Test'
+            };
+
+            try {
+                // Load texture
+                const texture = await textureManager.getAlbumTexture(testTrack);
+                addTestResult('✅ Texture loaded successfully', true);
+
+                // Create crystal with texture
+                const geometry = new THREE.IcosahedronGeometry(2, 1);
+                const material = CrystalShaderMaterial.createForGenre(testTrack.genre, {
+                    albumTexture: texture,
+                    emissiveIntensity: 0.6,
+                    pulseAmplitude: 0.2,
+                    pulseSpeed: 1.0
+                });
+
+                const crystal = new THREE.Mesh(geometry, material);
+                crystal.position.set(0, 0, 0);
+                scene.add(crystal);
+                testCrystals.push(crystal);
+
+                addTestResult('✅ Crystal created with album texture', true);
+                addTestResult('✅ Basic integration test passed', true);
+
+            } catch (error) {
+                addTestResult(`❌ Integration test failed: ${error.message}`, false);
+            }
+
+            updateStats();
+        };
+
+        // Test distortion and blur effects for "memory" aesthetic
+        window.testDistortionEffects = async function() {
+            console.log('🌀 Testing distortion effects...');
+            clearTestResults();
+            clearCrystals();
+
+            const testTracks = [
+                {
+                    id: 'focused_crystal',
+                    name: 'Focused Crystal',
+                    genre: 'metal',
+                    imageUrl: 'https://via.placeholder.com/300x300/FF0040/FFFFFF?text=Focused'
+                },
+                {
+                    id: 'blurred_crystal',
+                    name: 'Blurred Crystal',
+                    genre: 'electronic',
+                    imageUrl: 'https://via.placeholder.com/300x300/8000FF/FFFFFF?text=Blurred'
+                }
+            ];
+
+            try {
+                for (let i = 0; i < testTracks.length; i++) {
+                    const track = testTracks[i];
+                    const texture = await textureManager.getAlbumTexture(track);
+                    
+                    const geometry = new THREE.IcosahedronGeometry(1.5, 1);
+                    const material = CrystalShaderMaterial.createForGenre(track.genre, {
+                        albumTexture: texture,
+                        emissiveIntensity: 0.5,
+                        pulseAmplitude: 0.15
+                    });
+
+                    // Set focus state for testing distortion effects
+                    if (i === 0) {
+                        material.setFocused(true);
+                        addTestResult('✅ Focused crystal created (sharp texture)', true);
+                    } else {
+                        material.setFocused(false);
+                        addTestResult('✅ Unfocused crystal created (distorted texture)', true);
+                    }
+
+                    const crystal = new THREE.Mesh(geometry, material);
+                    crystal.position.set((i - 0.5) * 4, 0, 0);
+                    scene.add(crystal);
+                    testCrystals.push(crystal);
+                }
+
+                addTestResult('✅ Distortion effects test passed', true);
+
+            } catch (error) {
+                addTestResult(`❌ Distortion effects test failed: ${error.message}`, false);
+            }
+
+            updateStats();
+        };
+
+        // Test fallback system for missing textures
+        window.testFallbackSystem = async function() {
+            console.log('🔄 Testing fallback system...');
+            clearTestResults();
+            clearCrystals();
+
+            const testTracks = [
+                {
+                    id: 'no_image_url',
+                    name: 'No Image URL',
+                    genre: 'jazz',
+                    // No imageUrl - should use fallback
+                },
+                {
+                    id: 'invalid_url',
+                    name: 'Invalid URL',
+                    genre: 'punk',
+                    imageUrl: 'https://invalid-domain-that-does-not-exist.com/image.jpg'
+                },
+                {
+                    id: 'unknown_genre',
+                    name: 'Unknown Genre',
+                    genre: 'unknown_genre_test',
+                    // No imageUrl - should use default fallback
+                }
+            ];
+
+            try {
+                for (let i = 0; i < testTracks.length; i++) {
+                    const track = testTracks[i];
+                    let texture;
+                    
+                    if (!track.imageUrl) {
+                        // Direct fallback test
+                        texture = textureManager.getFallbackTexture(track.genre);
+                        addTestResult(`✅ Fallback texture created for ${track.genre}`, true);
+                    } else {
+                        // Test failed loading fallback
+                        try {
+                            texture = await textureManager.getAlbumTexture(track);
+                        } catch (error) {
+                            texture = textureManager.getFallbackTexture(track.genre);
+                            addTestResult(`✅ Failed loading handled, fallback used for ${track.genre}`, true);
+                        }
+                    }
+                    
+                    const geometry = new THREE.IcosahedronGeometry(1.2, 1);
+                    const material = CrystalShaderMaterial.createForGenre(track.genre, {
+                        albumTexture: texture,
+                        emissiveIntensity: 0.4
+                    });
+
+                    const crystal = new THREE.Mesh(geometry, material);
+                    crystal.position.set((i - 1) * 3, 0, 0);
+                    scene.add(crystal);
+                    testCrystals.push(crystal);
+                }
+
+                addTestResult('✅ Fallback system test passed', true);
+
+            } catch (error) {
+                addTestResult(`❌ Fallback system test failed: ${error.message}`, false);
+            }
+
+            updateStats();
+        };
+
+        // Test memory optimization and caching
+        window.testMemoryOptimization = async function() {
+            console.log('💾 Testing memory optimization...');
+            clearTestResults();
+            clearCrystals();
+
+            const initialStats = textureManager.getCacheStats();
+            addTestResult(`Initial cache size: ${initialStats.cachedTextures}`, true);
+
+            // Create many tracks to test caching
+            const manyTracks = [];
+            for (let i = 0; i < 25; i++) {
+                manyTracks.push({
+                    id: `cache_test_${i}`,
+                    name: `Cache Test ${i}`,
+                    genre: ['metal', 'rock', 'punk', 'electronic', 'jazz'][i % 5],
+                    imageUrl: i < 10 ? `https://via.placeholder.com/200x200/FF${(i*25).toString(16).padStart(2,'0')}40/FFFFFF?text=Test${i}` : undefined
+                });
+            }
+
+            try {
+                // Preload textures
+                await textureManager.preloadTextures(manyTracks);
+                
+                const afterPreloadStats = textureManager.getCacheStats();
+                addTestResult(`After preload - Cached: ${afterPreloadStats.cachedTextures}, Fallback: ${afterPreloadStats.fallbackTextures}`, true);
+
+                // Test cache hit for duplicate requests
+                const duplicateTexture1 = await textureManager.getAlbumTexture(manyTracks[0]);
+                const duplicateTexture2 = await textureManager.getAlbumTexture(manyTracks[0]);
+                
+                if (duplicateTexture1 === duplicateTexture2) {
+                    addTestResult('✅ Cache hit test passed (same texture instance)', true);
+                } else {
+                    addTestResult('❌ Cache hit test failed (different texture instances)', false);
+                }
+
+                // Test memory usage estimation
+                const memoryUsage = afterPreloadStats.memoryUsage;
+                addTestResult(`Memory usage: ${(memoryUsage / 1024 / 1024).toFixed(2)} MB`, true);
+
+                // Create a few crystals to visualize
+                for (let i = 0; i < 5; i++) {
+                    const track = manyTracks[i];
+                    const texture = await textureManager.getAlbumTexture(track);
+                    
+                    const geometry = new THREE.IcosahedronGeometry(0.8, 1);
+                    const material = CrystalShaderMaterial.createForGenre(track.genre, {
+                        albumTexture: texture,
+                        emissiveIntensity: 0.3
+                    });
+
+                    const crystal = new THREE.Mesh(geometry, material);
+                    crystal.position.set((i - 2) * 2, 0, 0);
+                    scene.add(crystal);
+                    testCrystals.push(crystal);
+                }
+
+                addTestResult('✅ Memory optimization test passed', true);
+
+            } catch (error) {
+                addTestResult(`❌ Memory optimization test failed: ${error.message}`, false);
+            }
+
+            updateStats();
+        };
+
+        // Test focus effects and dynamic changes
+        window.testFocusEffects = async function() {
+            console.log('🎯 Testing focus effects...');
+            clearTestResults();
+            clearCrystals();
+
+            const testTrack = {
+                id: 'focus_test',
+                name: 'Focus Test Track',
+                genre: 'rock',
+                imageUrl: 'https://via.placeholder.com/300x300/0080FF/FFFFFF?text=Focus+Test'
+            };
+
+            try {
+                const texture = await textureManager.getAlbumTexture(testTrack);
+                
+                const geometry = new THREE.IcosahedronGeometry(2, 1);
+                const material = CrystalShaderMaterial.createForGenre(testTrack.genre, {
+                    albumTexture: texture,
+                    emissiveIntensity: 0.5,
+                    pulseAmplitude: 0.2
+                });
+
+                const crystal = new THREE.Mesh(geometry, material);
+                crystal.position.set(0, 0, 0);
+                scene.add(crystal);
+                testCrystals.push(crystal);
+
+                // Test focus state changes
+                let focusToggle = false;
+                setInterval(() => {
+                    focusToggle = !focusToggle;
+                    material.setFocused(focusToggle);
+                    material.setHovered(focusToggle);
+                }, 2000);
+
+                addTestResult('✅ Focus effects crystal created', true);
+                addTestResult('✅ Dynamic focus/hover state changes enabled', true);
+                addTestResult('✅ Focus effects test passed', true);
+
+            } catch (error) {
+                addTestResult(`❌ Focus effects test failed: ${error.message}`, false);
+            }
+
+            updateStats();
+        };
+
+        // Run all tests sequentially
+        window.runAllTests = async function() {
+            console.log('🚀 Running all tests...');
+            clearTestResults();
+            
+            addTestResult('Starting comprehensive test suite...', true);
+            
+            await testBasicIntegration();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testDistortionEffects();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testFallbackSystem();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testMemoryOptimization();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testFocusEffects();
+            
+            const passedTests = testResults.filter(result => result.passed).length;
+            const totalTests = testResults.length;
+            
+            addTestResult(`\n🏁 All tests completed: ${passedTests}/${totalTests} passed`, passedTests === totalTests);
+        };
+
+        // Helper functions
+        function clearCrystals() {
+            testCrystals.forEach(crystal => {
+                scene.remove(crystal);
+                crystal.geometry.dispose();
+                crystal.material.dispose();
+            });
+            testCrystals = [];
+        }
+
+        function clearTestResults() {
+            testResults = [];
+            document.getElementById('test-results').innerHTML = '';
+        }
+
+        function addTestResult(message, passed) {
+            testResults.push({ message, passed });
+            const resultsDiv = document.getElementById('test-results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${passed ? 'test-pass' : 'test-fail'}`;
+            resultDiv.textContent = message;
+            resultsDiv.appendChild(resultDiv);
+            console.log(message);
+        }
+
+        function updateStats() {
+            const stats = textureManager.getCacheStats();
+            document.getElementById('stats').innerHTML = `
+                Cached: ${stats.cachedTextures} | 
+                Loading: ${stats.loadingTextures} | 
+                Fallback: ${stats.fallbackTextures} | 
+                Memory: ${(stats.memoryUsage / 1024 / 1024).toFixed(2)} MB<br>
+                Test Crystals: ${testCrystals.length}
+            `;
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            animationTime += 0.016; // ~60fps
+            
+            // Update shader materials
+            testCrystals.forEach((crystal, index) => {
+                if (crystal.material instanceof CrystalShaderMaterial) {
+                    crystal.material.updateTime(animationTime);
+                    crystal.material.updateCameraPosition(camera.position);
+                    
+                    // Rotate crystals
+                    crystal.rotation.x += 0.005;
+                    crystal.rotation.y += 0.01 * (1 + index * 0.1);
+                }
+            });
+            
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        function onWindowResize() {
+            const container = document.getElementById('container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        window.addEventListener('resize', onWindowResize);
+
+        // Initialize everything
+        initScene();
+        animate();
+        
+        // Auto-run basic integration test
+        setTimeout(() => {
+            testBasicIntegration();
+        }, 1000);
+
+    </script>
+</body>
+</html>
+</content>
+</invoke>

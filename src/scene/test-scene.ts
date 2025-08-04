@@ -3,7 +3,7 @@ import { ProcessedTrack } from '../types';
 import * as THREE from 'three';
 
 // Тестовая функция для проверки SceneManager
-export function testSceneManager(): void {
+export async function testSceneManager(): Promise<void> {
   console.log('=== Тестирование SceneManager ===');
   
   // Создание тестового контейнера
@@ -90,7 +90,7 @@ export function testSceneManager(): void {
     ];
     
     // Создание объектов треков
-    sceneManager.createTrackObjects(testTracks);
+    await sceneManager.createTrackObjects(testTracks);
     // Classic track objects removed - Soul Galaxy handles visualization
     console.log('✓ Объекты треков созданы через Soul Galaxy рендерер');
     

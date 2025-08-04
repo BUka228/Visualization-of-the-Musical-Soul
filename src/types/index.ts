@@ -30,6 +30,7 @@ export interface ProcessedTrack {
   popularity: number;
   duration: number;
   previewUrl?: string;
+  imageUrl?: string;
   color: string;
   size: number;
   position: Vector3;
@@ -80,7 +81,7 @@ export interface DataProcessor {
 
 export interface SceneManager {
   initializeScene(): void;
-  createTrackObjects(tracks: ProcessedTrack[]): void;
+  createTrackObjects(tracks: ProcessedTrack[]): Promise<void>;
   updateScene(): void;
   dispose(): void;
   getScene(): THREE.Scene;
@@ -211,7 +212,7 @@ export interface AppState {
 // Главный интерфейс приложения
 export interface MusicGalaxyApp {
   initialize(container: HTMLElement): Promise<void>;
-  loadTracks(tracks: Track[]): void;
+  loadTracks(tracks: ProcessedTrack[]): Promise<void>;
   selectTrack(trackId: string): void;
   resetView(): void;
   toggleAnimation(): void;

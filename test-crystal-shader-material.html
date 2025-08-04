@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crystal Shader Material Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 100;
+            max-width: 300px;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 100;
+        }
+        
+        .control-group {
+            margin-bottom: 10px;
+        }
+        
+        label {
+            display: inline-block;
+            width: 120px;
+            font-size: 11px;
+        }
+        
+        input[type="range"] {
+            width: 100px;
+        }
+        
+        button {
+            margin: 2px;
+            padding: 5px 10px;
+            font-size: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>Crystal Shader Material Test</h3>
+        <p>Testing CrystalShaderMaterial with pulsation effects</p>
+        <div id="stats"></div>
+    </div>
+    
+    <div id="controls">
+        <div class="control-group">
+            <label>Pulse Amplitude:</label>
+            <input type="range" id="pulseAmplitude" min="0" max="1.0" step="0.05" value="0.35">
+            <span id="pulseAmplitudeValue">0.35</span>
+        </div>
+        
+        <div class="control-group">
+            <label>Pulse Speed:</label>
+            <input type="range" id="pulseSpeed" min="0.1" max="5" step="0.1" value="1.0">
+            <span id="pulseSpeedValue">1.0</span>
+        </div>
+        
+        <div class="control-group">
+            <label>Sharpness:</label>
+            <input type="range" id="sharpness" min="0.1" max="3" step="0.1" value="1.0">
+            <span id="sharpnessValue">1.0</span>
+        </div>
+        
+        <div class="control-group">
+            <label>Emissive:</label>
+            <input type="range" id="emissive" min="0" max="2" step="0.1" value="0.5">
+            <span id="emissiveValue">0.5</span>
+        </div>
+        
+        <div class="control-group">
+            <button id="focusBtn">Toggle Focus</button>
+            <button id="hoverBtn">Toggle Hover</button>
+        </div>
+        
+        <div class="control-group">
+            <label>Genre:</label>
+            <select id="genreSelect">
+                <option value="metal">Metal (Red)</option>
+                <option value="rock">Rock (Blue)</option>
+                <option value="punk">Punk (Green)</option>
+                <option value="electronic">Electronic (Purple)</option>
+                <option value="jazz">Jazz (Gold)</option>
+                <option value="classical">Classical (Silver)</option>
+                <option value="pop">Pop (Pink)</option>
+                <option value="indie">Indie (Cyan)</option>
+                <option value="hiphop">Hip-Hop (Orange)</option>
+                <option value="default">Default (White)</option>
+            </select>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from './node_modules/three/build/three.module.js';
+        import { CrystalShaderMaterial } from './src/soul-galaxy/materials/CrystalShaderMaterial.js';
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000011);
+        document.body.appendChild(renderer.domElement);
+
+        // Create crystal geometry (rough, faceted)
+        function createCrystalGeometry() {
+            const geometry = new THREE.BufferGeometry();
+            
+            // Create a rough crystal shape using multiple tetrahedrons
+            const vertices = [];
+            const normals = [];
+            const uvs = [];
+            const pulsePhases = [];
+            const bpmMultipliers = [];
+            const originalPositions = [];
+            const facetNormals = [];
+            
+            // Create multiple facets for crystal-like appearance
+            const facetCount = 12;
+            const radius = 1;
+            
+            for (let i = 0; i < facetCount; i++) {
+                const angle1 = (i / facetCount) * Math.PI * 2;
+                const angle2 = ((i + 1) / facetCount) * Math.PI * 2;
+                const height = (Math.random() - 0.5) * 0.5;
+                
+                // Create triangular facet
+                const v1 = new THREE.Vector3(0, 0, 0);
+                const v2 = new THREE.Vector3(
+                    Math.cos(angle1) * radius * (0.8 + Math.random() * 0.4),
+                    Math.sin(angle1) * radius * (0.8 + Math.random() * 0.4),
+                    height
+                );
+                const v3 = new THREE.Vector3(
+                    Math.cos(angle2) * radius * (0.8 + Math.random() * 0.4),
+                    Math.sin(angle2) * radius * (0.8 + Math.random() * 0.4),
+                    height
+                );
+                
+                // Calculate facet normal
+                const edge1 = new THREE.Vector3().subVectors(v2, v1);
+                const edge2 = new THREE.Vector3().subVectors(v3, v1);
+                const facetNormal = new THREE.Vector3().crossVectors(edge1, edge2).normalize();
+                
+                // Add vertices
+                vertices.push(v1.x, v1.y, v1.z);
+                vertices.push(v2.x, v2.y, v2.z);
+                vertices.push(v3.x, v3.y, v3.z);
+                
+                // Add normals (same for all vertices of facet)
+                for (let j = 0; j < 3; j++) {
+                    normals.push(facetNormal.x, facetNormal.y, facetNormal.z);
+                    facetNormals.push(facetNormal.x, facetNormal.y, facetNormal.z);
+                }
+                
+                // Add UVs
+                uvs.push(0.5, 0.5);
+                uvs.push(0, 1);
+                uvs.push(1, 1);
+                
+                // Add pulse attributes
+                const pulsePhase = Math.random() * Math.PI * 2;
+                const bpmMultiplier = 0.8 + Math.random() * 0.4;
+                
+                for (let j = 0; j < 3; j++) {
+                    pulsePhases.push(pulsePhase);
+                    bpmMultipliers.push(bpmMultiplier);
+                }
+                
+                // Store original positions
+                originalPositions.push(v1.x, v1.y, v1.z);
+                originalPositions.push(v2.x, v2.y, v2.z);
+                originalPositions.push(v3.x, v3.y, v3.z);
+            }
+            
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+            geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+            geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+            geometry.setAttribute('pulsePhase', new THREE.Float32BufferAttribute(pulsePhases, 1));
+            geometry.setAttribute('bpmMultiplier', new THREE.Float32BufferAttribute(bpmMultipliers, 1));
+            geometry.setAttribute('originalPosition', new THREE.Float32BufferAttribute(originalPositions, 3));
+            geometry.setAttribute('facetNormal', new THREE.Float32BufferAttribute(facetNormals, 3));
+            
+            return geometry;
+        }
+
+        // Create test crystals with different genres
+        const crystals = [];
+        const genres = ['metal', 'rock', 'punk', 'electronic', 'jazz'];
+        
+        for (let i = 0; i < 5; i++) {
+            const geometry = createCrystalGeometry();
+            const material = CrystalShaderMaterial.createForGenre(genres[i], {
+                emissiveIntensity: 0.5,
+                pulseAmplitude: 0.35,
+                pulseSpeed: 1.5 + i * 0.2,
+                sharpness: 1.0 + (i === 0 ? 0.5 : 0) // Metal gets extra sharpness
+            });
+            
+            const crystal = new THREE.Mesh(geometry, material);
+            crystal.position.x = (i - 2) * 3;
+            crystal.userData.genre = genres[i];
+            
+            scene.add(crystal);
+            crystals.push(crystal);
+        }
+
+        // Add lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.3);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        directionalLight.position.set(5, 5, 5);
+        scene.add(directionalLight);
+
+        // Position camera
+        camera.position.z = 8;
+        camera.position.y = 2;
+        camera.lookAt(0, 0, 0);
+
+        // Animation loop
+        let time = 0;
+        let selectedCrystal = crystals[0];
+        let isFocused = false;
+        let isHovered = false;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            time += 0.016; // ~60fps
+            
+            // Update all crystal materials
+            crystals.forEach(crystal => {
+                const material = crystal.material;
+                material.updateTime(time);
+                material.updateCameraPosition(camera.position);
+            });
+            
+            // Rotate crystals slowly
+            crystals.forEach((crystal, index) => {
+                crystal.rotation.y += 0.005 * (index + 1);
+                crystal.rotation.x += 0.003 * (index + 1);
+            });
+            
+            renderer.render(scene, camera);
+            
+            // Update stats
+            updateStats();
+        }
+
+        function updateStats() {
+            const stats = document.getElementById('stats');
+            stats.innerHTML = `
+                <strong>Crystals:</strong> ${crystals.length}<br>
+                <strong>Time:</strong> ${time.toFixed(2)}s<br>
+                <strong>Selected:</strong> ${selectedCrystal.userData.genre}<br>
+                <strong>Focused:</strong> ${isFocused}<br>
+                <strong>Hovered:</strong> ${isHovered}
+            `;
+        }
+
+        // Controls
+        const pulseAmplitudeSlider = document.getElementById('pulseAmplitude');
+        const pulseSpeedSlider = document.getElementById('pulseSpeed');
+        const sharpnessSlider = document.getElementById('sharpness');
+        const emissiveSlider = document.getElementById('emissive');
+        const focusBtn = document.getElementById('focusBtn');
+        const hoverBtn = document.getElementById('hoverBtn');
+        const genreSelect = document.getElementById('genreSelect');
+
+        pulseAmplitudeSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            document.getElementById('pulseAmplitudeValue').textContent = value;
+            selectedCrystal.material.setPulsationParams(
+                value,
+                parseFloat(pulseSpeedSlider.value),
+                parseFloat(sharpnessSlider.value)
+            );
+        });
+
+        pulseSpeedSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            document.getElementById('pulseSpeedValue').textContent = value;
+            selectedCrystal.material.setPulsationParams(
+                parseFloat(pulseAmplitudeSlider.value),
+                value,
+                parseFloat(sharpnessSlider.value)
+            );
+        });
+
+        sharpnessSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            document.getElementById('sharpnessValue').textContent = value;
+            selectedCrystal.material.setPulsationParams(
+                parseFloat(pulseAmplitudeSlider.value),
+                parseFloat(pulseSpeedSlider.value),
+                value
+            );
+        });
+
+        emissiveSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            document.getElementById('emissiveValue').textContent = value;
+            selectedCrystal.material.setEmissiveIntensity(value);
+        });
+
+        focusBtn.addEventListener('click', () => {
+            isFocused = !isFocused;
+            selectedCrystal.material.setFocused(isFocused);
+        });
+
+        hoverBtn.addEventListener('click', () => {
+            isHovered = !isHovered;
+            selectedCrystal.material.setHovered(isHovered);
+        });
+
+        genreSelect.addEventListener('change', (e) => {
+            const genre = e.target.value;
+            selectedCrystal.material.setGenreColor(genre);
+            selectedCrystal.userData.genre = genre;
+        });
+
+        // Mouse interaction for crystal selection
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        renderer.domElement.addEventListener('click', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(crystals);
+
+            if (intersects.length > 0) {
+                // Reset previous selection
+                selectedCrystal.material.setFocused(false);
+                selectedCrystal.material.setHovered(false);
+                
+                // Select new crystal
+                selectedCrystal = intersects[0].object;
+                selectedCrystal.material.setFocused(isFocused);
+                selectedCrystal.material.setHovered(isHovered);
+                
+                // Update genre selector
+                genreSelect.value = selectedCrystal.userData.genre;
+                
+                console.log('Selected crystal:', selectedCrystal.userData.genre);
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Start animation
+        animate();
+
+        console.log('Crystal Shader Material test initialized');
+        console.log('Available genre colors:', CrystalShaderMaterial.getGenreColors());
+    </script>
+</body>
+</html>

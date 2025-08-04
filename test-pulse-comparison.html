@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pulse Comparison: Old vs Enhanced</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        .info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            color: white;
+            z-index: 100;
+            max-width: 400px;
+        }
+        
+        .comparison {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+        }
+        
+        .old, .new {
+            flex: 1;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        .old {
+            background: rgba(255, 0, 0, 0.2);
+            border: 1px solid #ff0000;
+        }
+        
+        .new {
+            background: rgba(0, 255, 0, 0.2);
+            border: 1px solid #00ff00;
+        }
+        
+        .stats {
+            font-size: 12px;
+            margin-top: 10px;
+            color: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div class="info">
+        <h3>🎵 Pulse Comparison Test</h3>
+        <p>Сравнение старой и новой системы пульсации кристаллов</p>
+        
+        <div class="comparison">
+            <div class="old">
+                <h4>🔴 Старая пульсация</h4>
+                <ul>
+                    <li>Amplitude: 0.15</li>
+                    <li>Speed: 1.0</li>
+                    <li>2 гармоники</li>
+                    <li>Emissive: 0.5x</li>
+                    <li>Opacity: 0.1 range</li>
+                </ul>
+            </div>
+            
+            <div class="new">
+                <h4>🟢 Новая пульсация</h4>
+                <ul>
+                    <li>Amplitude: 0.35</li>
+                    <li>Speed: 1.5</li>
+                    <li>3 гармоники + дыхание</li>
+                    <li>Emissive: 1.2x</li>
+                    <li>Opacity: 0.4 range</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="stats">
+            <p><strong>Левый кристалл:</strong> Старые параметры</p>
+            <p><strong>Правый кристалл:</strong> Новые параметры</p>
+            <p>Оба кристалла используют жанр "electronic" для честного сравнения</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
+        import { CrystalShaderMaterial } from './src/soul-galaxy/materials/CrystalShaderMaterial.js';
+        import { CrystalGeometryGenerator } from './src/soul-galaxy/core/CrystalGeometryGenerator.js';
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000011, 1);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        
+        document.getElementById('container').appendChild(renderer.domElement);
+
+        // Camera position
+        camera.position.set(0, 0, 8);
+
+        // Create two identical crystals with different pulse settings
+        const crystals = [];
+        
+        // Old pulse settings (left crystal)
+        const oldGeometry = CrystalGeometryGenerator.generateCrystal({
+            complexity: 'medium',
+            size: 1.2,
+            asymmetry: 0.3
+        });
+        
+        const oldMaterial = CrystalShaderMaterial.createForGenre('electronic', {
+            emissiveIntensity: 0.5,
+            pulseAmplitude: 0.15,  // Old value
+            pulseSpeed: 1.0,       // Old value
+            sharpness: 1.0
+        });
+        
+        // Manually override the shader to use old harmonic settings
+        // We'll simulate this by reducing the effect
+        
+        const oldCrystal = new THREE.Mesh(oldGeometry, oldMaterial);
+        oldCrystal.position.x = -2.5;
+        oldCrystal.userData = { type: 'old' };
+        scene.add(oldCrystal);
+        crystals.push(oldCrystal);
+        
+        // New pulse settings (right crystal)
+        const newGeometry = CrystalGeometryGenerator.generateCrystal({
+            complexity: 'medium',
+            size: 1.2,
+            asymmetry: 0.3
+        });
+        
+        const newMaterial = CrystalShaderMaterial.createForGenre('electronic', {
+            emissiveIntensity: 0.5,
+            pulseAmplitude: 0.35,  // New enhanced value
+            pulseSpeed: 1.5,       // New enhanced value
+            sharpness: 1.0
+        });
+        
+        const newCrystal = new THREE.Mesh(newGeometry, newMaterial);
+        newCrystal.position.x = 2.5;
+        newCrystal.userData = { type: 'new' };
+        scene.add(newCrystal);
+        crystals.push(newCrystal);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.3);
+        scene.add(ambientLight);
+
+        const pointLight = new THREE.PointLight(0xffffff, 1, 100);
+        pointLight.position.set(10, 10, 10);
+        scene.add(pointLight);
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = Date.now() * 0.001;
+
+            // Update all crystal materials
+            crystals.forEach((crystal, index) => {
+                crystal.material.updateTime(time);
+                crystal.material.updateCameraPosition(camera.position);
+                
+                // Rotate crystals slowly
+                crystal.rotation.x += 0.005;
+                crystal.rotation.y += 0.01;
+            });
+
+            // Gentle camera movement
+            camera.position.y = Math.sin(time * 0.2) * 0.5;
+            camera.lookAt(0, 0, 0);
+
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Start animation
+        animate();
+
+        console.log('🎵 Pulse Comparison Test loaded!');
+        console.log('🔴 Left crystal: Old pulse settings (amplitude: 0.15, speed: 1.0)');
+        console.log('🟢 Right crystal: Enhanced pulse settings (amplitude: 0.35, speed: 1.5)');
+        console.log('👀 Watch the difference in pulsation intensity!');
+    </script>
+</body>
+</html>

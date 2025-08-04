@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shader Compilation Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+        #container {
+            width: 100%;
+            height: 400px;
+            border: 1px solid #333;
+            position: relative;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 100;
+            max-width: 300px;
+        }
+        .test-result {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .test-pass {
+            background: rgba(0, 255, 0, 0.2);
+            border-left: 3px solid #00FF00;
+        }
+        .test-fail {
+            background: rgba(255, 0, 0, 0.2);
+            border-left: 3px solid #FF0000;
+        }
+    </style>
+</head>
+<body>
+    <h1>Shader Compilation Test</h1>
+    <p>Testing CrystalShaderMaterial compilation and GenreColorSystem integration</p>
+    
+    <div id="container"></div>
+    
+    <div id="info">
+        <div><strong>Shader Compilation Test</strong></div>
+        <div id="results">Testing...</div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { CrystalShaderMaterial } from './dist/soul-galaxy/materials/CrystalShaderMaterial.js';
+        import { CrystalGeometryGenerator } from './dist/soul-galaxy/core/CrystalGeometryGenerator.js';
+        import { GenreColorUtils } from './dist/soul-galaxy/materials/GenreColorSystem.js';
+
+        let scene, camera, renderer;
+        let testResults = [];
+
+        function addTestResult(message, passed) {
+            testResults.push({ message, passed });
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${passed ? 'test-pass' : 'test-fail'}`;
+            resultDiv.textContent = message;
+            resultsDiv.appendChild(resultDiv);
+            console.log(message);
+        }
+
+        function initScene() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            
+            const container = document.getElementById('container');
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setClearColor(0x000011);
+            container.appendChild(renderer.domElement);
+
+            camera.position.set(0, 0, 5);
+
+            console.log('✅ Scene initialized');
+        }
+
+        async function testShaderCompilation() {
+            try {
+                // Test 1: Create a test track
+                const testTrack = {
+                    id: 'shader_test',
+                    name: 'Shader Test Track',
+                    artist: 'Test Artist',
+                    album: 'Test Album',
+                    genre: 'metal',
+                    popularity: 80,
+                    duration: 180,
+                    color: '#FF0030',
+                    size: 1.0,
+                    position: new THREE.Vector3(0, 0, 0)
+                };
+
+                addTestResult('✅ Test track created', true);
+
+                // Test 2: Generate geometry with custom attributes
+                const geometry = CrystalGeometryGenerator.generateCrystalGeometry(testTrack);
+                
+                // Check if all required attributes are present
+                const requiredAttributes = ['position', 'normal', 'uv', 'originalPosition', 'pulsePhase', 'bpmMultiplier', 'facetNormal'];
+                let attributesOk = true;
+                
+                requiredAttributes.forEach(attr => {
+                    if (!geometry.attributes[attr]) {
+                        addTestResult(`❌ Missing attribute: ${attr}`, false);
+                        attributesOk = false;
+                    }
+                });
+
+                if (attributesOk) {
+                    addTestResult('✅ All geometry attributes present', true);
+                }
+
+                // Test 3: Create CrystalShaderMaterial
+                const material = CrystalShaderMaterial.createForGenre('metal', {
+                    emissiveIntensity: 0.6,
+                    pulseAmplitude: 0.4,
+                    pulseSpeed: 1.8
+                });
+
+                addTestResult('✅ CrystalShaderMaterial created', true);
+
+                // Test 4: Create mesh and add to scene
+                const crystal = new THREE.Mesh(geometry, material);
+                scene.add(crystal);
+
+                addTestResult('✅ Crystal mesh added to scene', true);
+
+                // Test 5: Update material uniforms
+                material.updateTime(0.0);
+                material.updateCameraPosition(camera.position);
+                material.setGenreColor('metal', 1.2);
+
+                addTestResult('✅ Material uniforms updated', true);
+
+                // Test 6: Test GenreColorSystem integration
+                const metalColor = GenreColorUtils.getColor('metal', 1.0);
+                const rockColor = GenreColorUtils.getColor('rock', 1.0);
+                const punkColor = GenreColorUtils.getColor('punk', 1.0);
+
+                if (metalColor && rockColor && punkColor) {
+                    addTestResult('✅ GenreColorSystem working', true);
+                } else {
+                    addTestResult('❌ GenreColorSystem failed', false);
+                }
+
+                // Test 7: Render test
+                renderer.render(scene, camera);
+                addTestResult('✅ Render test passed', true);
+
+                // Test 8: Animation test
+                let animationTime = 0;
+                function animate() {
+                    animationTime += 0.016;
+                    
+                    material.updateTime(animationTime);
+                    material.updateCameraPosition(camera.position);
+                    
+                    crystal.rotation.x += 0.01;
+                    crystal.rotation.y += 0.02;
+                    
+                    renderer.render(scene, camera);
+                    
+                    if (animationTime < 1.0) {
+                        requestAnimationFrame(animate);
+                    } else {
+                        addTestResult('✅ Animation test completed', true);
+                        
+                        const passedTests = testResults.filter(result => result.passed).length;
+                        const totalTests = testResults.length;
+                        
+                        addTestResult(`\n🏁 Tests completed: ${passedTests}/${totalTests} passed`, passedTests === totalTests);
+                    }
+                }
+                
+                animate();
+
+            } catch (error) {
+                addTestResult(`❌ Shader compilation failed: ${error.message}`, false);
+                console.error('Shader compilation error:', error);
+            }
+        }
+
+        // Initialize and run tests
+        initScene();
+        testShaderCompilation();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crystal Pulse System Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 11px;
+            max-width: 400px;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px;
+            border-radius: 5px;
+        }
+        
+        button {
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 6px 10px;
+            margin: 2px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 10px;
+        }
+        
+        button:hover {
+            background: #555;
+        }
+        
+        button.active {
+            background: #4CAF50;
+        }
+        
+        .status {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        
+        .error {
+            color: #f44336;
+            font-weight: bold;
+        }
+        
+        .pulse-group {
+            margin: 8px 0;
+            padding: 6px;
+            border-left: 2px solid #555;
+            background: rgba(255, 255, 255, 0.03);
+        }
+        
+        .pulse-stats {
+            font-size: 9px;
+            color: #aaa;
+            margin-top: 3px;
+        }
+        
+        .sync-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .sync-group-1 { background: #ff4444; }
+        .sync-group-2 { background: #44ff44; }
+        .sync-group-3 { background: #4444ff; }
+        .sync-group-4 { background: #ffff44; }
+        .sync-group-5 { background: #ff44ff; }
+        .no-sync { background: #666; }
+        
+        input[type="range"] {
+            width: 100px;
+            margin: 0 5px;
+        }
+        
+        .control-group {
+            margin: 5px 0;
+            display: flex;
+            align-items:
