@@ -1,6 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Интерфейсы для данных Яндекс.Музыки
+interface DownloadInfo {
+  codec: string;
+  bitrateInKbps: number;
+  downloadInfoUrl: string;
+  direct: boolean;
+}
+
 interface ProcessedTrack {
   id: string;
   title: string;
@@ -10,6 +17,7 @@ interface ProcessedTrack {
   genre: string;
   cover_url?: string;
   preview_url?: string;
+  download_urls?: DownloadInfo[];
   available: boolean;
 }
 
@@ -152,14 +160,85 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             console.log('Single track error:', errorText);
           }
         } catch (singleTrackError) {
-          console.log('Single track fetch error:', singleTrackError.message);
+          console.log('Single track fetch error:', singleTrackError instanceof Error ? singleTrackError.message : 'Unknown error');
         }
       }
     }
 
-    // Обрабатываем треки (убираем фильтрацию по available)
-    const processedTracks: ProcessedTrack[] = allTracks
+    // Получаем ссылки на превью и скачивание для треков
+    console.log('Fetching download info for tracks...');
+    const tracksWithDownloadInfo: any[] = [];
+    
+    // Обрабатываем треки батчами для получения ссылок на скачивание
+    const downloadBatchSize = 50; // Меньший размер батча для download info
+    
+    for (let i = 0; i < allTracks.length; i += downloadBatchSize) {
+      const batch = allTracks.slice(i, i + downloadBatchSize);
+      const trackIds = batch.map(track => track.id);
+      
+      try {
+        // Получаем информацию о скачивании
+        const downloadInfoResponse = await fetch(`${baseURL}/tracks/${trackIds.join(',')}/download-info`, {
+          method: 'GET',
+          headers
+        });
+
+        if (downloadInfoResponse.ok) {
+          const downloadInfoData = await downloadInfoResponse.json();
+          const downloadInfos = downloadInfoData.result || [];
+          
+          // Объединяем информацию о треках с информацией о скачивании
+          batch.forEach((track, index) => {
+            const downloadInfo = downloadInfos.find((info: any) => info.trackId === track.id);
+            tracksWithDownloadInfo.push({
+              ...track,
+              downloadInfo: downloadInfo
+            });
+          });
+        } else {
+          // Если не удалось получить download info, добавляем треки без него
+          tracksWithDownloadInfo.push(...batch);
+        }
+      } catch (downloadError) {
+        console.log(`Error fetching download info for batch ${Math.floor(i/downloadBatchSize) + 1}:`, downloadError);
+        // Добавляем треки без download info
+        tracksWithDownloadInfo.push(...batch);
+      }
+      
+      // Небольшая пауза между запросами
+      if (i + downloadBatchSize < allTracks.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    console.log(`Processed download info for ${tracksWithDownloadInfo.length} tracks.`);
+
+    // Обрабатываем треки с улучшенной информацией
+    const processedTracks: ProcessedTrack[] = tracksWithDownloadInfo
       .map((track: any): ProcessedTrack => {
+        // Пытаемся найти превью URL и полные ссылки на скачивание
+        let previewUrl: string | undefined = undefined;
+        let downloadUrls: DownloadInfo[] = [];
+        
+        if (track.downloadInfo && Array.isArray(track.downloadInfo)) {
+          // Обрабатываем все доступные форматы
+          downloadUrls = track.downloadInfo.map((info: any) => ({
+            codec: info.codec || 'unknown',
+            bitrateInKbps: info.bitrateInKbps || 0,
+            downloadInfoUrl: info.downloadInfoUrl || '',
+            direct: info.direct || false
+          }));
+          
+          // Ищем превью среди доступных форматов (низкое качество для превью)
+          const previewInfo = track.downloadInfo.find((info: any) => 
+            info.codec === 'mp3' && info.bitrateInKbps <= 128
+          ) || track.downloadInfo.find((info: any) => info.codec === 'mp3') || track.downloadInfo[0];
+          
+          if (previewInfo && previewInfo.downloadInfoUrl) {
+            previewUrl = previewInfo.downloadInfoUrl;
+          }
+        }
+
         return {
           id: String(track.id),
           title: track.title || 'Unknown Title',
@@ -168,11 +247,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           duration: Math.floor((track.durationMs || 0) / 1000),
           genre: track.albums?.[0]?.genre || 'unknown',
           cover_url: track.coverUri ? `https://${track.coverUri.replace('%%', '400x400')}` : undefined,
-          preview_url: undefined, // Превью требуют дополнительных запросов
-          available: track.available !== false, // Считаем доступными все треки, кроме явно недоступных
+          preview_url: previewUrl,
+          download_urls: downloadUrls.length > 0 ? downloadUrls : undefined,
+          available: track.available !== false,
         };
       })
-      .filter((track: ProcessedTrack) => track.title && track.artist); // Фильтруем только треки без базовой информации
+      .filter((track: ProcessedTrack) => track.title && track.artist);
 
     console.log(`Processed ${processedTracks.length} tracks after filtering.`);
     
