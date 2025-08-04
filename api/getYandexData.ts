@@ -108,13 +108,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     for (let i = 0; i < trackIds.length; i += batchSize) {
       const batch = trackIds.slice(i, i + batchSize);
-      const tracksResponse = await fetch(`${baseURL}/tracks`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          'track-ids': batch,
-          'with-positions': false
-        })
+      const trackIdsParam = batch.join(',');
+      
+      const tracksResponse = await fetch(`${baseURL}/tracks?track-ids=${trackIdsParam}`, {
+        method: 'GET',
+        headers
       });
 
       if (tracksResponse.ok) {
