@@ -8,7 +8,10 @@
     "dev": "webpack serve --mode development",
     "type-check": "tsc --noEmit",
     "collect-data": "python scripts/collect_yandex_music_data.py",
-    "serve": "npx http-server dist -p 8080"
+    "serve": "npx http-server dist -p 8080",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui"
   },
   "keywords": [
     "3d",
@@ -19,13 +22,17 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@types/jsdom": "^21.1.7",
     "@types/three": "^0.158.0",
+    "@vitest/ui": "^3.2.4",
     "copy-webpack-plugin": "^13.0.0",
     "css-loader": "^6.8.1",
     "html-webpack-plugin": "^5.5.3",
+    "jsdom": "^26.1.0",
     "style-loader": "^3.3.3",
     "ts-loader": "^9.5.1",
     "typescript": "^5.3.0",
+    "vitest": "^3.2.4",
     "webpack": "^5.89.0",
     "webpack-cli": "^5.1.4",
     "webpack-dev-server": "^4.15.1"

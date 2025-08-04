@@ -32,8 +32,8 @@ export class CinematicCameraController {
     
     // Состояние управления
     private isInertialMode: boolean = true;
-    private lastMousePosition: THREE.Vector2 = new THREE.Vector2();
-    private mouseMovement: THREE.Vector2 = new THREE.Vector2();
+    private lastMousePosition: THREE.Vector2;
+    private mouseMovement: THREE.Vector2;
     private isMouseDown: boolean = false;
     
     // Настройки чувствительности
@@ -44,6 +44,10 @@ export class CinematicCameraController {
     constructor(camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer, scene?: THREE.Scene) {
         this.camera = camera;
         this.renderer = renderer;
+        
+        // Инициализируем переменные состояния
+        this.lastMousePosition = new THREE.Vector2();
+        this.mouseMovement = new THREE.Vector2();
         
         // Создаем системы кинематографических эффектов
         if (scene) {
@@ -136,7 +140,23 @@ export class CinematicCameraController {
         if (!this.isInertialMode || !this.isMouseDown) return;
         
         const currentMousePosition = new THREE.Vector2(event.clientX, event.clientY);
-        this.mouseMovement.copy(currentMousePosition).sub(this.lastMousePosition);
+        
+        // Проверяем, что lastMousePosition и mouseMovement инициализированы
+        if (!this.lastMousePosition || !this.mouseMovement) {
+            this.lastMousePosition = new THREE.Vector2(event.clientX, event.clientY);
+            this.mouseMovement = new THREE.Vector2(0, 0);
+            return;
+        }
+        
+        // Безопасное вычисление движения мыши
+        try {
+            this.mouseMovement.copy(currentMousePosition).sub(this.lastMousePosition);
+        } catch (error) {
+            // Если произошла ошибка, инициализируем заново
+            this.mouseMovement = new THREE.Vector2(0, 0);
+            this.lastMousePosition = new THREE.Vector2(event.clientX, event.clientY);
+            return;
+        }
         
         // Применяем вращение камеры
         this.applyCameraRotation(this.mouseMovement);
