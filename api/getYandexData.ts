@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { YandexMusicApi } from 'yandex-music-api';
+const { YandexMusicApi } = require('yandex-music-api');
 
 // Интерфейсы для данных Яндекс.Музыки
 interface ProcessedTrack {
