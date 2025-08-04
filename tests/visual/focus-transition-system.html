@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Focus Transition System Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            max-width: 300px;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #ccc;
+        }
+        
+        .control-group input, .control-group button, .control-group select {
+            width: 100%;
+            padding: 5px;
+            margin-bottom: 5px;
+            border: 1px solid #555;
+            background: #333;
+            color: white;
+            border-radius: 3px;
+        }
+        
+        .control-group button {
+            cursor: pointer;
+            background: #0066cc;
+        }
+        
+        .control-group button:hover {
+            background: #0088ff;
+        }
+        
+        .control-group button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        
+        .crystal-list {
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #555;
+            border-radius: 3px;
+        }
+        
+        .crystal-item {
+            padding: 8px;
+            cursor: pointer;
+            border-bottom: 1px solid #333;
+            transition: background 0.2s;
+        }
+        
+        .crystal-item:hover {
+            background: rgba(0, 102, 204, 0.3);
+        }
+        
+        .crystal-item.selected {
+            background: rgba(0, 102, 204, 0.6);
+        }
+        
+        #info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 8px;
+            color: white;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        
+        .instructions {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+            font-size: 12px;
+            max-width: 250px;
+        }
+        
+        .instructions h3 {
+            margin-top: 0;
+            color: #00ff00;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #0066cc, #00aaff);
+            width: 0%;
+            transition: width 0.1s;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div id="controls">
+        <h3>🎯 Focus Transition Controls</h3>
+        
+        <div class="control-group">
+            <label>Transition Duration: <span id="durationValue">2.0s</span></label>
+            <input type="range" id="durationSlider" min="0.5" max="5.0" step="0.1" value="2.0">
+        </div>
+        
+        <div class="control-group">
+            <label>Easing Type:</label>
+            <select id="easingSelect">
+                <option value="linear">Linear</option>
+                <option value="easeIn">Ease In</option>
+                <option value="easeOut">Ease Out</option>
+                <option value="easeInOut">Ease In Out</option>
+                <option value="easeInCubic" selected>Ease In Out Cubic</option>
+                <option value="easeOutCubic">Ease Out Cubic</option>
+                <option value="easeInOutCubic">Ease In Out Cubic</option>
+                <option value="easeInQuart">Ease In Quart</option>
+                <option value="easeOutQuart">Ease Out Quart</option>
+                <option value="easeInOutQuart">Ease In Out Quart</option>
+            </select>
+        </div>
+        
+        <div class="control-group">
+            <label>Focus Distance: <span id="distanceValue">15</span></label>
+            <input type="range" id="distanceSlider" min="5" max="50" step="1" value="15">
+        </div>
+        
+        <div class="control-group">
+            <label>Select Crystal to Focus:</label>
+            <div class="crystal-list" id="crystalList">
+                <!-- Crystals will be populated here -->
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <button id="returnToOverview" disabled>Return to Overview</button>
+        </div>
+        
+        <div class="control-group">
+            <label>Transition Progress:</label>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <span id="progressText">0%</span>
+        </div>
+    </div>
+    
+    <div class="instructions">
+        <h3>📋 Instructions</h3>
+        <ul>
+            <li>Click crystals in the list to focus</li>
+            <li>Adjust transition settings</li>
+            <li>Watch smooth camera movements</li>
+            <li>Use "Return to Overview" button</li>
+            <li><br></li>
+            <li><strong>Mouse Controls:</strong></li>
+            <li>• Drag to rotate view</li>
+            <li>• Scroll to zoom</li>
+            <li>• Right-click to pan</li>
+        </ul>
+    </div>
+    
+    <div id="info">
+        <div>Camera Position: <span id="positionDisplay">0, 0, 0</span></div>
+        <div>Transition Active: <span id="transitionDisplay">No</span></div>
+        <div>Selected Crystal: <span id="selectedDisplay">None</span></div>
+        <div>FPS: <span id="fpsDisplay">60</span></div>
+    </div>
+
+    <script type="module">
+        import * as THREE from './node_modules/three/build/three.module.js';
+        import { OrbitControls } from './node_modules/three/examples/jsm/controls/OrbitControls.js';
+        import { FocusTransitionSystem, EasingType } from './src/soul-galaxy/camera/FocusTransitionSystem.js';
+
+        class FocusTransitionTest {
+            constructor() {
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.controls = null;
+                this.focusSystem = null;
+                
+                // Test objects
+                this.crystals = [];
+                this.selectedCrystal = null;
+                
+                // Performance monitoring
+                this.frameCount = 0;
+                this.lastTime = performance.now();
+                this.fps = 60;
+                
+                this.init();
+                this.setupControls();
+                this.animate();
+            }
+            
+            init() {
+                const container = document.getElementById('container');
+                
+                // Scene
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x000011);
+                
+                // Camera
+                this.camera = new THREE.PerspectiveCamera(
+                    75,
+                    window.innerWidth / window.innerHeight,
+                    0.1,
+                    1000
+                );
+                this.camera.position.set(0, 20, 80);
+                
+                // Renderer
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(window.devicePixelRatio);
+                container.appendChild(this.renderer.domElement);
+                
+                // Controls (for manual navigation when not transitioning)
+                this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enableDamping = true;
+                this.controls.dampingFactor = 0.05;
+                
+                // Focus Transition System
+                this.focusSystem = new FocusTransitionSystem(this.camera);
+                
+                // Create test scene
+                this.createTestScene();
+                this.populateCrystalList();
+                
+                // Handle resize
+                window.addEventListener('resize', this.onWindowResize.bind(this));
+                
+                console.log('✅ Focus Transition Test initialized');
+            }
+            
+            createTestScene() {
+                // Create various crystal shapes for testing
+                const geometries = [
+                    new THREE.OctahedronGeometry(2, 1),
+                    new THREE.IcosahedronGeometry(2, 0),
+                    new THREE.TetrahedronGeometry(3),
+                    new THREE.DodecahedronGeometry(2),
+                    new THREE.ConeGeometry(2, 4, 6)
+                ];
+                
+                const colors = [
+                    0xff0040, // Red (Metal)
+                    0x0080ff, // Blue (Rock)
+                    0x00ff40, // Green (Punk)
+                    0x8000ff, // Purple (Electronic)
+                    0xffd700, // Gold (Jazz)
+                    0xff0080, // Pink (Pop)
+                    0x00ffff, // Cyan (Indie)
+                    0xff8000  // Orange (Hip-hop)
+                ];
+                
+                for (let i = 0; i < 20; i++) {
+                    const geometry = geometries[i % geometries.length];
+                    const color = colors[i % colors.length];
+                    
+                    const material = new THREE.MeshPhongMaterial({
+                        color: color,
+                        transparent: true,
+                        opacity: 0.8,
+                        shininess: 100,
+                        emissive: new THREE.Color(color).multiplyScalar(0.1)
+                    });
+                    
+                    const crystal = new THREE.Mesh(geometry, material);
+                    
+                    // Random position in sphere
+                    const radius = 15 + Math.random() * 40;
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.random() * Math.PI;
+                    
+                    crystal.position.setFromSphericalCoords(radius, phi, theta);
+                    crystal.rotation.set(
+                        Math.random() * Math.PI,
+                        Math.random() * Math.PI,
+                        Math.random() * Math.PI
+                    );
+                    
+                    // Store metadata
+                    crystal.userData = {
+                        id: i,
+                        name: `Crystal ${i + 1}`,
+                        genre: Object.keys({
+                            'Metal': 0xff0040,
+                            'Rock': 0x0080ff,
+                            'Punk': 0x00ff40,
+                            'Electronic': 0x8000ff,
+                            'Jazz': 0xffd700,
+                            'Pop': 0xff0080,
+                            'Indie': 0x00ffff,
+                            'Hip-hop': 0xff8000
+                        })[i % 8],
+                        originalPosition: crystal.position.clone(),
+                        rotationSpeed: (Math.random() - 0.5) * 0.02,
+                        radius: 2 + Math.random() * 2
+                    };
+                    
+                    // Calculate bounding box
+                    const box = new THREE.Box3().setFromObject(crystal);
+                    crystal.userData.boundingBox = box;
+                    
+                    this.crystals.push(crystal);
+                    this.scene.add(crystal);
+                }
+                
+                // Add lights
+                const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+                this.scene.add(ambientLight);
+                
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(20, 20, 10);
+                this.scene.add(directionalLight);
+                
+                const pointLight1 = new THREE.PointLight(0x00ffff, 0.6, 100);
+                pointLight1.position.set(-20, -20, -20);
+                this.scene.add(pointLight1);
+                
+                const pointLight2 = new THREE.PointLight(0xff00ff, 0.4, 80);
+                pointLight2.position.set(15, -10, 25);
+                this.scene.add(pointLight2);
+                
+                // Create star field background
+                this.createStarField();
+                
+                console.log('✅ Test scene created with', this.crystals.length, 'crystals');
+            }
+            
+            createStarField() {
+                const starCount = 2000;
+                const geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(starCount * 3);
+                const colors = new Float32Array(starCount * 3);
+                
+                for (let i = 0; i < starCount; i++) {
+                    const i3 = i * 3;
+                    
+                    // Random position in large sphere
+                    const radius = 200 + Math.random() * 300;
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.random() * Math.PI;
+                    
+                    positions[i3] = radius * Math.sin(phi) * Math.cos(theta);
+                    positions[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+                    positions[i3 + 2] = radius * Math.cos(phi);
+                    
+                    // Random color (white to blue)
+                    const intensity = 0.5 + Math.random() * 0.5;
+                    colors[i3] = intensity;
+                    colors[i3 + 1] = intensity;
+                    colors[i3 + 2] = intensity + Math.random() * 0.3;
+                }
+                
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                
+                const material = new THREE.PointsMaterial({
+                    size: 1,
+                    vertexColors: true,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                const stars = new THREE.Points(geometry, material);
+                this.scene.add(stars);
+            }
+            
+            populateCrystalList() {
+                const crystalList = document.getElementById('crystalList');
+                crystalList.innerHTML = '';
+                
+                this.crystals.forEach((crystal, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'crystal-item';
+                    item.textContent = `${crystal.userData.name} (${crystal.userData.genre})`;
+                    item.addEventListener('click', () => this.focusOnCrystal(crystal));
+                    crystalList.appendChild(item);
+                });
+            }
+            
+            setupControls() {
+                const durationSlider = document.getElementById('durationSlider');
+                const easingSelect = document.getElementById('easingSelect');
+                const distanceSlider = document.getElementById('distanceSlider');
+                const returnBtn = document.getElementById('returnToOverview');
+                
+                // Duration slider
+                durationSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    document.getElementById('durationValue').textContent = value.toFixed(1) + 's';
+                });
+                
+                // Distance slider
+                distanceSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    document.getElementById('distanceValue').textContent = value;
+                });
+                
+                // Return button
+                returnBtn.addEventListener('click', () => {
+                    this.returnToOverview();
+                });
+            }
+            
+            async focusOnCrystal(crystal) {
+                if (this.focusSystem.isTransitionActive()) {
+                    console.log('Transition already active, ignoring click');
+                    return;
+                }
+                
+                // Update UI
+                document.querySelectorAll('.crystal-item').forEach(item => {
+                    item.classList.remove('selected');
+                });
+                
+                const crystalIndex = this.crystals.indexOf(crystal);
+                if (crystalIndex >= 0) {
+                    document.querySelectorAll('.crystal-item')[crystalIndex].classList.add('selected');
+                }
+                
+                this.selectedCrystal = crystal;
+                
+                // Get settings from UI
+                const duration = parseFloat(document.getElementById('durationSlider').value);
+                const easingType = document.getElementById('easingSelect').value;
+                const distance = parseInt(document.getElementById('distanceSlider').value);
+                
+                // Disable controls during transition
+                this.controls.enabled = false;
+                document.getElementById('returnToOverview').disabled = false;
+                
+                console.log('Focusing on crystal:', crystal.userData.name);
+                
+                try {
+                    await this.focusSystem.focusOnCrystal({
+                        position: crystal.position,
+                        boundingBox: crystal.userData.boundingBox,
+                        radius: crystal.userData.radius
+                    }, {
+                        duration: duration,
+                        easing: EasingType[easingType.toUpperCase()],
+                        maintainDistance: distance,
+                        lookAtTarget: true,
+                        smoothLookAt: true
+                    });
+                    
+                    console.log('Focus transition completed');
+                } catch (error) {
+                    console.error('Focus transition failed:', error);
+                } finally {
+                    // Re-enable controls after transition
+                    this.controls.enabled = true;
+                }
+            }
+            
+            async returnToOverview() {
+                if (this.focusSystem.isTransitionActive()) {
+                    return;
+                }
+                
+                // Clear selection
+                document.querySelectorAll('.crystal-item').forEach(item => {
+                    item.classList.remove('selected');
+                });
+                this.selectedCrystal = null;
+                
+                // Get settings
+                const duration = parseFloat(document.getElementById('durationSlider').value);
+                const easingType = document.getElementById('easingSelect').value;
+                
+                // Disable controls during transition
+                this.controls.enabled = false;
+                document.getElementById('returnToOverview').disabled = true;
+                
+                console.log('Returning to overview');
+                
+                try {
+                    await this.focusSystem.returnToOverview({
+                        duration: duration,
+                        easing: EasingType[easingType.toUpperCase()],
+                        lookAtTarget: true,
+                        smoothLookAt: true
+                    });
+                    
+                    console.log('Return transition completed');
+                } catch (error) {
+                    console.error('Return transition failed:', error);
+                } finally {
+                    // Re-enable controls after transition
+                    this.controls.enabled = true;
+                }
+            }
+            
+            onWindowResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+            
+            updateInfo() {
+                // Update camera position
+                const positionDisplay = document.getElementById('positionDisplay');
+                const pos = this.camera.position;
+                positionDisplay.textContent = `${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}`;
+                
+                // Update transition status
+                const transitionDisplay = document.getElementById('transitionDisplay');
+                transitionDisplay.textContent = this.focusSystem.isTransitionActive() ? 'Yes' : 'No';
+                
+                // Update selected crystal
+                const selectedDisplay = document.getElementById('selectedDisplay');
+                selectedDisplay.textContent = this.selectedCrystal ? this.selectedCrystal.userData.name : 'None';
+                
+                // Update progress
+                const progress = this.focusSystem.getTransitionProgress();
+                const progressFill = document.getElementById('progressFill');
+                const progressText = document.getElementById('progressText');
+                
+                progressFill.style.width = (progress * 100) + '%';
+                progressText.textContent = Math.round(progress * 100) + '%';
+                
+                // Update FPS
+                const fpsDisplay = document.getElementById('fpsDisplay');
+                fpsDisplay.textContent = this.fps.toFixed(0);
+            }
+            
+            animate() {
+                requestAnimationFrame(this.animate.bind(this));
+                
+                const currentTime = performance.now();
+                const deltaTime = (currentTime - this.lastTime) / 1000;
+                this.lastTime = currentTime;
+                
+                // Calculate FPS
+                this.frameCount++;
+                if (this.frameCount % 60 === 0) {
+                    this.fps = 1 / deltaTime;
+                }
+                
+                // Update focus transition system
+                this.focusSystem.update();
+                
+                // Update controls only if not transitioning
+                if (!this.focusSystem.isTransitionActive()) {
+                    this.controls.update();
+                }
+                
+                // Animate crystals
+                this.crystals.forEach(crystal => {
+                    crystal.rotation.y += crystal.userData.rotationSpeed;
+                    
+                    // Subtle pulsing effect
+                    const scale = 1 + Math.sin(currentTime * 0.001 + crystal.userData.id) * 0.05;
+                    crystal.scale.setScalar(scale);
+                    
+                    // Highlight selected crystal
+                    if (crystal === this.selectedCrystal) {
+                        crystal.material.emissive.setScalar(0.2 + Math.sin(currentTime * 0.005) * 0.1);
+                    } else {
+                        crystal.material.emissive.setScalar(0.1);
+                    }
+                });
+                
+                // Update info display
+                this.updateInfo();
+                
+                // Render
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        // Start the test
+        new FocusTransitionTest();
+    </script>
+</body>
+</html>

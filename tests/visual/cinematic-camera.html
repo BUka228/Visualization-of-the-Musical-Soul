@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cinematic Camera Controller Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            max-width: 300px;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #ccc;
+        }
+        
+        .control-group input, .control-group button {
+            width: 100%;
+            padding: 5px;
+            margin-bottom: 5px;
+            border: 1px solid #555;
+            background: #333;
+            color: white;
+            border-radius: 3px;
+        }
+        
+        .control-group button {
+            cursor: pointer;
+            background: #0066cc;
+        }
+        
+        .control-group button:hover {
+            background: #0088ff;
+        }
+        
+        .control-group button.active {
+            background: #00aa00;
+        }
+        
+        #info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 8px;
+            color: white;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        
+        .instructions {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+            font-size: 12px;
+            max-width: 250px;
+        }
+        
+        .instructions h3 {
+            margin-top: 0;
+            color: #00ff00;
+        }
+        
+        .instructions ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div id="controls">
+        <h3>🎮 Camera Controls</h3>
+        
+        <div class="control-group">
+            <button id="toggleMode">Switch to OrbitControls</button>
+        </div>
+        
+        <div class="control-group">
+            <label>Damping Factor: <span id="dampingValue">0.95</span></label>
+            <input type="range" id="dampingSlider" min="0.8" max="0.99" step="0.01" value="0.95">
+        </div>
+        
+        <div class="control-group">
+            <label>Mouse Sensitivity: <span id="sensitivityValue">0.002</span></label>
+            <input type="range" id="sensitivitySlider" min="0.001" max="0.01" step="0.001" value="0.002">
+        </div>
+        
+        <div class="control-group">
+            <label>Max Angular Velocity: <span id="maxAngularValue">2.0</span></label>
+            <input type="range" id="maxAngularSlider" min="0.5" max="5.0" step="0.1" value="2.0">
+        </div>
+        
+        <div class="control-group">
+            <button id="resetCamera">Reset Camera</button>
+        </div>
+    </div>
+    
+    <div class="instructions">
+        <h3>📋 Instructions</h3>
+        <ul>
+            <li><strong>Cinematic Mode:</strong></li>
+            <li>• Drag to rotate with inertia</li>
+            <li>• Scroll to zoom</li>
+            <li>• Release mouse for smooth continuation</li>
+            <li><br></li>
+            <li><strong>OrbitControls Mode:</strong></li>
+            <li>• Left: Rotate</li>
+            <li>• Right: Pan</li>
+            <li>• Scroll: Zoom</li>
+            <li><br></li>
+            <li><strong>Keys:</strong></li>
+            <li>• R: Reset camera</li>
+            <li>• Space: Toggle mode</li>
+        </ul>
+    </div>
+    
+    <div id="info">
+        <div>Mode: <span id="modeDisplay">Cinematic</span></div>
+        <div>Camera Position: <span id="positionDisplay">0, 0, 0</span></div>
+        <div>Angular Velocity: <span id="velocityDisplay">0, 0</span></div>
+        <div>FPS: <span id="fpsDisplay">60</span></div>
+    </div>
+
+    <script type="module">
+        import * as THREE from './node_modules/three/build/three.module.js';
+        import { CinematicCameraController } from './src/soul-galaxy/camera/CinematicCameraController.js';
+
+        class CinematicCameraTest {
+            constructor() {
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.cameraController = null;
+                
+                // Test objects
+                this.crystals = [];
+                this.nebula = null;
+                
+                // Performance monitoring
+                this.frameCount = 0;
+                this.lastTime = performance.now();
+                this.fps = 60;
+                
+                this.init();
+                this.setupControls();
+                this.animate();
+            }
+            
+            init() {
+                const container = document.getElementById('container');
+                
+                // Scene
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x000011);
+                
+                // Camera
+                this.camera = new THREE.PerspectiveCamera(
+                    75,
+                    window.innerWidth / window.innerHeight,
+                    0.1,
+                    1000
+                );
+                this.camera.position.set(0, 0, 50);
+                
+                // Renderer
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(window.devicePixelRatio);
+                container.appendChild(this.renderer.domElement);
+                
+                // Cinematic Camera Controller
+                this.cameraController = new CinematicCameraController(this.camera, this.renderer);
+                
+                // Create test scene
+                this.createTestScene();
+                
+                // Handle resize
+                window.addEventListener('resize', this.onWindowResize.bind(this));
+                
+                // Keyboard controls
+                document.addEventListener('keydown', this.onKeyDown.bind(this));
+                
+                console.log('✅ Cinematic Camera Test initialized');
+            }
+            
+            createTestScene() {
+                // Create crystal-like objects for testing
+                const crystalGeometry = new THREE.OctahedronGeometry(2, 1);
+                
+                for (let i = 0; i < 50; i++) {
+                    const material = new THREE.MeshPhongMaterial({
+                        color: new THREE.Color().setHSL(Math.random(), 0.8, 0.6),
+                        transparent: true,
+                        opacity: 0.8,
+                        shininess: 100
+                    });
+                    
+                    const crystal = new THREE.Mesh(crystalGeometry, material);
+                    
+                    // Random position in sphere
+                    const radius = 20 + Math.random() * 30;
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.random() * Math.PI;
+                    
+                    crystal.position.setFromSphericalCoords(radius, phi, theta);
+                    crystal.rotation.set(
+                        Math.random() * Math.PI,
+                        Math.random() * Math.PI,
+                        Math.random() * Math.PI
+                    );
+                    
+                    // Store original position for animation
+                    crystal.userData.originalPosition = crystal.position.clone();
+                    crystal.userData.rotationSpeed = (Math.random() - 0.5) * 0.02;
+                    
+                    this.crystals.push(crystal);
+                    this.scene.add(crystal);
+                }
+                
+                // Add some lights
+                const ambientLight = new THREE.AmbientLight(0x404040, 0.3);
+                this.scene.add(ambientLight);
+                
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(10, 10, 5);
+                this.scene.add(directionalLight);
+                
+                const pointLight = new THREE.PointLight(0x00ffff, 0.5, 100);
+                pointLight.position.set(-10, -10, -10);
+                this.scene.add(pointLight);
+                
+                // Create nebula background
+                this.createNebulaBackground();
+                
+                console.log('✅ Test scene created with', this.crystals.length, 'crystals');
+            }
+            
+            createNebulaBackground() {
+                // Simple nebula effect using particles
+                const particleCount = 1000;
+                const geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(particleCount * 3);
+                const colors = new Float32Array(particleCount * 3);
+                
+                for (let i = 0; i < particleCount; i++) {
+                    const i3 = i * 3;
+                    
+                    // Random position in large sphere
+                    const radius = 100 + Math.random() * 200;
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.random() * Math.PI;
+                    
+                    positions[i3] = radius * Math.sin(phi) * Math.cos(theta);
+                    positions[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+                    positions[i3 + 2] = radius * Math.cos(phi);
+                    
+                    // Random color (bluish-purple nebula)
+                    const color = new THREE.Color().setHSL(0.6 + Math.random() * 0.2, 0.8, 0.3);
+                    colors[i3] = color.r;
+                    colors[i3 + 1] = color.g;
+                    colors[i3 + 2] = color.b;
+                }
+                
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                
+                const material = new THREE.PointsMaterial({
+                    size: 2,
+                    vertexColors: true,
+                    transparent: true,
+                    opacity: 0.6,
+                    blending: THREE.AdditiveBlending
+                });
+                
+                this.nebula = new THREE.Points(geometry, material);
+                this.scene.add(this.nebula);
+            }
+            
+            setupControls() {
+                const toggleModeBtn = document.getElementById('toggleMode');
+                const dampingSlider = document.getElementById('dampingSlider');
+                const sensitivitySlider = document.getElementById('sensitivitySlider');
+                const maxAngularSlider = document.getElementById('maxAngularSlider');
+                const resetCameraBtn = document.getElementById('resetCamera');
+                
+                // Toggle mode button
+                toggleModeBtn.addEventListener('click', () => {
+                    const isInertial = this.cameraController.isInertialModeEnabled();
+                    this.cameraController.setInertialMode(!isInertial);
+                    
+                    toggleModeBtn.textContent = isInertial ? 'Switch to Cinematic' : 'Switch to OrbitControls';
+                    toggleModeBtn.classList.toggle('active', !isInertial);
+                });
+                
+                // Damping slider
+                dampingSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    document.getElementById('dampingValue').textContent = value.toFixed(2);
+                    this.cameraController.setInertiaSettings({ dampingFactor: value });
+                });
+                
+                // Sensitivity slider
+                sensitivitySlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    document.getElementById('sensitivityValue').textContent = value.toFixed(3);
+                    this.cameraController.setInertiaSettings({ mouseSensitivity: value });
+                });
+                
+                // Max angular velocity slider
+                maxAngularSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    document.getElementById('maxAngularValue').textContent = value.toFixed(1);
+                    this.cameraController.setInertiaSettings({ maxAngularVelocity: value });
+                });
+                
+                // Reset camera button
+                resetCameraBtn.addEventListener('click', () => {
+                    this.cameraController.resetCamera();
+                });
+            }
+            
+            onKeyDown(event) {
+                switch (event.code) {
+                    case 'KeyR':
+                        event.preventDefault();
+                        this.cameraController.resetCamera();
+                        break;
+                    case 'Space':
+                        event.preventDefault();
+                        const toggleBtn = document.getElementById('toggleMode');
+                        toggleBtn.click();
+                        break;
+                }
+            }
+            
+            onWindowResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+            
+            updateInfo() {
+                // Update mode display
+                const modeDisplay = document.getElementById('modeDisplay');
+                modeDisplay.textContent = this.cameraController.isInertialModeEnabled() ? 'Cinematic' : 'OrbitControls';
+                
+                // Update camera position
+                const positionDisplay = document.getElementById('positionDisplay');
+                const pos = this.camera.position;
+                positionDisplay.textContent = `${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}`;
+                
+                // Update FPS
+                const fpsDisplay = document.getElementById('fpsDisplay');
+                fpsDisplay.textContent = this.fps.toFixed(0);
+            }
+            
+            animate() {
+                requestAnimationFrame(this.animate.bind(this));
+                
+                const currentTime = performance.now();
+                const deltaTime = (currentTime - this.lastTime) / 1000;
+                this.lastTime = currentTime;
+                
+                // Calculate FPS
+                this.frameCount++;
+                if (this.frameCount % 60 === 0) {
+                    this.fps = 1 / deltaTime;
+                }
+                
+                // Update camera controller
+                this.cameraController.update(deltaTime);
+                
+                // Animate crystals
+                this.crystals.forEach(crystal => {
+                    crystal.rotation.y += crystal.userData.rotationSpeed;
+                    
+                    // Subtle pulsing effect
+                    const scale = 1 + Math.sin(currentTime * 0.001 + crystal.id) * 0.1;
+                    crystal.scale.setScalar(scale);
+                });
+                
+                // Rotate nebula slowly
+                if (this.nebula) {
+                    this.nebula.rotation.y += 0.0002;
+                }
+                
+                // Update info display
+                this.updateInfo();
+                
+                // Render
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        // Start the test
+        new CinematicCameraTest();
+    </script>
+</body>
+</html>

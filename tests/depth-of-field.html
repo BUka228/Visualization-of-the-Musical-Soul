@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Depth of Field System Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            max-width: 320px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #ccc;
+            font-size: 12px;
+        }
+        
+        .control-group input, .control-group button, .control-group select {
+            width: 100%;
+            padding: 5px;
+            margin-bottom: 5px;
+            border: 1px solid #555;
+            background: #333;
+            color: white;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        
+        .control-group button {
+            cursor: pointer;
+            background: #0066cc;
+        }
+        
+        .control-group button:hover {
+            background: #0088ff;
+        }
+        
+        .control-group button.active {
+            background: #00aa00;
+        }
+        
+        .control-group button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        
+        .preset-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+        }
+        
+        .preset-buttons button {
+            padding: 8px 4px;
+            font-size: 11px;
+        }
+        
+        .object-list {
+            max-height: 120px;
+            overflow-y: auto;
+            border: 1px solid #555;
+            border-radius: 3px;
+        }
+        
+        .object-item {
+            padding: 6px;
+            cursor: pointer;
+            border-bottom: 1px solid #333;
+            transition: background 0.2s;
+            font-size: 11px;
+        }
+        
+        .object-item:hover {
+            background: rgba(0, 102, 204, 0.3);
+        }
+        
+        .object-item.focused {
+            background: rgba(0, 102, 204, 0.6);
+        }
+        
+        #info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 8px;
+            color: white;
+            font-size: 11px;
+            font-family: monospace;
+        }
+        
+        .instructions {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+            font-size: 12px;
+            max-width: 250px;
+        }
+        
+        .instructions h3 {
+            margin-top: 0;
+            color: #00ff00;
+            font-size: 14px;
+        }
+        
+        .value-display {
+            color: #00aaff;
+            font-weight: bold;
+        }
+        
+        h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #00ff00;
+            font-size: 16px;
+        }
+        
+        h4 {
+            margin: 10px 0 5px 0;
+            color: #ffaa00;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div id="controls">
+        <h3>📷 Depth of Field Controls</h3>
+        
+        <div class="control-group">
+            <button id="toggleDOF">Enable Depth of Field</button>
+        </div>
+        
+        <h4>🎯 Focus Controls</h4>
+        <div class="control-group">
+            <label>Focus Distance: <span id="focusValue" class="value-display">50.0</span></label>
+            <input type="range" id="focusSlider" min="5" max="200" step="1" value="50">
+        </div>
+        
+        <div class="control-group">
+            <label>Focus on Objects:</label>
+            <div class="object-list" id="objectList">
+                <!-- Objects will be populated here -->
+            </div>
+        </div>
+        
+        <h4>📸 Camera Settings</h4>
+        <div class="control-group">
+            <label>Aperture: <span id="apertureValue" class="value-display">0.025</span></label>
+            <input type="range" id="apertureSlider" min="0.005" max="0.1" step="0.005" value="0.025">
+        </div>
+        
+        <div class="control-group">
+            <label>Max Blur: <span id="maxBlurValue" class="value-display">0.01</span></label>
+            <input type="range" id="maxBlurSlider" min="0.001" max="0.05" step="0.001" value="0.01">
+        </div>
+        
+        <h4>⚡ Transition Settings</h4>
+        <div class="control-group">
+            <label>Focus Speed: <span id="focusSpeedValue" class="value-display">2.0</span></label>
+            <input type="range" id="focusSpeedSlider" min="0.5" max="5.0" step="0.1" value="2.0">
+        </div>
+        
+        <div class="control-group">
+            <label>Aperture Speed: <span id="apertureSpeedValue" class="value-display">1.0</span></label>
+            <input type="range" id="apertureSpeedSlider" min="0.2" max="3.0" step="0.1" value="1.0">
+        </div>
+        
+        <h4>🎨 Presets</h4>
+        <div class="control-group">
+            <div class="preset-buttons">
+                <button class="preset-btn" data-preset="subtle">Subtle</button>
+                <button class="preset-btn" data-preset="medium">Medium</button>
+                <button class="preset-btn" data-preset="strong">Strong</button>
+                <button class="preset-btn" data-preset="cinematic">Cinematic</button>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <button id="resetSettings">Reset to Defaults</button>
+        </div>
+    </div>
+    
+    <div class="instructions">
+        <h3>📋 Instructions</h3>
+        <ul>
+            <li><strong>Enable DOF:</strong> Toggle depth of field effect</li>
+            <li><strong>Focus:</strong> Adjust focus distance or click objects</li>
+            <li><strong>Aperture:</strong> Control blur intensity</li>
+            <li><strong>Presets:</strong> Try different DOF styles</li>
+            <li><br></li>
+            <li><strong>Mouse Controls:</strong></li>
+            <li>• Drag to rotate view</li>
+            <li>• Scroll to zoom</li>
+            <li>• Right-click to pan</li>
+        </ul>
+    </div>
+    
+    <div id="info">
+        <div>DOF Enabled: <span id="dofStatusDisplay">No</span></div>
+        <div>Current Focus: <span id="currentFocusDisplay">50.0</span></div>
+        <div>Current Aperture: <span id="currentApertureDisplay">0.025</span></div>
+        <div>Camera Distance: <span id="cameraDistanceDisplay">0</span></div>
+        <div>FPS: <span id="fpsDisplay">60</span></div>
+    </div>
+
+    <script type="module">
+        import * as THREE from './node_modules/three/build/three.module.js';
+        import { OrbitControls } from './node_modules/three/examples/jsm/controls/OrbitControls.js';
+        import { DepthOfFieldSystem } from './src/soul-galaxy/camera/DepthOfFieldSystem.js';
+
+        class DepthOfFieldTest {
+            constructor() {
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.controls = null;
+                this.dofSystem = null;
+                
+                // Test objects
+                this.objects = [];
+                this.focusedObject = null;
+                
+                // Performance monitoring
+                this.frameCount = 0;
+                this.lastTime = performance.now();
+                this.fps = 60;
+                
+                this.init();
+                this.setupControls();
+                this.animate();
+            }
+            
+            init() {
+                const container = document.getElementById('container');
+                
+                // Scene
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x000011);
+                
+                // Camera
+                this.camera = new THREE.PerspectiveCamera(
+                    75,
+                    window.innerWidth / window.innerHeight,
+                    0.1,
+                    1000
+                );
+                this.camera.position.set(0, 10, 80);
+                
+                // Renderer
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(window.devicePixelRatio);
+                container.appendChild(this.renderer.domElement);
+                
+                // Controls
+                this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enableDamping = true;
+                this.controls.dampingFactor = 0.05;
+                
+                // Depth of Field System
+                this.dofSystem = new DepthOfFieldSystem(this.renderer, this.scene, this.camera);
+                
+                // Create test scene
+                this.createTestScene();
+                this.populateObjectList();
+                
+                // Handle resize
+                window.addEventListener('resize', this.onWindowResize.bind(this));
+                
+                console.log('✅ Depth of Field Test initialized');
+            }
+            
+            createTestScene() {
+                // Create objects at different distances for testing DOF
+                const distances = [20, 35, 50, 65, 80, 100, 120];
+                const geometries = [
+                    new THREE.BoxGeometry(4, 4, 4),
+                    new THREE.SphereGeometry(3, 16, 16),
+                    new THREE.ConeGeometry(3, 6, 8),
+                    new THREE.CylinderGeometry(2, 4, 6, 8),
+                    new THREE.OctahedronGeometry(3),
+                    new THREE.IcosahedronGeometry(3),
+                    new THREE.TorusGeometry(3, 1, 8, 16)
+                ];
+                
+                const colors = [
+                    0xff0040, // Red
+                    0x0080ff, // Blue
+                    0x00ff40, // Green
+                    0x8000ff, // Purple
+                    0xffd700, // Gold
+                    0xff0080, // Pink
+                    0x00ffff  // Cyan
+                ];
+                
+                distances.forEach((distance, index) => {
+                    const geometry = geometries[index % geometries.length];
+                    const color = colors[index % colors.length];
+                    
+                    const material = new THREE.MeshPhongMaterial({
+                        color: color,
+                        shininess: 100,
+                        emissive: new THREE.Color(color).multiplyScalar(0.1)
+                    });
+                    
+                    const object = new THREE.Mesh(geometry, material);
+                    
+                    // Position objects in a line along Z-axis
+                    object.position.set(
+                        (Math.random() - 0.5) * 20,
+                        (Math.random() - 0.5) * 10,
+                        -distance + 80
+                    );
+                    
+                    object.rotation.set(
+                        Math.random() * Math.PI,
+                        Math.random() * Math.PI,
+                        Math.random() * Math.PI
+                    );
+                    
+                    // Store metadata
+                    object.userData = {
+                        id: index,
+                        name: `Object ${index + 1}`,
+                        distance: distance,
+                        rotationSpeed: (Math.random() - 0.5) * 0.02,
+                        originalColor: color
+                    };
+                    
+                    this.objects.push(object);
+                    this.scene.add(object);
+                });
+                
+                // Add some background objects for depth
+                for (let i = 0; i < 30; i++) {
+                    const geometry = new THREE.SphereGeometry(1 + Math.random() * 2, 8, 8);
+                    const material = new THREE.MeshPhongMaterial({
+                        color: new THREE.Color().setHSL(Math.random(), 0.5, 0.3),
+                        transparent: true,
+                        opacity: 0.6
+                    });
+                    
+                    const sphere = new THREE.Mesh(geometry, material);
+                    
+                    // Random position in large area
+                    sphere.position.set(
+                        (Math.random() - 0.5) * 200,
+                        (Math.random() - 0.5) * 100,
+                        -Math.random() * 200
+                    );
+                    
+                    this.scene.add(sphere);
+                }
+                
+                // Add lights
+                const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+                this.scene.add(ambientLight);
+                
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(20, 20, 10);
+                this.scene.add(directionalLight);
+                
+                const pointLight1 = new THREE.PointLight(0x00ffff, 0.6, 100);
+                pointLight1.position.set(-30, -20, 20);
+                this.scene.add(pointLight1);
+                
+                const pointLight2 = new THREE.PointLight(0xff00ff, 0.4, 80);
+                pointLight2.position.set(30, 20, -20);
+                this.scene.add(pointLight2);
+                
+                // Create star field
+                this.createStarField();
+                
+                console.log('✅ Test scene created with', this.objects.length, 'main objects');
+            }
+            
+            createStarField() {
+                const starCount = 1000;
+                const geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(starCount * 3);
+                const colors = new Float32Array(starCount * 3);
+                
+                for (let i = 0; i < starCount; i++) {
+                    const i3 = i * 3;
+                    
+                    // Random position in large sphere
+                    const radius = 300 + Math.random() * 200;
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.random() * Math.PI;
+                    
+                    positions[i3] = radius * Math.sin(phi) * Math.cos(theta);
+                    positions[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+                    positions[i3 + 2] = radius * Math.cos(phi);
+                    
+                    // Random color (white to blue)
+                    const intensity = 0.3 + Math.random() * 0.7;
+                    colors[i3] = intensity;
+                    colors[i3 + 1] = intensity;
+                    colors[i3 + 2] = intensity + Math.random() * 0.3;
+                }
+                
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                
+                const material = new THREE.PointsMaterial({
+                    size: 1,
+                    vertexColors: true,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                const stars = new THREE.Points(geometry, material);
+                this.scene.add(stars);
+            }
+            
+            populateObjectList() {
+                const objectList = document.getElementById('objectList');
+                objectList.innerHTML = '';
+                
+                this.objects.forEach((object, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'object-item';
+                    item.textContent = `${object.userData.name} (${object.userData.distance}m)`;
+                    item.addEventListener('click', () => this.focusOnObject(object));
+                    objectList.appendChild(item);
+                });
+            }
+            
+            setupControls() {
+                const toggleDOFBtn = document.getElementById('toggleDOF');
+                const focusSlider = document.getElementById('focusSlider');
+                const apertureSlider = document.getElementById('apertureSlider');
+                const maxBlurSlider = document.getElementById('maxBlurSlider');
+                const focusSpeedSlider = document.getElementById('focusSpeedSlider');
+                const apertureSpeedSlider = document.getElementById('apertureSpeedSlider');
+                const presetButtons = document.querySelectorAll('.preset-btn');
+                const resetBtn = document.getElementById('resetSettings');
+                
+                // Toggle DOF button
+                toggleDOFBtn.addEventListener('click', () => {
+                    if (this.dofSystem.isDepthOfFieldEnabled()) {
+                        this.dofSystem.disableDepthOfField();
+                        toggleDOFBtn.textContent = 'Enable Depth of Field';
+                        toggleDOFBtn.classList.remove('active');
+                    } else {
+                        this.dofSystem.enableDepthOfField();
+                        toggleDOFBtn.textContent = 'Disable Depth of Field';
+                        toggleDOFBtn.classList.add('active');
+                    }
+                });
+                
+                // Focus slider
+                focusSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    document.getElementById('focusValue').textContent = value.toFixed(1);
+                    this.dofSystem.setFocus(value, false);
+                    this.clearObjectFocus();
+                });
+                
+                // Aperture slider
+                apertureSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    document.getElementById('apertureValue').textContent = value.toFixed(3);
+                    this.dofSystem.setAperture(value, false);
+                });
+                
+                // Max blur slider
+                maxBlurSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    document.getElementById('maxBlurValue').textContent = value.toFixed(3);
+                    this.dofSystem.setMaxBlur(value);
+                });
+                
+                // Focus speed slider
+                focusSpeedSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    document.getElementById('focusSpeedValue').textContent = value.toFixed(1);
+                    this.updateTransitionSpeeds();
+                });
+                
+                // Aperture speed slider
+                apertureSpeedSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    document.getElementById('apertureSpeedValue').textContent = value.toFixed(1);
+                    this.updateTransitionSpeeds();
+                });
+                
+                // Preset buttons
+                presetButtons.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const preset = btn.dataset.preset;
+                        this.dofSystem.applyPreset(preset);
+                        this.updateUIFromSettings();
+                        
+                        // Visual feedback
+                        presetButtons.forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        setTimeout(() => btn.classList.remove('active'), 1000);
+                    });
+                });
+                
+                // Reset button
+                resetBtn.addEventListener('click', () => {
+                    this.resetToDefaults();
+                });
+            }
+            
+            updateTransitionSpeeds() {
+                const focusSpeed = parseFloat(document.getElementById('focusSpeedSlider').value);
+                const apertureSpeed = parseFloat(document.getElementById('apertureSpeedSlider').value);
+                this.dofSystem.setTransitionSpeeds(focusSpeed, apertureSpeed);
+            }
+            
+            focusOnObject(object) {
+                // Clear previous focus
+                this.clearObjectFocus();
+                
+                // Set new focus
+                this.focusedObject = object;
+                this.dofSystem.focusOnObject(object, true);
+                
+                // Update UI
+                const objectItems = document.querySelectorAll('.object-item');
+                const objectIndex = this.objects.indexOf(object);
+                if (objectIndex >= 0) {
+                    objectItems[objectIndex].classList.add('focused');
+                }
+                
+                // Highlight object
+                object.material.emissive.setScalar(0.3);
+                
+                console.log('Focused on:', object.userData.name);
+            }
+            
+            clearObjectFocus() {
+                if (this.focusedObject) {
+                    this.focusedObject.material.emissive.setScalar(0.1);
+                    this.focusedObject = null;
+                }
+                
+                document.querySelectorAll('.object-item').forEach(item => {
+                    item.classList.remove('focused');
+                });
+            }
+            
+            updateUIFromSettings() {
+                const settings = this.dofSystem.getSettings();
+                
+                document.getElementById('focusSlider').value = settings.focus;
+                document.getElementById('focusValue').textContent = settings.focus.toFixed(1);
+                
+                document.getElementById('apertureSlider').value = settings.aperture;
+                document.getElementById('apertureValue').textContent = settings.aperture.toFixed(3);
+                
+                document.getElementById('maxBlurSlider').value = settings.maxblur;
+                document.getElementById('maxBlurValue').textContent = settings.maxblur.toFixed(3);
+            }
+            
+            resetToDefaults() {
+                // Reset sliders to default values
+                document.getElementById('focusSlider').value = 50;
+                document.getElementById('focusValue').textContent = '50.0';
+                
+                document.getElementById('apertureSlider').value = 0.025;
+                document.getElementById('apertureValue').textContent = '0.025';
+                
+                document.getElementById('maxBlurSlider').value = 0.01;
+                document.getElementById('maxBlurValue').textContent = '0.010';
+                
+                document.getElementById('focusSpeedSlider').value = 2.0;
+                document.getElementById('focusSpeedValue').textContent = '2.0';
+                
+                document.getElementById('apertureSpeedSlider').value = 1.0;
+                document.getElementById('apertureSpeedValue').textContent = '1.0';
+                
+                // Reset DOF system
+                this.dofSystem.setFocus(50, false);
+                this.dofSystem.setAperture(0.025, false);
+                this.dofSystem.setMaxBlur(0.01);
+                this.dofSystem.setTransitionSpeeds(2.0, 1.0);
+                
+                this.clearObjectFocus();
+            }
+            
+            onWindowResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.dofSystem.handleResize(window.innerWidth, window.innerHeight);
+            }
+            
+            updateInfo() {
+                // Update DOF status
+                const dofStatusDisplay = document.getElementById('dofStatusDisplay');
+                dofStatusDisplay.textContent = this.dofSystem.isDepthOfFieldEnabled() ? 'Yes' : 'No';
+                
+                // Update current settings
+                const settings = this.dofSystem.getSettings();
+                document.getElementById('currentFocusDisplay').textContent = settings.focus.toFixed(1);
+                document.getElementById('currentApertureDisplay').textContent = settings.aperture.toFixed(3);
+                
+                // Update camera distance from origin
+                const cameraDistanceDisplay = document.getElementById('cameraDistanceDisplay');
+                const distance = this.camera.position.length();
+                cameraDistanceDisplay.textContent = distance.toFixed(1);
+                
+                // Update FPS
+                const fpsDisplay = document.getElementById('fpsDisplay');
+                fpsDisplay.textContent = this.fps.toFixed(0);
+            }
+            
+            animate() {
+                requestAnimationFrame(this.animate.bind(this));
+                
+                const currentTime = performance.now();
+                const deltaTime = (currentTime - this.lastTime) / 1000;
+                this.lastTime = currentTime;
+                
+                // Calculate FPS
+                this.frameCount++;
+                if (this.frameCount % 60 === 0) {
+                    this.fps = 1 / deltaTime;
+                }
+                
+                // Update controls
+                this.controls.update();
+                
+                // Animate objects
+                this.objects.forEach(object => {
+                    object.rotation.y += object.userData.rotationSpeed;
+                    
+                    // Subtle pulsing effect
+                    const scale = 1 + Math.sin(currentTime * 0.001 + object.userData.id) * 0.05;
+                    object.scale.setScalar(scale);
+                });
+                
+                // Update info display
+                this.updateInfo();
+                
+                // Render with DOF system
+                this.dofSystem.render(deltaTime);
+            }
+        }
+
+        // Start the test
+        new DepthOfFieldTest();
+    </script>
+</body>
+</html>
