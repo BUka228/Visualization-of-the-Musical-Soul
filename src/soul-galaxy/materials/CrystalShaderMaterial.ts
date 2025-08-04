@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GenreColorPalette } from '../types';
 import { GenreColorUtils } from './GenreColorSystem';
+import { DynamicGenreColorUtils, ExtendedGenreColorPalette } from './DynamicGenreColorSystem';
 
 // Vertex shader for crystal pulsation and deformation
 const crystalVertexShader = `
@@ -376,10 +377,16 @@ export class CrystalShaderMaterial extends THREE.ShaderMaterial {
   }
 
   /**
-   * Sets the genre color with neon intensity using the enhanced color system
+   * Sets the genre color with neon intensity using the enhanced dynamic color system
    */
-  setGenreColor(genre: string, intensity: number = 1.0): void {
-    const color = GenreColorUtils.getColor(genre, intensity);
+  setGenreColor(genre: string, options: {
+    intensity?: number;
+    bpm?: number;
+    popularity?: number;
+    time?: number;
+    energy?: number;
+  } = {}): void {
+    const color = DynamicGenreColorUtils.getColor(genre, options);
     this.uniforms.genreColor.value = color.clone();
   }
 
@@ -387,8 +394,23 @@ export class CrystalShaderMaterial extends THREE.ShaderMaterial {
    * Sets dynamic intensity for the current genre
    */
   setGenreIntensity(genre: string, intensity: number): void {
-    GenreColorUtils.setIntensity(genre, intensity);
-    this.setGenreColor(genre, intensity);
+    DynamicGenreColorUtils.setIntensity(genre, intensity);
+    this.setGenreColor(genre, { intensity });
+  }
+
+  /**
+   * Sets genre color with audio-based characteristics
+   */
+  setGenreColorWithAudio(genre: string, audioFeatures: {
+    bpm?: number;
+    energy?: number;
+    valence?: number;
+    danceability?: number;
+    acousticness?: number;
+    instrumentalness?: number;
+  }): void {
+    const color = DynamicGenreColorUtils.getAudioBasedColor(genre, audioFeatures);
+    this.uniforms.genreColor.value = color.clone();
   }
 
   /**
@@ -500,7 +522,7 @@ export class CrystalShaderMaterial extends THREE.ShaderMaterial {
   }
 
   /**
-   * Creates a material configured for a specific genre using the enhanced color system
+   * Creates a material configured for a specific genre using the enhanced dynamic color system
    */
   static createForGenre(genre: string, config: {
     albumTexture?: THREE.Texture;
@@ -509,13 +531,48 @@ export class CrystalShaderMaterial extends THREE.ShaderMaterial {
     pulseSpeed?: number;
     sharpness?: number;
     intensity?: number;
+    bpm?: number;
+    popularity?: number;
+    energy?: number;
   } = {}): CrystalShaderMaterial {
-    const { intensity = 1.0, ...materialConfig } = config;
-    const genreColor = GenreColorUtils.getColor(genre, intensity);
+    const { intensity = 1.0, bpm, popularity, energy, ...materialConfig } = config;
+    
+    // Используем новую динамическую систему цветов
+    const genreColor = DynamicGenreColorUtils.getColor(genre, {
+      intensity,
+      bpm,
+      popularity,
+      energy
+    });
 
     return new CrystalShaderMaterial({
       genreColor,
       ...materialConfig
+    });
+  }
+
+  /**
+   * Creates a material with audio-based color characteristics
+   */
+  static createForGenreWithAudio(genre: string, audioFeatures: {
+    bpm?: number;
+    energy?: number;
+    valence?: number;
+    danceability?: number;
+    acousticness?: number;
+    instrumentalness?: number;
+  }, config: {
+    albumTexture?: THREE.Texture;
+    emissiveIntensity?: number;
+    pulseAmplitude?: number;
+    pulseSpeed?: number;
+    sharpness?: number;
+  } = {}): CrystalShaderMaterial {
+    const genreColor = DynamicGenreColorUtils.getAudioBasedColor(genre, audioFeatures);
+
+    return new CrystalShaderMaterial({
+      genreColor,
+      ...config
     });
   }
 

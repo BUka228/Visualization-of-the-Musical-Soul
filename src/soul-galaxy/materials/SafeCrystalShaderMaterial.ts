@@ -151,9 +151,19 @@ export class SafeCrystalShaderMaterial {
   /**
    * Set genre color
    */
-  public setGenreColor(genre: string, intensity: number = 1.0): void {
+  public setGenreColor(genre: string, options: {
+    intensity?: number;
+    bpm?: number;
+    popularity?: number;
+    time?: number;
+    energy?: number;
+  } | number = {}): void {
+    // Handle backward compatibility - if number is passed, convert to options object
+    const colorOptions = typeof options === 'number' ? { intensity: options } : options;
+    const intensity = colorOptions.intensity || 1.0;
+    
     if (!this.isUsingFallback && this.material instanceof CrystalShaderMaterial) {
-      this.material.setGenreColor(genre, intensity);
+      this.material.setGenreColor(genre, colorOptions);
     } else if (this.isUsingFallback) {
       // Apply to fallback material
       const phongMaterial = this.material as THREE.MeshPhongMaterial;

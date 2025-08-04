@@ -5,6 +5,7 @@
 import { Vector3 } from 'three';
 import { Track, ProcessedTrack, GenreStats, DataProcessor as IDataProcessor } from '../types/index.js';
 import { YandexTrackData } from './DataLoader.js';
+import { DynamicGenreColorUtils } from '../soul-galaxy/materials/DynamicGenreColorSystem';
 
 /**
  * Класс для обработки и анализа музыкальных данных
@@ -229,11 +230,31 @@ export class DataProcessor implements IDataProcessor {
   }
 
   /**
-   * Возвращает цвет для указанного жанра
+   * Возвращает цвет для указанного жанра используя новую динамическую систему цветов
    */
   getGenreColor(genre: string): string {
     const normalizedGenre = this.normalizeGenre(genre);
-    return DataProcessor.GENRE_COLORS[normalizedGenre] || DataProcessor.GENRE_COLORS['default'];
+    
+    // Используем новую динамическую систему цветов
+    const color = DynamicGenreColorUtils.getColor(normalizedGenre, {
+      intensity: 1.0
+    });
+    
+    return `#${color.getHexString()}`;
+  }
+
+  /**
+   * Возвращает цвет для указанного жанра с дополнительными параметрами
+   */
+  getGenreColorWithParams(genre: string, options: {
+    intensity?: number;
+    bpm?: number;
+    popularity?: number;
+    energy?: number;
+  } = {}): string {
+    const normalizedGenre = this.normalizeGenre(genre);
+    const color = DynamicGenreColorUtils.getColor(normalizedGenre, options);
+    return `#${color.getHexString()}`;
   }
 
   /**

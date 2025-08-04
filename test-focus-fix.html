@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Focus Fix - Music Galaxy 3D</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #debug-panel {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            z-index: 1000;
+            max-width: 300px;
+        }
+        
+        #debug-panel h3 {
+            margin: 0 0 10px 0;
+            color: #00ff00;
+        }
+        
+        #debug-panel .debug-item {
+            margin: 5px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        #debug-panel .debug-value {
+            color: #ffff00;
+        }
+        
+        #instructions {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 1000;
+            max-width: 400px;
+        }
+        
+        #instructions h3 {
+            margin: 0 0 10px 0;
+            color: #00ff00;
+        }
+        
+        #instructions ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        #instructions li {
+            margin: 5px 0;
+        }
+        
+        .highlight {
+            color: #ffff00;
+            font-weight: bold;
+        }
+        
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
+            z-index: 2000;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Загрузка музыкальной галактики...</div>
+    <div id="container"></div>
+    
+    <div id="debug-panel">
+        <h3>🔧 Debug Info</h3>
+        <div class="debug-item">
+            <span>Camera Mode:</span>
+            <span class="debug-value" id="camera-mode">-</span>
+        </div>
+        <div class="debug-item">
+            <span>Focus State:</span>
+            <span class="debug-value" id="focus-state">-</span>
+        </div>
+        <div class="debug-item">
+            <span>Animation Progress:</span>
+            <span class="debug-value" id="animation-progress">-</span>
+        </div>
+        <div class="debug-item">
+            <span>Focused Crystal:</span>
+            <span class="debug-value" id="focused-crystal">-</span>
+        </div>
+        <div class="debug-item">
+            <span>Hovered Crystal:</span>
+            <span class="debug-value" id="hovered-crystal">-</span>
+        </div>
+        <div class="debug-item">
+            <span>Camera Position:</span>
+            <span class="debug-value" id="camera-position">-</span>
+        </div>
+        <div class="debug-item">
+            <span>Total Crystals:</span>
+            <span class="debug-value" id="total-crystals">-</span>
+        </div>
+    </div>
+    
+    <div id="instructions">
+        <h3>🎯 Test Instructions</h3>
+        <ul>
+            <li><span class="highlight">Click</span> on any crystal to focus on it</li>
+            <li><span class="highlight">R key</span> to reset camera position</li>
+            <li><span class="highlight">Space</span> to toggle animation</li>
+            <li><span class="highlight">Mouse drag</span> to rotate camera (when not focused)</li>
+            <li><span class="highlight">Mouse wheel</span> to zoom in/out</li>
+            <li>Watch the debug panel for focus state changes</li>
+        </ul>
+    </div>
+
+    <script src="dist/bundle.js"></script>
+    <script>
+        // Debug panel update function
+        function updateDebugPanel() {
+            if (!window.app || !window.app.sceneManager) return;
+            
+            const sceneManager = window.app.sceneManager;
+            const cameraController = sceneManager.getCinematicCameraController();
+            const soulGalaxyRenderer = sceneManager.getSoulGalaxyRenderer();
+            const crystalTrackSystem = soulGalaxyRenderer.getCrystalTrackSystem();
+            const hoverSystem = crystalTrackSystem.getHoverSystem();
+            
+            // Camera mode
+            const cameraMode = cameraController.isInertialModeEnabled() ? 'Inertial' : 'OrbitControls';
+            document.getElementById('camera-mode').textContent = cameraMode;
+            
+            // Focus state
+            const focusAnimationSystem = cameraController.getFocusAnimationSystem();
+            const focusStats = focusAnimationSystem.getPerformanceStats();
+            
+            let focusState = 'None';
+            if (focusStats.isAnimating) {
+                focusState = 'Animating';
+            } else if (focusStats.isFocused) {
+                focusState = 'Focused';
+            }
+            document.getElementById('focus-state').textContent = focusState;
+            
+            // Animation progress
+            const progress = Math.round(focusStats.animationProgress * 100);
+            document.getElementById('animation-progress').textContent = `${progress}%`;
+            
+            // Focused crystal
+            const focusedCrystal = focusStats.focusedCrystal || 'None';
+            document.getElementById('focused-crystal').textContent = focusedCrystal;
+            
+            // Hovered crystal
+            const hoveredCrystal = hoverSystem.getHoveredCrystal();
+            const hoveredName = hoveredCrystal ? hoveredCrystal.name : 'None';
+            document.getElementById('hovered-crystal').textContent = hoveredName;
+            
+            // Camera position
+            const camera = sceneManager.getCamera();
+            const pos = camera.position;
+            const posStr = `(${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)})`;
+            document.getElementById('camera-position').textContent = posStr;
+            
+            // Total crystals
+            const crystalTracks = crystalTrackSystem.getCrystalTracks();
+            document.getElementById('total-crystals').textContent = crystalTracks.length;
+        }
+        
+        // Wait for app to initialize
+        function waitForApp() {
+            if (window.app && window.app.sceneManager) {
+                console.log('🎯 Focus test initialized');
+                document.getElementById('loading').style.display = 'none';
+                
+                // Start debug panel updates
+                setInterval(updateDebugPanel, 100);
+                
+                // Add additional test logging
+                const sceneManager = window.app.sceneManager;
+                const cameraController = sceneManager.getCinematicCameraController();
+                const focusAnimationSystem = cameraController.getFocusAnimationSystem();
+                
+                // Set up focus callbacks for testing
+                focusAnimationSystem.setCallbacks({
+                    onFocusStart: (crystal) => {
+                        console.log(`🎯 Focus started on: ${crystal.name} by ${crystal.artist}`);
+                    },
+                    onFocusComplete: (crystal) => {
+                        console.log(`✅ Focus completed on: ${crystal.name} by ${crystal.artist}`);
+                    },
+                    onReturnStart: () => {
+                        console.log('🔄 Return animation started');
+                    },
+                    onReturnComplete: () => {
+                        console.log('✅ Return animation completed');
+                    }
+                });
+                
+                // Test keyboard shortcuts
+                document.addEventListener('keydown', (event) => {
+                    switch (event.code) {
+                        case 'KeyT':
+                            // Test focus on random crystal
+                            event.preventDefault();
+                            const crystalTracks = sceneManager.getSoulGalaxyRenderer().getCrystalTrackSystem().getCrystalTracks();
+                            if (crystalTracks.length > 0) {
+                                const randomCrystal = crystalTracks[Math.floor(Math.random() * crystalTracks.length)];
+                                console.log(`🎯 Testing focus on random crystal: ${randomCrystal.name}`);
+                                cameraController.focusOnCrystal(randomCrystal);
+                            }
+                            break;
+                        case 'KeyU':
+                            // Test return to previous position
+                            event.preventDefault();
+                            console.log('🔄 Testing return to previous position');
+                            cameraController.returnToPreviousPosition();
+                            break;
+                        case 'KeyI':
+                            // Toggle inertial mode
+                            event.preventDefault();
+                            const currentMode = cameraController.isInertialModeEnabled();
+                            cameraController.setInertialMode(!currentMode);
+                            console.log(`🎮 Camera mode switched to: ${!currentMode ? 'Inertial' : 'OrbitControls'}`);
+                            break;
+                    }
+                });
+                
+                console.log('🎮 Additional test controls:');
+                console.log('  T - Focus on random crystal');
+                console.log('  U - Return to previous position');
+                console.log('  I - Toggle camera mode');
+                
+            } else {
+                setTimeout(waitForApp, 100);
+            }
+        }
+        
+        waitForApp();
+    </script>
+</body>
+</html>

@@ -92,7 +92,7 @@ export class FocusAnimationSystem {
         
         // Рассчитываем оптимальную позицию камеры
         const optimalPosition = this.calculateOptimalCameraPosition(crystal);
-        const targetPoint = crystal.position.clone();
+        const targetPoint = this.getCrystalWorldPosition(crystal);
         
         // Настраиваем состояние анимации
         this.focusState = {
@@ -192,10 +192,11 @@ export class FocusAnimationSystem {
      * Рассчитывает оптимальную позицию камеры для просмотра кристалла
      */
     private calculateOptimalCameraPosition(crystal: CrystalTrack): THREE.Vector3 {
-        const crystalPosition = crystal.position.clone();
+        // Получаем реальную мировую позицию кристалла с учетом трансформаций группы
+        const crystalWorldPosition = this.getCrystalWorldPosition(crystal);
         
         // Рассчитываем направление от центра к кристаллу
-        const directionFromCenter = crystalPosition.clone().normalize();
+        const directionFromCenter = crystalWorldPosition.clone().normalize();
         
         // Добавляем небольшое смещение для более интересного угла
         const offsetAngle = this.settings.optimalAngle;
@@ -203,21 +204,81 @@ export class FocusAnimationSystem {
             .crossVectors(directionFromCenter, new THREE.Vector3(0, 1, 0))
             .normalize();
         
+        // Если perpendicular получился нулевым (кристалл на оси Y), используем другой вектор
+        if (perpendicular.length() < 0.001) {
+            perpendicular.set(1, 0, 0);
+        }
+        
         // Создаем поворот для более кинематографического угла
         const rotationMatrix = new THREE.Matrix4().makeRotationAxis(perpendicular, offsetAngle);
         const optimalDirection = directionFromCenter.clone().applyMatrix4(rotationMatrix);
         
         // Позиционируем камеру на оптимальном расстоянии
-        const optimalPosition = crystalPosition.clone()
+        const optimalPosition = crystalWorldPosition.clone()
             .add(optimalDirection.multiplyScalar(this.settings.optimalDistance));
         
         console.log(`📐 Calculated optimal camera position:`, {
-            crystal: crystalPosition,
+            crystalLocal: crystal.position,
+            crystalWorld: crystalWorldPosition,
             camera: optimalPosition,
-            distance: optimalPosition.distanceTo(crystalPosition)
+            distance: optimalPosition.distanceTo(crystalWorldPosition)
         });
         
         return optimalPosition;
+    }
+    
+    /**
+     * Получает реальную мировую позицию кристалла с учетом трансформаций группы
+     */
+    private getCrystalWorldPosition(crystal: CrystalTrack): THREE.Vector3 {
+        // Пытаемся найти mesh кристалла в сцене для получения точной позиции
+        const scene = (this.camera.parent as THREE.Scene) || 
+                     (this.camera as any).scene ||
+                     this.findSceneFromCamera();
+        
+        if (scene) {
+            const crystalMesh = this.findCrystalMeshInScene(scene, crystal.id);
+            if (crystalMesh) {
+                const worldPosition = new THREE.Vector3();
+                crystalMesh.getWorldPosition(worldPosition);
+                return worldPosition;
+            }
+        }
+        
+        // Fallback на локальную позицию кристалла
+        console.warn(`⚠️ Could not find crystal mesh for ${crystal.name}, using local position`);
+        return crystal.position.clone();
+    }
+    
+    /**
+     * Находит сцену через иерархию объектов
+     */
+    private findSceneFromCamera(): THREE.Scene | null {
+        let current: THREE.Object3D | null = this.camera;
+        while (current && current.parent) {
+            current = current.parent;
+            if (current instanceof THREE.Scene) {
+                return current;
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * Находит mesh кристалла в сцене по ID
+     */
+    private findCrystalMeshInScene(scene: THREE.Scene, trackId: string): THREE.Mesh | null {
+        let foundMesh: THREE.Mesh | null = null;
+        
+        scene.traverse((object) => {
+            if (object instanceof THREE.Mesh && 
+                object.userData.trackId === trackId && 
+                object.userData.isCrystal) {
+                foundMesh = object;
+            }
+        });
+        
+        return foundMesh;
     }
     
     /**
@@ -228,9 +289,9 @@ export class FocusAnimationSystem {
         const direction = new THREE.Vector3();
         this.camera.getWorldDirection(direction);
         
-        // Используем расстояние до центра сцены как базовое
-        const distance = this.camera.position.length();
-        return this.camera.position.clone().add(direction.multiplyScalar(distance));
+        // Используем фиксированное расстояние для более предсказуемого поведения
+        const targetDistance = 50; // Расстояние до цели
+        return this.camera.position.clone().add(direction.multiplyScalar(targetDistance));
     }
     
     /**
@@ -290,6 +351,9 @@ export class FocusAnimationSystem {
         // Применяем новую позицию и направление
         this.camera.position.copy(currentPosition);
         this.camera.lookAt(currentTarget);
+        
+        // Обновляем матрицы камеры для корректного отображения
+        this.camera.updateMatrixWorld();
         
         // Обновляем depth of field фокус если включен
         if (this.settings.enableDepthOfField && this.depthOfFieldSystem && 

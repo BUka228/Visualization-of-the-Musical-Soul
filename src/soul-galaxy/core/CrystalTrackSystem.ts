@@ -10,6 +10,7 @@ import { CrystalHoverSystem } from '../interaction/CrystalHoverSystem';
 import { SoulGalaxyAudioIntegration } from '../audio/SoulGalaxyAudioIntegration';
 import { CinematicCameraController } from '../camera/CinematicCameraController';
 import { CrystalRotationSystem } from '../effects/CrystalRotationSystem';
+import { DynamicGenreColorUtils } from '../materials/DynamicGenreColorSystem';
 
 /**
  * Система управления кристаллическими треками
@@ -20,7 +21,7 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
   private camera?: THREE.Camera;
   private crystalCluster?: THREE.Group;
   private crystalTracks: CrystalTrack[] = [];
-  private clusterRotationSpeed: number = 0.001; // Медленное вращение
+  private clusterRotationSpeed: number = 0.0002; // Очень медленное вращение для большого радиуса
   private initialized: boolean = false;
   private pulseSystem: CrystalPulseSystem;
   private albumTextureManager: AlbumTextureManager;
@@ -59,10 +60,10 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
 
   // Конфигурация кластера
   private static readonly CLUSTER_CONFIG = {
-    radius: 30,           // Радиус звездного скопления
-    heightVariation: 15,  // Вариация по высоте
-    minDistance: 2,       // Минимальное расстояние между кристаллами
-    rotationSpeed: 0.001  // Скорость вращения кластера
+    radius: 120,          // Радиус звездного скопления (значительно увеличен)
+    heightVariation: 40,  // Вариация по высоте (значительно увеличена)
+    minDistance: 10,      // Минимальное расстояние между кристаллами (значительно увеличено)
+    rotationSpeed: 0.0002 // Скорость вращения кластера (значительно уменьшена для большого радиуса)
   };
 
   initialize(scene: THREE.Scene, camera: THREE.Camera, container?: HTMLElement): void {
@@ -138,15 +139,23 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
   }
 
   createCrystalMaterial(crystalTrack: CrystalTrack): THREE.ShaderMaterial {
-    // Создаем кастомный шейдерный материал с пульсацией
+    // Создаем кастомный шейдерный материал с пульсацией и динамическими цветами
     const genreModifiers = this.getGenreModifiers(crystalTrack.genre);
+    
+    // Извлекаем дополнительные параметры из трека для динамических цветов
+    const bpm = this.extractBPMFromTrack(crystalTrack);
+    const energy = this.calculateEnergyFromGenre(crystalTrack.genre);
     
     const material = CrystalShaderMaterial.createForGenre(crystalTrack.genre, {
       albumTexture: crystalTrack.albumTexture,
       emissiveIntensity: crystalTrack.emissiveIntensity,
       pulseAmplitude: crystalTrack.pulseAmplitude * genreModifiers.amplitudeMultiplier,
       pulseSpeed: crystalTrack.pulseSpeed * genreModifiers.speedMultiplier,
-      sharpness: genreModifiers.sharpness
+      sharpness: genreModifiers.sharpness,
+      intensity: 1.2, // Увеличенная интенсивность для лучшей видимости
+      bpm: bpm,
+      popularity: crystalTrack.popularity,
+      energy: energy
     });
     
     return material;
@@ -638,6 +647,7 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
     sharpness: number;
   } {
     const genrePulseModifiers: { [key: string]: { speedMultiplier: number; amplitudeMultiplier: number; sharpness: number } } = {
+      // Основные жанры
       metal: { speedMultiplier: 1.2, amplitudeMultiplier: 1.3, sharpness: 1.4 },
       rock: { speedMultiplier: 1.1, amplitudeMultiplier: 1.1, sharpness: 1.2 },
       punk: { speedMultiplier: 1.4, amplitudeMultiplier: 1.2, sharpness: 1.5 },
@@ -647,10 +657,158 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
       pop: { speedMultiplier: 1.0, amplitudeMultiplier: 1.0, sharpness: 1.0 },
       indie: { speedMultiplier: 0.9, amplitudeMultiplier: 0.9, sharpness: 0.9 },
       hiphop: { speedMultiplier: 1.1, amplitudeMultiplier: 1.0, sharpness: 1.1 },
+      
+      // Новые жанры
+      kpop: { speedMultiplier: 1.2, amplitudeMultiplier: 1.1, sharpness: 1.1 },
+      electronics: { speedMultiplier: 1.1, amplitudeMultiplier: 0.9, sharpness: 0.9 },
+      dance: { speedMultiplier: 1.3, amplitudeMultiplier: 1.2, sharpness: 1.0 },
+      rnb: { speedMultiplier: 0.9, amplitudeMultiplier: 0.8, sharpness: 0.8 },
+      edmgenre: { speedMultiplier: 1.4, amplitudeMultiplier: 1.3, sharpness: 1.2 },
+      hardrock: { speedMultiplier: 1.3, amplitudeMultiplier: 1.4, sharpness: 1.5 },
+      videogame: { speedMultiplier: 1.1, amplitudeMultiplier: 1.0, sharpness: 1.0 },
+      soundtrack: { speedMultiplier: 0.8, amplitudeMultiplier: 0.9, sharpness: 0.7 },
+      
       default: { speedMultiplier: 1.0, amplitudeMultiplier: 1.0, sharpness: 1.0 }
     };
 
     const normalizedGenre = genre.toLowerCase();
     return genrePulseModifiers[normalizedGenre] || genrePulseModifiers.default;
+  }
+
+  /**
+   * Извлекает BPM из трека (если доступно) или оценивает на основе жанра
+   */
+  private extractBPMFromTrack(crystalTrack: CrystalTrack): number | undefined {
+    // Если BPM доступен в данных трека, используем его
+    if ((crystalTrack as any).bpm) {
+      return (crystalTrack as any).bpm;
+    }
+    
+    // Иначе оцениваем на основе жанра
+    return this.estimateBPMFromGenre(crystalTrack.genre);
+  }
+
+  /**
+   * Оценивает BPM на основе жанра
+   */
+  private estimateBPMFromGenre(genre: string): number {
+    const genreBPMRanges: { [key: string]: { min: number; max: number } } = {
+      // Быстрые жанры
+      metal: { min: 120, max: 180 },
+      hardrock: { min: 110, max: 160 },
+      punk: { min: 140, max: 200 },
+      edmgenre: { min: 120, max: 140 },
+      dance: { min: 120, max: 135 },
+      
+      // Средние жанры
+      rock: { min: 100, max: 140 },
+      pop: { min: 100, max: 130 },
+      kpop: { min: 110, max: 140 },
+      electronic: { min: 90, max: 130 },
+      electronics: { min: 90, max: 130 },
+      indie: { min: 90, max: 120 },
+      
+      // Медленные жанры
+      jazz: { min: 60, max: 120 },
+      classical: { min: 60, max: 120 },
+      rnb: { min: 70, max: 110 },
+      hiphop: { min: 70, max: 100 },
+      soundtrack: { min: 60, max: 120 },
+      videogame: { min: 80, max: 140 },
+      
+      default: { min: 90, max: 130 }
+    };
+
+    const normalizedGenre = genre.toLowerCase();
+    const range = genreBPMRanges[normalizedGenre] || genreBPMRanges.default;
+    
+    // Возвращаем случайное значение в диапазоне
+    return Math.floor(Math.random() * (range.max - range.min + 1)) + range.min;
+  }
+
+  /**
+   * Вычисляет энергию на основе жанра
+   */
+  private calculateEnergyFromGenre(genre: string): number {
+    const genreEnergyLevels: { [key: string]: number } = {
+      // Высокая энергия
+      metal: 0.9,
+      hardrock: 0.85,
+      punk: 0.95,
+      edmgenre: 0.9,
+      dance: 0.85,
+      
+      // Средняя энергия
+      rock: 0.7,
+      pop: 0.65,
+      kpop: 0.75,
+      electronic: 0.6,
+      electronics: 0.6,
+      indie: 0.55,
+      hiphop: 0.65,
+      
+      // Низкая энергия
+      jazz: 0.4,
+      classical: 0.3,
+      rnb: 0.5,
+      soundtrack: 0.45,
+      videogame: 0.6,
+      
+      default: 0.5
+    };
+
+    const normalizedGenre = genre.toLowerCase();
+    return genreEnergyLevels[normalizedGenre] || genreEnergyLevels.default;
+  }
+
+  /**
+   * Обновляет динамические цвета всех кристаллов
+   */
+  updateDynamicColors(deltaTime: number): void {
+    if (!this.initialized || this.crystalTracks.length === 0) {
+      return;
+    }
+
+    // Обновляем временные эффекты в системе цветов
+    DynamicGenreColorUtils.updateEffects(deltaTime);
+
+    // Обновляем цвета материалов кристаллов
+    this.crystalTracks.forEach(crystal => {
+      const mesh = this.findCrystalMesh(crystal.id);
+      if (mesh && mesh.material instanceof CrystalShaderMaterial) {
+        // Получаем обновленный цвет с временными эффектами
+        const updatedColor = DynamicGenreColorUtils.getColor(crystal.genre, {
+          intensity: 1.2,
+          bpm: this.extractBPMFromTrack(crystal),
+          popularity: crystal.popularity,
+          energy: this.calculateEnergyFromGenre(crystal.genre),
+          time: performance.now()
+        });
+        
+        mesh.material.setCustomColor(updatedColor);
+      }
+    });
+  }
+
+  /**
+   * Получает статистику цветовой системы
+   */
+  getColorSystemStats(): any {
+    return DynamicGenreColorUtils.getStats();
+  }
+
+  /**
+   * Создает цветовую палитру на основе текущих треков
+   */
+  createGenrePalette(): { genre: string; color: THREE.Color; weight: number }[] {
+    if (this.crystalTracks.length === 0) return [];
+
+    // Подсчитываем частоту жанров
+    const genreFrequency: { [genre: string]: number } = {};
+    this.crystalTracks.forEach(crystal => {
+      genreFrequency[crystal.genre] = (genreFrequency[crystal.genre] || 0) + 1;
+    });
+
+    return DynamicGenreColorUtils.createDominantPalette(genreFrequency, 8);
   }
 }

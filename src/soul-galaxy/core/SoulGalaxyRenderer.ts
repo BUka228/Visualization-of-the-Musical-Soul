@@ -49,6 +49,9 @@ export class SoulGalaxyRenderer implements ISoulGalaxyRenderer {
     // Update crystal track system animations
     this.crystalTrackSystem.updatePulsation(deltaTime);
     this.crystalTrackSystem.rotateCluster(deltaTime);
+    
+    // Update dynamic colors with temporal effects
+    this.crystalTrackSystem.updateDynamicColors(deltaTime);
   }
 
   /**

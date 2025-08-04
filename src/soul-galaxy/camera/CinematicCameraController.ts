@@ -124,6 +124,9 @@ export class CinematicCameraController {
     private onMouseDown(event: MouseEvent): void {
         if (!this.isInertialMode) return;
         
+        // Не обрабатываем события мыши во время анимации фокуса
+        if (this.focusAnimationSystem.isAnimating()) return;
+        
         this.isMouseDown = true;
         this.lastMousePosition.set(event.clientX, event.clientY);
         this.mouseMovement.set(0, 0);
@@ -138,6 +141,9 @@ export class CinematicCameraController {
      */
     private onMouseMove(event: MouseEvent): void {
         if (!this.isInertialMode || !this.isMouseDown) return;
+        
+        // Не обрабатываем события мыши во время анимации фокуса
+        if (this.focusAnimationSystem.isAnimating()) return;
         
         const currentMousePosition = new THREE.Vector2(event.clientX, event.clientY);
         
@@ -198,6 +204,9 @@ export class CinematicCameraController {
     private onWheel(event: WheelEvent): void {
         if (!this.isInertialMode) return;
         
+        // Не обрабатываем события колеса мыши во время анимации фокуса
+        if (this.focusAnimationSystem.isAnimating()) return;
+        
         event.preventDefault();
         
         const zoomDelta = event.deltaY * 0.001 * this.zoomSensitivity;
@@ -254,6 +263,9 @@ export class CinematicCameraController {
      */
     public updateInertia(deltaTime: number): void {
         if (!this.isInertialMode || this.isMouseDown) return;
+        
+        // Не применяем инерцию во время анимации фокуса
+        if (this.focusAnimationSystem.isAnimating()) return;
         
         // Применяем угловую инерцию
         if (this.angularVelocity.x !== 0 || this.angularVelocity.y !== 0) {
@@ -370,12 +382,15 @@ export class CinematicCameraController {
     public async focusOnCrystal(crystal: CrystalTrack): Promise<void> {
         console.log(`🎯 Focusing camera on crystal: ${crystal.name} by ${crystal.artist}`);
         
-        // Сохраняем текущий режим, но НЕ переключаем его во время анимации
-        const wasInertialMode = this.isInertialMode;
-        
-        // Останавливаем инерцию, но не переключаем на OrbitControls
+        // Останавливаем инерцию и отключаем управление на время анимации
         this.velocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
+        
+        // Временно отключаем все системы управления
+        const wasInertialEnabled = this.isInertialMode;
+        const wasOrbitEnabled = this.orbitControls.enabled;
+        
+        this.orbitControls.enabled = false;
         
         try {
             // Запускаем анимацию фокуса
@@ -384,8 +399,13 @@ export class CinematicCameraController {
             console.log(`✅ Camera focused on crystal: ${crystal.name}`);
         } catch (error) {
             console.error('❌ Failed to focus on crystal:', error);
+        } finally {
+            // Восстанавливаем управление только после завершения анимации
+            // Но не включаем OrbitControls если был инерциальный режим
+            if (!wasInertialEnabled) {
+                this.orbitControls.enabled = wasOrbitEnabled;
+            }
         }
-        // Не восстанавливаем режим - оставляем как есть
     }
     
     /**
@@ -394,9 +414,15 @@ export class CinematicCameraController {
     public async returnToPreviousPosition(): Promise<void> {
         console.log('🔄 Returning camera to previous position');
         
-        // Останавливаем инерцию, но не переключаем режимы
+        // Останавливаем инерцию и отключаем управление на время анимации
         this.velocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
+        
+        // Временно отключаем все системы управления
+        const wasInertialEnabled = this.isInertialMode;
+        const wasOrbitEnabled = this.orbitControls.enabled;
+        
+        this.orbitControls.enabled = false;
         
         try {
             // Запускаем анимацию возврата
@@ -405,8 +431,13 @@ export class CinematicCameraController {
             console.log('✅ Camera returned to previous position');
         } catch (error) {
             console.error('❌ Failed to return to previous position:', error);
+        } finally {
+            // Восстанавливаем управление только после завершения анимации
+            // Но не включаем OrbitControls если был инерциальный режим
+            if (!wasInertialEnabled) {
+                this.orbitControls.enabled = wasOrbitEnabled;
+            }
         }
-        // Не переключаем режимы - оставляем как есть
     }
     
     /**
