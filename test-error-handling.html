@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soul Galaxy Error Handling Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+        
+        #container {
+            width: 800px;
+            height: 600px;
+            border: 1px solid #333;
+            margin: 20px 0;
+        }
+        
+        .controls {
+            margin: 20px 0;
+        }
+        
+        button {
+            margin: 5px;
+            padding: 10px 15px;
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background: #555;
+        }
+        
+        .info {
+            margin: 20px 0;
+            padding: 15px;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 5px;
+        }
+        
+        .error-log {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #111;
+            padding: 10px;
+            border: 1px solid #333;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🌌 Soul Galaxy Error Handling Test</h1>
+    
+    <div class="info">
+        <h3>Test the error handling and fallback system:</h3>
+        <p>This test demonstrates how the Soul Galaxy error handling system works with shader failures, texture loading errors, and performance warnings.</p>
+    </div>
+    
+    <div id="container"></div>
+    
+    <div class="controls">
+        <button onclick="testShaderError()">Test Shader Error</button>
+        <button onclick="testTextureError()">Test Texture Error</button>
+        <button onclick="testGeometryError()">Test Geometry Error</button>
+        <button onclick="testPerformanceWarning()">Test Performance Warning</button>
+        <button onclick="testWebGLError()">Test WebGL Error</button>
+        <button onclick="clearNotifications()">Clear Notifications</button>
+        <button onclick="showCompatibility()">Show Compatibility</button>
+    </div>
+    
+    <div class="info">
+        <h3>Error Statistics:</h3>
+        <div id="error-stats">Loading...</div>
+    </div>
+    
+    <div class="info">
+        <h3>Error Log:</h3>
+        <div id="error-log" class="error-log">Loading...</div>
+    </div>
+
+    <script type="module">
+        import * as THREE from './node_modules/three/build/three.module.js';
+        
+        // Mock the Soul Galaxy error handling system for testing
+        class MockErrorHandlingSystem {
+            constructor() {
+                this.errorLog = [];
+                this.notificationContainer = document.createElement('div');
+                document.body.appendChild(this.notificationContainer);
+                this.setupNotificationStyles();
+            }
+            
+            setupNotificationStyles() {
+                const style = document.createElement('style');
+                style.textContent = `
+                    .mock-notification {
+                        position: fixed;
+                        top: 20px;
+                        right: 20px;
+                        background: rgba(239, 68, 68, 0.9);
+                        color: white;
+                        padding: 12px 16px;
+                        border-radius: 8px;
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                        z-index: 10000;
+                        max-width: 300px;
+                        margin-bottom: 8px;
+                        animation: slideIn 0.3s ease-out;
+                    }
+                    
+                    @keyframes slideIn {
+                        from { transform: translateX(100%); opacity: 0; }
+                        to { transform: translateX(0); opacity: 1; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            reportError(type, severity, message, context = {}) {
+                const error = {
+                    type,
+                    severity,
+                    message,
+                    context,
+                    timestamp: Date.now()
+                };
+                
+                this.errorLog.push(error);
+                this.showNotification(error);
+                this.updateErrorDisplay();
+                
+                console.log(`[${severity.toUpperCase()}] ${type}: ${message}`, context);
+            }
+            
+            showNotification(error) {
+                const notification = document.createElement('div');
+                notification.className = 'mock-notification';
+                notification.innerHTML = `
+                    <div style="font-weight: bold; margin-bottom: 4px;">
+                        ${this.getIcon(error.severity)} Soul Galaxy Error
+                    </div>
+                    <div style="font-size: 12px;">
+                        ${error.message}
+                    </div>
+                    <button onclick="this.parentElement.remove()" 
+                            style="position: absolute; top: 5px; right: 8px; background: none; border: none; color: white; cursor: pointer;">×</button>
+                `;
+                
+                this.notificationContainer.appendChild(notification);
+                
+                // Auto-remove after 5 seconds
+                setTimeout(() => {
+                    if (notification.parentElement) {
+                        notification.remove();
+                    }
+                }, 5000);
+            }
+            
+            getIcon(severity) {
+                switch (severity) {
+                    case 'low': return 'ℹ️';
+                    case 'medium': return '⚠️';
+                    case 'high': return '❌';
+                    case 'critical': return '🚨';
+                    default: return 'ℹ️';
+                }
+            }
+            
+            updateErrorDisplay() {
+                // Update statistics
+                const stats = this.getErrorStatistics();
+                document.getElementById('error-stats').innerHTML = `
+                    <p>Total Errors: ${stats.total}</p>
+                    <p>Recent Errors (last minute): ${stats.recent}</p>
+                    <p>By Severity: Critical: ${stats.bySeverity.critical || 0}, High: ${stats.bySeverity.high || 0}, Medium: ${stats.bySeverity.medium || 0}, Low: ${stats.bySeverity.low || 0}</p>
+                `;
+                
+                // Update error log
+                const logHtml = this.errorLog.slice(-10).map(error => {
+                    const time = new Date(error.timestamp).toLocaleTimeString();
+                    return `<div>[${time}] ${error.severity.toUpperCase()}: ${error.message}</div>`;
+                }).join('');
+                
+                document.getElementById('error-log').innerHTML = logHtml || 'No errors logged yet.';
+            }
+            
+            getErrorStatistics() {
+                const now = Date.now();
+                const recent = this.errorLog.filter(e => now - e.timestamp < 60000);
+                
+                const bySeverity = {};
+                this.errorLog.forEach(error => {
+                    bySeverity[error.severity] = (bySeverity[error.severity] || 0) + 1;
+                });
+                
+                return {
+                    total: this.errorLog.length,
+                    recent: recent.length,
+                    bySeverity
+                };
+            }
+            
+            clearNotifications() {
+                Array.from(this.notificationContainer.children).forEach(child => {
+                    child.remove();
+                });
+            }
+            
+            showCompatibilityInfo() {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+                
+                const capabilities = {
+                    hasWebGL2: !!canvas.getContext('webgl2'),
+                    hasFloatTextures: gl ? !!gl.getExtension('OES_texture_float') : false,
+                    maxTextureSize: gl ? gl.getParameter(gl.MAX_TEXTURE_SIZE) : 0,
+                    vendor: gl ? gl.getParameter(gl.VENDOR) : 'Unknown',
+                    renderer: gl ? gl.getParameter(gl.RENDERER) : 'Unknown'
+                };
+                
+                const notification = document.createElement('div');
+                notification.className = 'mock-notification';
+                notification.style.background = 'rgba(30, 41, 59, 0.95)';
+                notification.style.maxWidth = '400px';
+                notification.innerHTML = `
+                    <div style="font-weight: bold; margin-bottom: 8px; color: #60a5fa;">
+                        🌌 WebGL Capabilities
+                    </div>
+                    <div style="font-size: 11px; line-height: 1.4;">
+                        <div>WebGL 2.0: ${capabilities.hasWebGL2 ? '✅' : '❌'}</div>
+                        <div>Float Textures: ${capabilities.hasFloatTextures ? '✅' : '❌'}</div>
+                        <div>Max Texture Size: ${capabilities.maxTextureSize}px</div>
+                        <div>Vendor: ${capabilities.vendor}</div>
+                        <div>Renderer: ${capabilities.renderer.substring(0, 50)}...</div>
+                    </div>
+                    <button onclick="this.parentElement.remove()" 
+                            style="position: absolute; top: 5px; right: 8px; background: none; border: none; color: white; cursor: pointer;">×</button>
+                `;
+                
+                this.notificationContainer.appendChild(notification);
+            }
+        }
+        
+        // Initialize the mock system
+        const errorSystem = new MockErrorHandlingSystem();
+        
+        // Make functions available globally
+        window.testShaderError = () => {
+            errorSystem.reportError(
+                'shader_compilation',
+                'high',
+                'Crystal shader compilation failed. Using fallback material.',
+                { shaderType: 'fragment', materialType: 'crystal' }
+            );
+        };
+        
+        window.testTextureError = () => {
+            errorSystem.reportError(
+                'texture_loading',
+                'medium',
+                'Album artwork failed to load. Using procedural texture.',
+                { textureUrl: 'https://example.com/album.jpg', trackId: 'track_123' }
+            );
+        };
+        
+        window.testGeometryError = () => {
+            errorSystem.reportError(
+                'geometry_generation',
+                'medium',
+                'Crystal geometry generation failed. Using simple geometry.',
+                { geometryType: 'crystal', trackData: { id: 'track_456', title: 'Test Track' } }
+            );
+        };
+        
+        window.testPerformanceWarning = () => {
+            errorSystem.reportError(
+                'performance_warning',
+                'high',
+                'Low frame rate detected: 24.5 FPS. Performance mode enabled.',
+                { warningType: 'fps_drop', threshold: 30, currentValue: 24.5 }
+            );
+        };
+        
+        window.testWebGLError = () => {
+            errorSystem.reportError(
+                'webgl_context',
+                'critical',
+                'WebGL context lost. Switching to basic rendering mode.',
+                { contextLostReason: 'unknown' }
+            );
+        };
+        
+        window.clearNotifications = () => {
+            errorSystem.clearNotifications();
+        };
+        
+        window.showCompatibility = () => {
+            errorSystem.showCompatibilityInfo();
+        };
+        
+        // Initialize display
+        errorSystem.updateErrorDisplay();
+        
+        // Create a simple Three.js scene for context
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, 800/600, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(800, 600);
+        renderer.setClearColor(0x000011);
+        document.getElementById('container').appendChild(renderer.domElement);
+        
+        // Add some basic objects
+        const geometry = new THREE.IcosahedronGeometry(1, 1);
+        const material = new THREE.MeshBasicMaterial({ 
+            color: 0x4080ff, 
+            wireframe: true,
+            transparent: true,
+            opacity: 0.6
+        });
+        const crystal = new THREE.Mesh(geometry, material);
+        scene.add(crystal);
+        
+        camera.position.z = 3;
+        
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            crystal.rotation.x += 0.01;
+            crystal.rotation.y += 0.01;
+            
+            renderer.render(scene, camera);
+        }
+        
+        animate();
+        
+        console.log('Soul Galaxy Error Handling Test initialized');
+        console.log('Click the buttons above to test different error scenarios');
+    </script>
+</body>
+</html>
