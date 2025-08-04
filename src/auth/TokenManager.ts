@@ -18,6 +18,11 @@ export interface TokenValidationResult {
 export class TokenManager {
   private static readonly STORAGE_KEY = 'yandex_music_token';
   private static readonly TOKEN_LIFETIME_HOURS = 24; // Примерное время жизни токена
+  
+  // Проверяем, работаем ли мы в Electron
+  private static get isElectron(): boolean {
+    return typeof window !== 'undefined' && window.electronAPI !== undefined;
+  }
 
   /**
    * Сохраняет токен в localStorage
@@ -227,9 +232,48 @@ export class TokenManager {
   }
 
   /**
+   * Открывает окно авторизации в Electron
+   */
+  static async openElectronAuth(): Promise<string> {
+    if (!this.isElectron) {
+      throw new Error('Метод доступен только в Electron');
+    }
+
+    return new Promise((resolve, reject) => {
+      // Устанавливаем слушатель для получения токена
+      (window as any).electronAPI.onTokenReceived((token: string) => {
+        console.log('✅ Токен получен через Electron');
+        this.saveToken(token);
+        resolve(token);
+      });
+
+      // Открываем окно авторизации
+      (window as any).electronAPI.openAuthWindow().catch((error: any) => {
+        console.error('❌ Ошибка открытия окна авторизации:', error);
+        reject(error);
+      });
+    });
+  }
+
+  /**
    * Получает инструкции по получению токена
    */
   static getTokenInstructions(): string {
+    if (this.isElectron) {
+      return `
+Авторизация в Electron приложении:
+
+1. Нажмите кнопку "Войти через Яндекс.Музыку"
+2. В открывшемся окне войдите в свой аккаунт Яндекс
+3. После успешного входа окно закроется автоматически
+4. Токен будет сохранен и приложение готово к работе
+
+⚠️ Важно:
+- Токен действует ограниченное время (обычно 24 часа)
+- При истечении токена потребуется повторная авторизация
+      `.trim();
+    }
+
     return `
 Как получить токен Яндекс.Музыки:
 

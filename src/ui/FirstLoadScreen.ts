@@ -193,6 +193,7 @@ export class FirstLoadScreen {
    */
   private getTokenSectionHTML(dataStatus: any): string {
     const tokenInfo = TokenManager.getTokenInfo();
+    const isElectron = typeof window !== 'undefined' && (window as any).electronAPI !== undefined;
     
     if (tokenInfo.hasToken && tokenInfo.isValid) {
       const formattedToken = TokenManager.formatTokenForDisplay(TokenManager.getToken()?.token || '');
@@ -222,6 +223,96 @@ export class FirstLoadScreen {
       `;
     }
 
+    // Для Electron показываем кнопку авторизации
+    if (isElectron) {
+      return `
+        <div style="margin-bottom: 30px;">
+          <div style="background: rgba(255, 193, 7, 0.2); border: 1px solid rgba(255, 193, 7, 0.5); border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+            <h3 style="color: #ffc107; margin: 0 0 10px 0; font-size: 18px;">🔑 Авторизация</h3>
+            <p style="color: #ccc; margin: 0; font-size: 14px; line-height: 1.5;">
+              ${tokenInfo.hasToken ? 
+                `Токен недействителен: ${tokenInfo.error}` : 
+                'Для загрузки данных необходимо войти в Яндекс.Музыку'
+              }
+            </p>
+          </div>
+
+          <div style="text-align: center; margin-bottom: 20px;">
+            <button 
+              id="electron-auth-btn"
+              style="
+                background: linear-gradient(90deg, #ff6b35, #f7931e);
+                color: #fff;
+                border: none;
+                padding: 15px 30px;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: bold;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                margin-bottom: 15px;
+              "
+            >
+              🎵 Войти через Яндекс.Музыку
+            </button>
+          </div>
+
+          <details style="margin-bottom: 20px;">
+            <summary style="color: #4fc3f7; cursor: pointer; font-weight: bold; margin-bottom: 10px;">
+              💡 Как это работает?
+            </summary>
+            <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 6px; margin-top: 10px;">
+              <p style="color: #ccc; line-height: 1.6; margin: 0;">
+                При нажатии кнопки откроется окно Яндекс.Музыки. Войдите в свой аккаунт, 
+                и токен авторизации будет автоматически сохранен в приложении.
+              </p>
+            </div>
+          </details>
+
+          <div style="text-align: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+            <button 
+              id="manual-token-btn"
+              style="
+                background: transparent;
+                color: #ccc;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-size: 12px;
+                cursor: pointer;
+              "
+            >
+              Ввести токен вручную
+            </button>
+          </div>
+
+          <div id="manual-token-section" style="display: none; margin-top: 20px;">
+            <div style="margin-bottom: 15px;">
+              <label style="color: #fff; display: block; margin-bottom: 8px; font-weight: bold;">
+                Токен Session_id:
+              </label>
+              <input 
+                type="text" 
+                id="token-input" 
+                placeholder="Вставьте токен Session_id из cookies"
+                style="
+                  width: 100%;
+                  padding: 12px;
+                  border: 1px solid rgba(255, 255, 255, 0.3);
+                  border-radius: 6px;
+                  background: rgba(255, 255, 255, 0.1);
+                  color: #fff;
+                  font-size: 14px;
+                  box-sizing: border-box;
+                "
+              />
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Для браузера показываем обычный ввод токена
     return `
       <div style="margin-bottom: 30px;">
         <div style="background: rgba(255, 193, 7, 0.2); border: 1px solid rgba(255, 193, 7, 0.5); border-radius: 8px; padding: 15px; margin-bottom: 20px;">
@@ -377,6 +468,18 @@ export class FirstLoadScreen {
     const skipBtn = document.getElementById('skip-btn');
     if (skipBtn) {
       skipBtn.addEventListener('click', () => this.handleSkip());
+    }
+
+    // Electron авторизация
+    const electronAuthBtn = document.getElementById('electron-auth-btn');
+    if (electronAuthBtn) {
+      electronAuthBtn.addEventListener('click', () => this.handleElectronAuth());
+    }
+
+    // Показать ручной ввод токена
+    const manualTokenBtn = document.getElementById('manual-token-btn');
+    if (manualTokenBtn) {
+      manualTokenBtn.addEventListener('click', () => this.handleShowManualToken());
     }
 
     // Enter в поле токена
@@ -624,6 +727,60 @@ export class FirstLoadScreen {
         notification.remove();
       }
     }, 3000);
+  }
+
+  /**
+   * Обработчик Electron авторизации
+   */
+  private async handleElectronAuth(): Promise<void> {
+    const electronAuthBtn = document.getElementById('electron-auth-btn');
+    if (electronAuthBtn) {
+      electronAuthBtn.textContent = '⏳ Открытие окна авторизации...';
+      (electronAuthBtn as HTMLButtonElement).disabled = true;
+    }
+
+    try {
+      const token = await TokenManager.openElectronAuth();
+      this.showSuccess('Авторизация успешна!');
+      
+      // Перерисовываем экран
+      setTimeout(() => {
+        this.hide();
+        this.show();
+      }, 1000);
+    } catch (error) {
+      this.showError('Ошибка авторизации: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'));
+      
+      // Восстанавливаем кнопку
+      if (electronAuthBtn) {
+        electronAuthBtn.textContent = '🎵 Войти через Яндекс.Музыку';
+        (electronAuthBtn as HTMLButtonElement).disabled = false;
+      }
+    }
+  }
+
+  /**
+   * Обработчик показа ручного ввода токена
+   */
+  private handleShowManualToken(): void {
+    const manualSection = document.getElementById('manual-token-section');
+    const manualBtn = document.getElementById('manual-token-btn');
+    
+    if (manualSection && manualBtn) {
+      if (manualSection.style.display === 'none') {
+        manualSection.style.display = 'block';
+        manualBtn.textContent = 'Скрыть ручной ввод';
+        
+        // Фокусируемся на поле ввода
+        const tokenInput = document.getElementById('token-input') as HTMLInputElement;
+        if (tokenInput) {
+          setTimeout(() => tokenInput.focus(), 100);
+        }
+      } else {
+        manualSection.style.display = 'none';
+        manualBtn.textContent = 'Ввести токен вручную';
+      }
+    }
   }
 
   /**

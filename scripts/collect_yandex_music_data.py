@@ -53,6 +53,14 @@ def get_token_from_user() -> str:
 def load_saved_token() -> Optional[str]:
     """Загружает сохраненный токен"""
     try:
+        # Сначала проверяем временный файл от Electron
+        temp_token_file = os.path.join(os.path.dirname(__file__), '.temp_token')
+        if os.path.exists(temp_token_file):
+            with open(temp_token_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            return data['token']
+        
+        # Затем проверяем обычный сохраненный токен
         token_file = os.path.join(os.path.dirname(__file__), '.yandex_token')
         if os.path.exists(token_file):
             with open(token_file, 'r', encoding='utf-8') as f:

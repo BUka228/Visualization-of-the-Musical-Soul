@@ -471,23 +471,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function setupBasicUIEventHandlers(app: MusicGalaxyApp): void {
-  // Кнопка сброса камеры
-  const resetCameraButton = document.getElementById('reset-camera');
-  if (resetCameraButton) {
-    resetCameraButton.addEventListener('click', () => {
-      app.resetView();
-    });
-  }
-
-  // Кнопка паузы анимации
-  const toggleAnimationButton = document.getElementById('toggle-animation');
-  if (toggleAnimationButton) {
-    toggleAnimationButton.addEventListener('click', () => {
-      app.toggleAnimation();
-    });
-  }
-
-  // Обработчики клавиатуры
+  // Обработчики клавиатуры остаются для удобства пользователей
   document.addEventListener('keydown', (event) => {
     switch (event.code) {
       case 'KeyR':

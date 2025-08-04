@@ -148,59 +148,13 @@ export class DataLoader {
    * Создает минимальный набор демо-данных
    */
   private static createMinimalDemoData(): MusicDataFile {
-    const demoTracks: YandexTrackData[] = [
-      {
-        id: '1',
-        title: 'Bohemian Rhapsody',
-        artist: 'Queen',
-        album: 'A Night at the Opera',
-        duration: 355,
-        genre: 'rock',
-        available: true
-      },
-      {
-        id: '2',
-        title: 'Stairway to Heaven',
-        artist: 'Led Zeppelin',
-        album: 'Led Zeppelin IV',
-        duration: 482,
-        genre: 'rock',
-        available: true
-      },
-      {
-        id: '3',
-        title: 'Hotel California',
-        artist: 'Eagles',
-        album: 'Hotel California',
-        duration: 391,
-        genre: 'rock',
-        available: true
-      },
-      {
-        id: '4',
-        title: 'Imagine',
-        artist: 'John Lennon',
-        album: 'Imagine',
-        duration: 183,
-        genre: 'pop',
-        available: true
-      },
-      {
-        id: '5',
-        title: 'Smells Like Teen Spirit',
-        artist: 'Nirvana',
-        album: 'Nevermind',
-        duration: 301,
-        genre: 'indie',
-        available: true
-      }
-    ];
+    const demoTracks: YandexTrackData[] = [];
 
     return {
       metadata: {
-        total_tracks: demoTracks.length,
+        total_tracks: 0,
         generated_at: new Date().toISOString(),
-        source: 'Demo Data'
+        source: 'Empty Demo Data'
       },
       tracks: demoTracks
     };
@@ -248,8 +202,9 @@ export class DataLoader {
     }
 
     if (data.tracks.length === 0) {
-      errors.push('Массив треков пуст');
-      return { isValid: false, errors };
+      // Пустой массив треков допустим для демо-данных
+      console.warn('⚠️ Массив треков пуст');
+      return { isValid: true, errors };
     }
 
     // Проверяем структуру треков (первые 5 для производительности)

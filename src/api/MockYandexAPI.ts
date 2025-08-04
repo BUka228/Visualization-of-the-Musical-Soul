@@ -34,49 +34,8 @@ export class MockYandexAPI {
     // Имитируем задержку API
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Возвращаем демо-треки
-    return [
-      {
-        id: 'mock_1',
-        title: 'Bohemian Rhapsody',
-        artists: [{ name: 'Queen' }],
-        albums: [{ title: 'A Night at the Opera' }],
-        duration_ms: 355000,
-        available: true
-      },
-      {
-        id: 'mock_2',
-        title: 'Stairway to Heaven',
-        artists: [{ name: 'Led Zeppelin' }],
-        albums: [{ title: 'Led Zeppelin IV' }],
-        duration_ms: 482000,
-        available: true
-      },
-      {
-        id: 'mock_3',
-        title: 'Hotel California',
-        artists: [{ name: 'Eagles' }],
-        albums: [{ title: 'Hotel California' }],
-        duration_ms: 391000,
-        available: true
-      },
-      {
-        id: 'mock_4',
-        title: 'Imagine',
-        artists: [{ name: 'John Lennon' }],
-        albums: [{ title: 'Imagine' }],
-        duration_ms: 183000,
-        available: true
-      },
-      {
-        id: 'mock_5',
-        title: 'Smells Like Teen Spirit',
-        artists: [{ name: 'Nirvana' }],
-        albums: [{ title: 'Nevermind' }],
-        duration_ms: 301000,
-        available: true
-      }
-    ];
+    // Возвращаем пустой массив треков
+    return [];
   }
 
   /**

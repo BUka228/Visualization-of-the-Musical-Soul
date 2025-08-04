@@ -221,3 +221,27 @@ export interface MusicGalaxyApp {
   dispose(): void;
   getState(): AppState;
 }
+
+// Типы для Electron API
+export interface ElectronAPI {
+  openAuthWindow: () => Promise<void>;
+  getStoredToken: () => Promise<string | null>;
+  collectYandexData: (token: string) => Promise<{
+    success: boolean;
+    tracksCollected?: number;
+    tracksWithPreview?: number;
+    data?: any;
+    error?: string;
+  }>;
+  onTokenReceived: (callback: (token: string) => void) => void;
+  onCollectionProgress: (callback: (message: string) => void) => void;
+  removeTokenListener: () => void;
+  removeProgressListener: () => void;
+}
+
+// Расширение глобального объекта Window для Electron
+declare global {
+  interface Window {
+    electronAPI?: ElectronAPI;
+  }
+}
