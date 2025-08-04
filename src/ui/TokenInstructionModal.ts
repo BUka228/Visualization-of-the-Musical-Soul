@@ -596,12 +596,11 @@ export class TokenInstructionModal {
     if (!tokenInput || !nextBtn) return;
 
     const token = tokenInput.value.trim();
-    const isValid = this.isValidTokenFormat(token);
+    const isValid = token.length > 0; // Принимаем любой непустой токен
 
     // Обновляем стиль поля ввода
     tokenInput.style.borderColor = token.length === 0 ? 
-      'rgba(79, 195, 247, 0.3)' : 
-      (isValid ? '#4caf50' : '#f44336');
+      'rgba(79, 195, 247, 0.3)' : '#4caf50';
 
     // Обновляем кнопку
     nextBtn.disabled = !isValid;
@@ -613,13 +612,8 @@ export class TokenInstructionModal {
    * Проверяет формат токена
    */
   private isValidTokenFormat(token: string): boolean {
-    if (token.length < 20) return false;
-    
-    // OAuth токен обычно начинается с "AQAAAAAY" и содержит буквы и цифры
-    // Например: AQAAAAAYc***...
-    const oauthTokenPattern = /^[A-Za-z0-9_-]+$/;
-    
-    return oauthTokenPattern.test(token) && !token.includes(' ') && token.startsWith('AQAAAAAY');
+    // Принимаем любой непустой токен
+    return token.length > 0;
   }
 
   /**
