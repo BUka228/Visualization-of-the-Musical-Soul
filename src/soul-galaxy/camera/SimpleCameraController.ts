@@ -65,15 +65,13 @@ export class SimpleCameraController {
         this.zoomSystem.setCallbacks({
             onZoomStart: (crystal: CrystalTrack) => {
                 console.log(`🔍 Zoom started to: ${crystal.name}`);
-                
-                // Останавливаем вращение кластера при начале приближения
-                if (this.crystalTrackSystem && typeof this.crystalTrackSystem.pauseClusterRotationWithDelay === 'function') {
-                    this.crystalTrackSystem.pauseClusterRotationWithDelay(3000); // 3 секунды паузы
-                }
+                // Не останавливаем вращение здесь - это уже делается в handleCrystalClick
+                // Избегаем дублирования логики управления вращением
             },
             
             onZoomComplete: (crystal: CrystalTrack) => {
                 console.log(`✅ Zoom completed to: ${crystal.name}`);
+                // Не возобновляем вращение здесь - это управляется аудио коллбэками и кликами мыши
             }
         });
     }

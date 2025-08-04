@@ -30,6 +30,9 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
   private targetRotationSpeed: number = 0.0002;
   private currentRotationSpeed: number = 0.0002;
   private rotationTransitionSpeed: number = 0.00001; // Скорость плавного перехода
+  private isRotationPausedForAudio: boolean = false; // Новый флаг для паузы во время аудио
+  private mouseClickListener?: (event: MouseEvent) => void; // Слушатель кликов мыши
+  private audioRotationCallbacksSetup: boolean = false; // Флаг настройки коллбэков аудио
   private pulseSystem: CrystalPulseSystem;
   private albumTextureManager: AlbumTextureManager;
   private textureClaritySystem: TextureClaritySystem;
@@ -256,6 +259,140 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
     }, pauseDuration);
   }
 
+  /**
+   * Останавливает вращение кластера во время воспроизведения аудио
+   * Вращение возобновляется при окончании аудио или клике мыши
+   */
+  pauseClusterRotationForAudio(): void {
+    console.log('⏸️ Pausing cluster rotation for audio playback');
+    
+    // Очищаем предыдущий таймер если есть
+    if (this.clusterRotationResumeTimer) {
+      clearTimeout(this.clusterRotationResumeTimer);
+      this.clusterRotationResumeTimer = undefined;
+    }
+    
+    // Устанавливаем флаг паузы для аудио
+    this.isRotationPausedForAudio = true;
+    
+    // Останавливаем вращение
+    this.pauseClusterRotation();
+    
+    // Настраиваем коллбэки аудио для автоматического возобновления (только один раз)
+    this.setupAudioRotationCallbacks();
+    
+    // Добавляем слушатель кликов мыши для возобновления вращения
+    this.setupMouseClickListener();
+  }
+
+  /**
+   * Возобновляет вращение кластера после аудио
+   */
+  resumeClusterRotationFromAudio(): void {
+    if (!this.isRotationPausedForAudio) {
+      return;
+    }
+    
+    console.log('▶️ Resuming cluster rotation after audio');
+    
+    // Сбрасываем флаг паузы для аудио
+    this.isRotationPausedForAudio = false;
+    
+    // Убираем слушатель кликов мыши
+    this.removeMouseClickListener();
+    
+    // Возобновляем вращение
+    this.resumeClusterRotation();
+  }
+
+  /**
+   * Настраивает слушатель кликов мыши для возобновления вращения
+   */
+  private setupMouseClickListener(): void {
+    // Убираем предыдущий слушатель если есть
+    this.removeMouseClickListener();
+    
+    // Создаем новый слушатель с проверкой на клики по кристаллам
+    this.mouseClickListener = (event: MouseEvent) => {
+      // Проверяем, что камера не находится в процессе приближения
+      if (this.isCameraZooming()) {
+        console.log('🔍 Camera is zooming, ignoring mouse click for rotation control');
+        return;
+      }
+      
+      // Проверяем, что аудио не воспроизводится
+      const currentTrack = this.getCurrentPlayingTrack();
+      if (currentTrack && this.audioIntegration.isTrackPlaying(currentTrack)) {
+        console.log('🎵 Audio is playing, ignoring mouse click for rotation control');
+        return;
+      }
+      
+      // Проверяем, не был ли клик по кристаллу через raycasting
+      const target = event.target as HTMLElement;
+      if (target && target.tagName === 'CANVAS') {
+        // Получаем координаты мыши в нормализованном пространстве
+        const rect = target.getBoundingClientRect();
+        const mouseX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        const mouseY = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        
+        // Проверяем, есть ли пересечение с кристаллом
+        const hoveredCrystal = this.getHoveredCrystal();
+        
+        if (!hoveredCrystal) {
+          // Клик не по кристаллу - возобновляем вращение
+          console.log('🖱️ Mouse click detected (not on crystal) - resuming cluster rotation');
+          this.resumeClusterRotationFromAudio();
+        }
+        // Если клик по кристаллу, не делаем ничего - пусть handleCrystalClick обработает
+      } else {
+        // Клик не по canvas - точно не по кристаллу
+        console.log('🖱️ Mouse click detected (outside canvas) - resuming cluster rotation');
+        this.resumeClusterRotationFromAudio();
+      }
+    };
+    
+    // Добавляем слушатель к документу для глобального отслеживания кликов
+    document.addEventListener('click', this.mouseClickListener);
+    
+    console.log('🖱️ Mouse click listener added for rotation control');
+  }
+
+  /**
+   * Убирает слушатель кликов мыши
+   */
+  private removeMouseClickListener(): void {
+    if (this.mouseClickListener) {
+      document.removeEventListener('click', this.mouseClickListener);
+      this.mouseClickListener = undefined;
+      console.log('🖱️ Mouse click listener removed');
+    }
+  }
+
+  /**
+   * Настраивает коллбэки аудио для управления вращением
+   */
+  private setupAudioRotationCallbacks(): void {
+    // Проверяем, не настроены ли уже коллбэки для управления вращением
+    if (this.audioRotationCallbacksSetup) {
+      return;
+    }
+    
+    // Настраиваем коллбэк для окончания воспроизведения
+    this.audioIntegration.setOnTrackPlayEnd((track: CrystalTrack) => {
+      console.log(`🎵 Audio ended for ${track.name} - resuming cluster rotation`);
+      this.resumeClusterRotationFromAudio();
+    });
+    
+    // Настраиваем коллбэк для ошибок аудио
+    this.audioIntegration.setOnAudioError((track: CrystalTrack, error: Error) => {
+      console.log(`❌ Audio error for ${track.name} - resuming cluster rotation`);
+      this.resumeClusterRotationFromAudio();
+    });
+    
+    this.audioRotationCallbacksSetup = true;
+    console.log('🎵 Audio rotation callbacks configured');
+  }
+
   focusOnCrystal(crystal: CrystalTrack): void {
     // Базовая реализация фокуса - будет расширена в задачах камеры
     console.log(`🎯 Focusing on crystal: ${crystal.name} by ${crystal.artist}`);
@@ -367,16 +504,21 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
       // Убираем подсветку при клике
       this.clearHover();
       
+      // Останавливаем вращение кластера для воспроизведения аудио
+      this.pauseClusterRotationForAudio();
+      
       // Используем простое приближение камеры если доступно
       if (this.cameraController) {
         await this.zoomToCrystalWithAnimation(crystalTrack);
       }
       
-      // Воспроизводим трек с переходом
+      // Воспроизводим трек с переходом (это автоматически остановит предыдущий трек)
       await this.audioIntegration.playTrackWithTransition(crystalTrack, crystalMesh);
       
     } catch (error) {
       console.error(`❌ Failed to play crystal: ${crystalTrack.name}`, error);
+      // В случае ошибки возобновляем вращение
+      this.resumeClusterRotationFromAudio();
     }
   }
 
@@ -475,6 +617,12 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
       clearTimeout(this.clusterRotationResumeTimer);
       this.clusterRotationResumeTimer = undefined;
     }
+    
+    // Убираем слушатель кликов мыши
+    this.removeMouseClickListener();
+    
+    // Сбрасываем флаги состояния вращения
+    this.isRotationPausedForAudio = false;
     
     // Dispose of the rotation system
     this.rotationSystem.dispose();
