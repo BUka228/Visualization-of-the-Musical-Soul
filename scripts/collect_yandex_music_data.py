@@ -77,11 +77,26 @@ def get_preview_url(client: Client, track) -> Optional[str]:
         # Получаем информацию о загрузке
         download_info = client.tracks_download_info(track.id)
         if download_info:
-            # Ищем превью (обычно это самое низкое качество)
+            # Ищем превью - сначала пробуем самое низкое качество для превью
+            preview_candidates = []
+            
             for info in download_info:
-                if info.codec == 'mp3' and info.bitrate_in_kbps <= 128:
+                if info.codec == 'mp3':
+                    preview_candidates.append(info)
+            
+            # Сортируем по битрейту (от меньшего к большему)
+            preview_candidates.sort(key=lambda x: x.bitrate_in_kbps)
+            
+            # Берем первый доступный (самое низкое качество)
+            for info in preview_candidates:
+                try:
                     download_url = info.get_direct_link()
-                    return download_url
+                    if download_url:
+                        print(f"✅ Получен preview URL для {track.title} ({info.bitrate_in_kbps}kbps)")
+                        return download_url
+                except Exception as link_error:
+                    print(f"⚠️  Ошибка получения ссылки для {track.title}: {link_error}")
+                    continue
         
         return None
     except Exception as e:
@@ -107,7 +122,12 @@ def process_track(client: Client, track) -> Dict[str, Any]:
         
         # Получаем превью только для доступных треков
         if track_data["available"]:
-            track_data["preview_url"] = get_preview_url(client, track)
+            preview_url = get_preview_url(client, track)
+            if preview_url:
+                track_data["preview_url"] = preview_url
+                print(f"  ✅ Превью получено: {track.title}")
+            else:
+                print(f"  ⚠️  Превью недоступно: {track.title}")
         
         return track_data
     
@@ -152,7 +172,12 @@ def collect_liked_tracks(token: str) -> List[Dict[str, Any]]:
                 print(f"⚠️  Пропуск трека {i}: {e}")
                 continue
         
+        # Статистика по превью
+        tracks_with_preview = sum(1 for track in tracks_data if track.get('preview_url'))
+        preview_percentage = (tracks_with_preview / len(tracks_data) * 100) if tracks_data else 0
+        
         print(f"✅ Успешно обработано {len(tracks_data)} треков")
+        print(f"🎵 Превью доступно для {tracks_with_preview} треков ({preview_percentage:.1f}%)")
         return tracks_data
     
     except YandexMusicError as e:
