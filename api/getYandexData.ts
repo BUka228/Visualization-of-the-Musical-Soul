@@ -71,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       tracks: processedTracks
     };
 
-    res.status(200).json(response);
+    return res.status(200).json(response);
 
   } catch (error) {
     console.error('Ошибка API Яндекс.Музыки:', error);
@@ -96,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    res.status(500).json({ 
+    return res.status(500).json({ 
       error: 'Failed to fetch data from Yandex Music', 
       details: errorMessage 
     });
