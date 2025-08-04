@@ -170,11 +170,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const tracksWithDownloadInfo: any[] = [];
     
     // Обрабатываем треки батчами для получения ссылок на скачивание
-    const downloadBatchSize = 50; // Меньший размер батча для download info
+    // Ограничиваем количество треков для получения превью (для тестирования)
+    const maxTracksForPreview = 10; // Получаем превью только для первых 10 треков
+    const downloadBatchSize = 5; // Очень маленький размер батча для download info
     
-    for (let i = 0; i < allTracks.length; i += downloadBatchSize) {
-      const batch = allTracks.slice(i, i + downloadBatchSize);
-      const trackIds = batch.map(track => track.id);
+    // Ограничиваем обработку превью только первыми треками
+    const tracksToProcess = allTracks.slice(0, maxTracksForPreview);
+    const remainingTracks = allTracks.slice(maxTracksForPreview);
+    
+    console.log(`Processing preview for first ${tracksToProcess.length} tracks, skipping ${remainingTracks.length} tracks`);
+    
+    for (let i = 0; i < tracksToProcess.length; i += downloadBatchSize) {
+      const batch = tracksToProcess.slice(i, i + downloadBatchSize);
       
       try {
         // Получаем информацию о скачивании для каждого трека отдельно
@@ -253,7 +260,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    console.log(`Processed download info for ${tracksWithDownloadInfo.length} tracks.`);
+    // Добавляем оставшиеся треки без превью
+    tracksWithDownloadInfo.push(...remainingTracks);
+
+    console.log(`Processed download info for ${tracksWithDownloadInfo.length} tracks (${maxTracksForPreview} with preview attempts).`);
 
     // Обрабатываем треки с улучшенной информацией
     const processedTracks: ProcessedTrack[] = tracksWithDownloadInfo
