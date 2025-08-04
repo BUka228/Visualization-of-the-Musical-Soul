@@ -14,7 +14,8 @@
     "test:ui": "vitest --ui",
     "vercel:dev": "vercel dev",
     "vercel:deploy": "vercel --prod",
-    "test:api": "echo 'Откройте test-vercel-api.html в браузере для тестирования API'"
+    "test:api": "echo 'Откройте test-vercel-api.html в браузере для тестирования API'",
+    "dev:api": "node server-local.js"
   },
   "keywords": [
     "3d",
@@ -42,6 +43,9 @@
   },
   "dependencies": {
     "@vercel/node": "^3.2.29",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "node-fetch": "^2.7.0",
     "three": "^0.158.0"
   }
 }

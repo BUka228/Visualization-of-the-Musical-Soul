@@ -44,14 +44,25 @@ export class DataCollector {
       
       this.updateProgress({
         stage: 'connecting',
-        message: 'Подключение к Яндекс.Музыке...',
-        progress: 10
+        message: 'Подключаемся к Яндекс.Музыке...',
+        progress: 5
       });
+
+      // Небольшая задержка для показа анимации подключения
+      await this.delay(800);
+
+      this.updateProgress({
+        stage: 'connecting',
+        message: 'Проверяем токен авторизации...',
+        progress: 15
+      });
+
+      await this.delay(500);
 
       this.updateProgress({
         stage: 'fetching',
-        message: 'Получение данных из Яндекс.Музыки...',
-        progress: 30
+        message: 'Получаем ваши любимые треки...',
+        progress: 25
       });
 
       // Получаем все данные одним запросом через наш API
@@ -69,26 +80,49 @@ export class DataCollector {
         throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
+      this.updateProgress({
+        stage: 'fetching',
+        message: 'Загружаем информацию о треках...',
+        progress: 50
+      });
+
       const musicData: MusicDataFile = await response.json();
 
       this.updateProgress({
         stage: 'processing',
-        message: 'Обработка полученных данных...',
-        progress: 70
+        message: 'Строим вашу галактику...',
+        progress: 65,
+        totalTracks: musicData.tracks.length,
+        processedTracks: 0
       });
+
+      // Симулируем обработку треков с прогрессом
+      await this.simulateTrackProcessing(musicData.tracks);
+
+      this.updateProgress({
+        stage: 'processing',
+        message: 'Настраиваем звезды...',
+        progress: 85,
+        totalTracks: musicData.tracks.length,
+        processedTracks: musicData.tracks.length
+      });
+
+      await this.delay(800);
 
       this.updateProgress({
         stage: 'saving',
-        message: 'Сохранение данных...',
-        progress: 90
+        message: 'Сохраняем данные...',
+        progress: 95
       });
 
       // Сохраняем данные локально
       await this.saveData(musicData);
 
+      await this.delay(300);
+
       this.updateProgress({
         stage: 'complete',
-        message: 'Данные успешно собраны!',
+        message: 'Галактика создана успешно!',
         progress: 100
       });
 
@@ -115,6 +149,43 @@ export class DataCollector {
         error: errorMessage
       };
     }
+  }
+
+  /**
+   * Симулирует обработку треков с показом прогресса
+   */
+  private async simulateTrackProcessing(tracks: YandexTrackData[]): Promise<void> {
+    const totalTracks = tracks.length;
+    const batchSize = Math.max(1, Math.floor(totalTracks / 20)); // Обрабатываем по батчам
+    
+    for (let i = 0; i < totalTracks; i += batchSize) {
+      if (this.abortController?.signal.aborted) {
+        throw new Error('Операция отменена');
+      }
+
+      const endIndex = Math.min(i + batchSize, totalTracks);
+      const currentTrack = tracks[i];
+      const progress = 65 + (i / totalTracks) * 20; // От 65% до 85%
+
+      this.updateProgress({
+        stage: 'processing',
+        message: 'Обрабатываем треки...',
+        progress: Math.round(progress),
+        totalTracks: totalTracks,
+        processedTracks: endIndex,
+        currentTrack: currentTrack ? `${currentTrack.title} - ${currentTrack.artist}` : undefined
+      });
+
+      // Небольшая задержка для показа прогресса
+      await this.delay(50);
+    }
+  }
+
+  /**
+   * Создает задержку
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**

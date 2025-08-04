@@ -3,7 +3,9 @@ import { SceneManager } from './scene/SceneManager';
 import { DataLoader } from './data/DataLoader';
 import { DataProcessor } from './data/DataProcessor';
 import { UIManager } from './ui/UIManager';
-import { FirstLoadScreen } from './ui/FirstLoadScreen';
+import { LandingPage } from './ui/LandingPage';
+import { GalaxyCreationProgress } from './ui/GalaxyCreationProgress';
+import { DataCollector, CollectionProgress, CollectionResult } from './data/DataCollector';
 import { BurgerMenu } from './ui/BurgerMenu';
 import { TokenManager } from './auth/TokenManager';
 import { setupMockAPI } from './api/MockYandexAPI';
@@ -57,7 +59,8 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
   private container?: HTMLElement;
   private sceneManager?: SceneManager;
   private uiManager?: UIManager;
-  private firstLoadScreen?: FirstLoadScreen;
+  private landingPage?: LandingPage;
+  private progressScreen?: GalaxyCreationProgress;
   private burgerMenu?: BurgerMenu;
 
   constructor(config: Partial<AppConfig> = {}) {
@@ -106,51 +109,144 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
     const hasValidToken = TokenManager.hasValidToken();
     const dataIsFresh = await DataLoader.checkDataFreshness();
 
-    // Показываем экран первой загрузки если:
+    // Показываем лендинг-страницу если:
     // 1. Нет данных вообще
     // 2. Данные устарели и нет валидного токена для обновления
     // 3. Есть токен, но он недействителен
-    const needsFirstLoad = !hasValidData || 
-                          (!dataIsFresh && !hasValidToken) || 
-                          (TokenManager.getToken() && !hasValidToken);
+    const needsOnboarding = !hasValidData || 
+                           (!dataIsFresh && !hasValidToken) || 
+                           (TokenManager.getToken() && !hasValidToken);
 
-    if (needsFirstLoad) {
-      await this.showFirstLoadScreen();
+    if (needsOnboarding) {
+      await this.showLandingPage();
     } else {
       await this.initializeMainApp();
     }
   }
 
   /**
-   * Показывает экран первой загрузки
+   * Показывает лендинг-страницу
    */
-  private async showFirstLoadScreen(): Promise<void> {
-    this.firstLoadScreen = new FirstLoadScreen(this.container!);
+  private async showLandingPage(): Promise<void> {
+    this.landingPage = new LandingPage(this.container!);
+    this.landingPage.show();
     
-    // Настраиваем обработчик завершения первой загрузки
-    window.addEventListener('first-load-completed', (event: any) => {
-      this.handleFirstLoadCompleted(event.detail);
+    // Настраиваем обработчики событий нового онбординга
+    this.setupOnboardingEventHandlers();
+  }
+
+  /**
+   * Настраивает обработчики событий онбординга
+   */
+  private setupOnboardingEventHandlers(): void {
+    // Обработчик начала создания галактики
+    window.addEventListener('galaxy-creation-started', (event: any) => {
+      this.handleGalaxyCreationStarted(event.detail);
+    }, { once: true });
+
+    // Обработчик готовности галактики
+    window.addEventListener('galaxy-ready', (event: any) => {
+      this.handleGalaxyReady(event.detail);
+    }, { once: true });
+
+    // Обработчик повтора создания галактики
+    window.addEventListener('galaxy-creation-retry', () => {
+      this.handleGalaxyCreationRetry();
     });
 
-    const shown = await this.firstLoadScreen.show();
-    if (!shown) {
-      // Экран не был показан, значит данные есть
-      await this.initializeMainApp();
+    // Обработчик использования демо-данных
+    window.addEventListener('galaxy-use-demo', () => {
+      this.handleUseDemoData();
+    });
+  }
+
+  /**
+   * Обрабатывает начало создания галактики
+   */
+  private async handleGalaxyCreationStarted(detail: any): Promise<void> {
+    console.log('Начало создания галактики:', detail);
+    
+    if (this.landingPage) {
+      this.landingPage.hide();
+      this.landingPage = undefined;
+    }
+
+    // Показываем экран прогресса
+    this.progressScreen = new GalaxyCreationProgress(this.container!);
+    this.progressScreen.show();
+
+    // Запускаем сбор данных
+    await this.startDataCollection(detail.token);
+  }
+
+  /**
+   * Запускает сбор данных с отображением прогресса
+   */
+  private async startDataCollection(token: string): Promise<void> {
+    const collector = new DataCollector((progress: CollectionProgress) => {
+      if (this.progressScreen) {
+        this.progressScreen.updateProgress(progress);
+      }
+    });
+
+    try {
+      const result: CollectionResult = await collector.collectData(token);
+      
+      if (result.success && this.progressScreen) {
+        this.progressScreen.showSuccess(
+          result.tracksCollected || 0,
+          result.tracksWithPreview || 0
+        );
+      } else if (this.progressScreen) {
+        this.progressScreen.showError(result.error || 'Неизвестная ошибка');
+      }
+    } catch (error) {
+      if (this.progressScreen) {
+        this.progressScreen.showError(
+          error instanceof Error ? error.message : 'Неизвестная ошибка'
+        );
+      }
     }
   }
 
   /**
-   * Обрабатывает завершение первой загрузки
+   * Обрабатывает готовность галактики
    */
-  private async handleFirstLoadCompleted(detail: any): Promise<void> {
-    console.log('Первая загрузка завершена:', detail);
+  private async handleGalaxyReady(detail: any): Promise<void> {
+    console.log('Галактика готова:', detail);
     
-    if (this.firstLoadScreen) {
-      this.firstLoadScreen.hide();
-      this.firstLoadScreen = undefined;
+    if (this.progressScreen) {
+      this.progressScreen.hide();
+      this.progressScreen = undefined;
     }
 
     // Инициализируем основное приложение
+    await this.initializeMainApp();
+  }
+
+  /**
+   * Обрабатывает повтор создания галактики
+   */
+  private handleGalaxyCreationRetry(): void {
+    if (this.progressScreen) {
+      this.progressScreen.hide();
+      this.progressScreen = undefined;
+    }
+
+    // Возвращаемся к лендинг-странице
+    this.showLandingPage();
+  }
+
+  /**
+   * Обрабатывает использование демо-данных
+   */
+  private async handleUseDemoData(): Promise<void> {
+    if (this.progressScreen) {
+      this.progressScreen.hide();
+      this.progressScreen = undefined;
+    }
+
+    // Инициализируем приложение с демо-данными
     await this.initializeMainApp();
   }
 
@@ -283,9 +379,14 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
       this.burgerMenu = undefined;
     }
     
-    if (this.firstLoadScreen) {
-      this.firstLoadScreen.hide();
-      this.firstLoadScreen = undefined;
+    if (this.landingPage) {
+      this.landingPage.dispose();
+      this.landingPage = undefined;
+    }
+    
+    if (this.progressScreen) {
+      this.progressScreen.dispose();
+      this.progressScreen = undefined;
     }
     
     this.state.isInitialized = false;
