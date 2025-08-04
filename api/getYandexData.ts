@@ -1,16 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Интерфейсы для данных Яндекс.Музыки
-interface YandexTrack {
-  id: string;
-  title: string;
-  artists: Array<{ name: string; genres?: string[] }>;
-  albums: Array<{ title: string; genre?: string; coverUri?: string }>;
-  durationMs: number;
-  available: boolean;
-  coverUri?: string;
-}
-
 interface ProcessedTrack {
   id: string;
   title: string;
@@ -290,7 +280,7 @@ function extractCoverUrl(track: any): string | undefined {
 /**
  * Получает URL превью трека
  */
-async function getPreviewUrl(trackId: string, token: string): Promise<string | null> {
+async function getPreviewUrl(trackId: string, token: string): Promise<string | undefined> {
   try {
     // Получаем информацию о загрузке трека
     const response = await fetch(`${YANDEX_API_BASE}/tracks/${trackId}/download-info`, {
@@ -301,14 +291,14 @@ async function getPreviewUrl(trackId: string, token: string): Promise<string | n
     });
 
     if (!response.ok) {
-      return null;
+      return undefined;
     }
 
     const data = await response.json();
     const downloadInfo = data.result;
 
     if (!downloadInfo || downloadInfo.length === 0) {
-      return null;
+      return undefined;
     }
 
     // Ищем превью или самое низкое качество для экономии трафика
@@ -317,13 +307,13 @@ async function getPreviewUrl(trackId: string, token: string): Promise<string | n
     ) || downloadInfo[0];
 
     if (!previewInfo) {
-      return null;
+      return undefined;
     }
 
     // Получаем прямую ссылку на файл
     const directLinkResponse = await fetch(previewInfo.downloadInfoUrl);
     if (!directLinkResponse.ok) {
-      return null;
+      return undefined;
     }
 
     const directLinkData = await directLinkResponse.text();
@@ -331,7 +321,7 @@ async function getPreviewUrl(trackId: string, token: string): Promise<string | n
     // Парсим XML ответ для получения прямой ссылки
     const urlMatch = directLinkData.match(/<host>(.*?)<\/host>.*?<path>(.*?)<\/path>.*?<s>(.*?)<\/s>/s);
     if (!urlMatch) {
-      return null;
+      return undefined;
     }
 
     const [, host, path, s] = urlMatch;
@@ -339,6 +329,6 @@ async function getPreviewUrl(trackId: string, token: string): Promise<string | n
 
   } catch (error) {
     console.warn(`Ошибка получения превью для трека ${trackId}:`, error);
-    return null;
+    return undefined;
   }
 }
