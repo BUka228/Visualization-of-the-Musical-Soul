@@ -46,6 +46,7 @@
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "node-fetch": "^2.7.0",
-    "three": "^0.158.0"
+    "three": "^0.158.0",
+    "yandex-music-api": "^0.0.3"
   }
 }
