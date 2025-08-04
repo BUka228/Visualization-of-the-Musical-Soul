@@ -72,35 +72,32 @@ def get_cover_url(track) -> Optional[str]:
 
 
 def get_preview_url(client: Client, track) -> Optional[str]:
-    """Получает URL превью трека"""
+    """Получает URL 30-секундного превью трека.
+    
+    Это более простой и надежный метод.
+    """
     try:
-        # Получаем информацию о загрузке
-        download_info = client.tracks_download_info(track.id)
-        if download_info:
-            # Ищем превью - сначала пробуем самое низкое качество для превью
-            preview_candidates = []
-            
-            for info in download_info:
-                if info.codec == 'mp3':
-                    preview_candidates.append(info)
-            
-            # Сортируем по битрейту (от меньшего к большему)
-            preview_candidates.sort(key=lambda x: x.bitrate_in_kbps)
-            
-            # Берем первый доступный (самое низкое качество)
-            for info in preview_candidates:
-                try:
-                    download_url = info.get_direct_link()
-                    if download_url:
-                        print(f"✅ Получен preview URL для {track.title} ({info.bitrate_in_kbps}kbps)")
-                        return download_url
-                except Exception as link_error:
-                    print(f"⚠️  Ошибка получения ссылки для {track.title}: {link_error}")
-                    continue
+        # Запрашиваем информацию о загрузке, включая прямые ссылки
+        # Метод на объекте track более надежен, чем client.tracks_download_info
+        download_info_list = track.get_download_info(get_direct_links=True)
         
+        # Превью обычно представляют собой MP3 с низким битрейтом (<= 192 kbps)
+        # Ищем первый подходящий вариант, этого достаточно.
+        for info in download_info_list:
+            if info.codec == 'mp3' and info.bitrate_in_kbps <= 192:
+                # Прямая ссылка уже получена благодаря get_direct_links=True
+                print(f"  ✅ Превью найдено для '{track.title}' ({info.bitrate_in_kbps}kbps)")
+                return info.direct_link
+        
+        # Если в цикле ничего не нашлось
+        print(f"  ⚠️  Превью для трека '{track.title}' недоступно в download_info.")
+        return None
+        
+    except YandexMusicError as e:
+        print(f"  ❌ Ошибка API при получении превью для '{track.title}': {e}")
         return None
     except Exception as e:
-        print(f"⚠️  Не удалось получить превью для трека {track.title}: {e}")
+        print(f"  ❌ Непредвиденная ошибка при получении превью для '{track.title}': {e}")
         return None
 
 

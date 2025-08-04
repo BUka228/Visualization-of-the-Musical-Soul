@@ -46,5 +46,18 @@ module.exports = {
     static: './dist',
     hot: true,
     open: true,
+    proxy: {
+      '/api/music': {
+        target: 'https://api.music.yandex.net',
+        changeOrigin: true,
+        secure: true,
+        pathRewrite: {
+          '^/api/music': ''
+        },
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+      }
+    }
   },
 };
