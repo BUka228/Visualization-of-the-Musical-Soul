@@ -155,7 +155,7 @@ export class TokenInstructionModal {
               <input 
                 type="text" 
                 id="token-input" 
-                placeholder="Например: 3:1234567890.5.0.1234567890123:abcdefghijklmnop..."
+                placeholder="Например: y0_AgAAAAAj2vgeAAG8XgAAAAEJa-6RAAAdPHm_OlpI_4ludZXEeCSbWupQkA"
                 style="
                   width: 100%;
                   padding: 15px;
@@ -188,8 +188,7 @@ export class TokenInstructionModal {
                   font-size: 0.9rem;
                   line-height: 1.4;
                 ">
-                  Токен должен начинаться с цифры и содержать точки и двоеточия. 
-                  Обычно он довольно длинный (50+ символов).
+                  Токен может начинаться с y0_ или AQA и обычно довольно длинный (50+ символов).
                 </p>
               </div>
             </div>
@@ -437,6 +436,30 @@ export class TokenInstructionModal {
             </p>
           </div>
         `
+      },
+      {
+        icon: '🚀',
+        title: 'Введите токен',
+        content: `
+          <p style="color: #ccc; line-height: 1.6; margin-bottom: 20px;">
+            Вставьте скопированный токен в поле ниже и нажмите кнопку для создания вашей музыкальной галактики.
+          </p>
+          <div style="
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+          ">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <span style="font-size: 1.2rem;">🔒</span>
+              <strong style="color: #4caf50;">Безопасность:</strong>
+            </div>
+            <p style="color: #ccc; margin: 0; font-size: 0.9rem;">
+              Токен сохраняется только локально в вашем браузере и используется исключительно для доступа к вашей музыкальной библиотеке.
+            </p>
+          </div>
+        `
       }
     ];
 
@@ -644,9 +667,9 @@ export class TokenInstructionModal {
   private isValidTokenFormat(token: string): boolean {
     if (token.length < 20) return false;
     
-    // Токен Session_id обычно начинается с цифры и содержит точки и двоеточия
-    const tokenPattern = /^\d+[:.]/;
-    return tokenPattern.test(token);
+    // Токен может начинаться с y0_ или быть в другом формате
+    // Основная проверка - достаточная длина и отсутствие пробелов
+    return !token.includes(' ') && token.length >= 20;
   }
 
   /**
