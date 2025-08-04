@@ -52,19 +52,19 @@ module.exports = async function handler(req: VercelRequest, res: VercelResponse)
     const { token } = req.body;
 
     if (!token) {
-      console.log('No token provided');
-      return res.status(400).json({ error: 'Token is required' });
+      console.log('No Session_id provided');
+      return res.status(400).json({ error: 'Session_id is required' });
     }
 
-    console.log('Token received, length:', token.length);
+    console.log('Session_id received, length:', token.length);
     console.log('Получение данных из Яндекс.Музыки...');
 
-    // Сначала просто проверим токен
+    // Сначала просто проверим Session_id
     try {
       const testResponse = await fetch(`${YANDEX_API_BASE}/account/status`, {
         headers: {
-          'Authorization': `OAuth ${token}`,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          'Cookie': `Session_id=${token}`,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
       });
       
@@ -139,17 +139,17 @@ module.exports = async function handler(req: VercelRequest, res: VercelResponse)
 /**
  * Получает список лайкнутых треков
  */
-async function fetchLikedTracks(token: string): Promise<any[]> {
+async function fetchLikedTracks(sessionId: string): Promise<any[]> {
   const response = await fetch(`${YANDEX_API_BASE}/users/me/likes/tracks`, {
     headers: {
-      'Authorization': `OAuth ${token}`,
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      'Cookie': `Session_id=${sessionId}`,
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
   });
 
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
-      throw new Error('Invalid or expired token');
+      throw new Error('Invalid or expired Session_id');
     }
     throw new Error(`Failed to fetch liked tracks: HTTP ${response.status}`);
   }
@@ -161,7 +161,7 @@ async function fetchLikedTracks(token: string): Promise<any[]> {
 /**
  * Обрабатывает треки батчами
  */
-async function processTracksInBatches(tracks: any[], token: string): Promise<ProcessedTrack[]> {
+async function processTracksInBatches(tracks: any[], sessionId: string): Promise<ProcessedTrack[]> {
   const processedTracks: ProcessedTrack[] = [];
   const batchSize = 20; // Обрабатываем по 20 треков за раз
 
@@ -170,12 +170,12 @@ async function processTracksInBatches(tracks: any[], token: string): Promise<Pro
     
     // Получаем детальную информацию о треках в батче
     const trackIds = batch.map(track => track.id).join(',');
-    const detailedTracks = await fetchTrackDetails(trackIds, token);
+    const detailedTracks = await fetchTrackDetails(trackIds, sessionId);
     
     // Обрабатываем каждый трек в батче
     for (const track of detailedTracks) {
       try {
-        const processedTrack = await processTrack(track, token);
+        const processedTrack = await processTrack(track, sessionId);
         if (processedTrack) {
           processedTracks.push(processedTrack);
         }
@@ -196,12 +196,12 @@ async function processTracksInBatches(tracks: any[], token: string): Promise<Pro
 /**
  * Получает детальную информацию о треках
  */
-async function fetchTrackDetails(trackIds: string, token: string): Promise<any[]> {
+async function fetchTrackDetails(trackIds: string, sessionId: string): Promise<any[]> {
   try {
     const response = await fetch(`${YANDEX_API_BASE}/tracks?track-ids=${trackIds}`, {
       headers: {
-        'Authorization': `OAuth ${token}`,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'Cookie': `Session_id=${sessionId}`,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       }
     });
 
@@ -220,7 +220,7 @@ async function fetchTrackDetails(trackIds: string, token: string): Promise<any[]
 /**
  * Обрабатывает один трек
  */
-async function processTrack(track: any, token: string): Promise<ProcessedTrack | null> {
+async function processTrack(track: any, sessionId: string): Promise<ProcessedTrack | null> {
   try {
     const processedTrack: ProcessedTrack = {
       id: String(track.id),
@@ -235,7 +235,7 @@ async function processTrack(track: any, token: string): Promise<ProcessedTrack |
 
     // Пытаемся получить превью (это может быть медленно, поэтому делаем опционально)
     try {
-      processedTrack.preview_url = await getPreviewUrl(track.id, token);
+      processedTrack.preview_url = await getPreviewUrl(track.id, sessionId);
     } catch (error) {
       // Превью не критично, продолжаем без него
       console.warn(`Не удалось получить превью для трека ${track.id}`);
@@ -313,13 +313,13 @@ function extractCoverUrl(track: any): string | undefined {
 /**
  * Получает URL превью трека
  */
-async function getPreviewUrl(trackId: string, token: string): Promise<string | undefined> {
+async function getPreviewUrl(trackId: string, sessionId: string): Promise<string | undefined> {
   try {
     // Получаем информацию о загрузке трека
     const response = await fetch(`${YANDEX_API_BASE}/tracks/${trackId}/download-info`, {
       headers: {
-        'Authorization': `OAuth ${token}`,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'Cookie': `Session_id=${sessionId}`,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       }
     });
 

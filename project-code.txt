@@ -1,6 +1,6 @@
 # Music Galaxy 3D - Project Code Collection
-Generated on: 2025-08-04T16:45:26.056Z
-Total files: 133
+Generated on: 2025-08-04T18:32:55.961Z
+Total files: 142
 
 ================================================================================
 
@@ -1615,11 +1615,472 @@ npm run serve
 
 ================================================================================
 
+## File: .vercel\project.json
+
+```
+{"projectId":"prj_j1GCT4F9hJK9mvRzomjJDffz8vQi","orgId":"team_RSjluOi1Db6OfZpSGUYrdq1c","projectName":"visualization-of-the-musical-soul"}
+```
+
+================================================================================
+
+## File: .vercel\README.txt
+
+```
+> Why do I have a folder named ".vercel" in my project?
+The ".vercel" folder is created when you link a directory to a Vercel project.
+
+> What does the "project.json" file contain?
+The "project.json" file contains:
+- The ID of the Vercel project that you linked ("projectId")
+- The ID of the user or team your Vercel project is owned by ("orgId")
+
+> Should I commit the ".vercel" folder?
+No, you should not share the ".vercel" folder with anyone.
+Upon creation, it will be automatically added to your ".gitignore" file.
+
+```
+
+================================================================================
+
 ## File: .vscode\settings.json
 
 ```
 {
     "html.autoClosingTags": false
+}
+```
+
+================================================================================
+
+## File: api\getYandexData.ts
+
+```
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+
+// Интерфейсы для данных Яндекс.Музыки
+interface ProcessedTrack {
+  id: string;
+  title: string;
+  artist: string;
+  album: string;
+  duration: number;
+  genre: string;
+  cover_url?: string;
+  preview_url?: string;
+  available: boolean;
+}
+
+interface MusicDataResponse {
+  metadata: {
+    total_tracks: number;
+    generated_at: string;
+    source: string;
+  };
+  tracks: ProcessedTrack[];
+}
+
+// Базовый URL API Яндекс.Музыки
+const YANDEX_API_BASE = 'https://api.music.yandex.net';
+
+/**
+ * Serverless-функция для получения данных из Яндекс.Музыки
+ */
+module.exports = async function handler(req: VercelRequest, res: VercelResponse) {
+  // Устанавливаем CORS заголовки
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Обрабатываем preflight запрос
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  // Принимаем только POST-запросы
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+
+  try {
+    console.log('API called with method:', req.method);
+    console.log('Request headers:', req.headers);
+    console.log('Request body type:', typeof req.body);
+    
+    const { token } = req.body;
+
+    if (!token) {
+      console.log('No token provided');
+      return res.status(400).json({ error: 'Token is required' });
+    }
+
+    console.log('Token received, length:', token.length);
+    console.log('Получение данных из Яндекс.Музыки...');
+
+    // Сначала просто проверим токен
+    try {
+      const testResponse = await fetch(`${YANDEX_API_BASE}/account/status`, {
+        headers: {
+          'Authorization': `OAuth ${token}`,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+      
+      console.log('Token test response status:', testResponse.status);
+      
+      if (!testResponse.ok) {
+        throw new Error(`Token validation failed: HTTP ${testResponse.status}`);
+      }
+      
+      const accountData = await testResponse.json();
+      console.log('Account data received:', !!accountData.result);
+      
+    } catch (tokenError) {
+      console.error('Token validation error:', tokenError);
+      throw tokenError;
+    }
+
+    // Получаем лайкнутые треки
+    const likedTracks = await fetchLikedTracks(token);
+    console.log(`Найдено ${likedTracks.length} лайкнутых треков`);
+
+    // Для начала вернем только первые 5 треков для тестирования
+    const limitedTracks = likedTracks.slice(0, 5);
+    console.log(`Обрабатываем ${limitedTracks.length} треков для тестирования`);
+
+    // Обрабатываем треки батчами для лучшей производительности
+    const processedTracks = await processTracksInBatches(limitedTracks, token);
+    console.log(`Обработано ${processedTracks.length} треков`);
+
+    // Формируем ответ
+    const response: MusicDataResponse = {
+      metadata: {
+        total_tracks: processedTracks.length,
+        generated_at: new Date().toISOString(),
+        source: 'Yandex Music API (via Vercel) - Test Mode'
+      },
+      tracks: processedTracks
+    };
+
+    return res.status(200).json(response);
+
+  } catch (error) {
+    console.error('Ошибка API Яндекс.Музыки:', error);
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Определяем тип ошибки
+    if (errorMessage.toLowerCase().includes('auth') || 
+        errorMessage.toLowerCase().includes('unauthorized') ||
+        errorMessage.toLowerCase().includes('forbidden')) {
+      return res.status(401).json({ 
+        error: 'Authorization failed. Check your token.',
+        details: errorMessage 
+      });
+    }
+
+    if (errorMessage.toLowerCase().includes('network') ||
+        errorMessage.toLowerCase().includes('fetch')) {
+      return res.status(503).json({ 
+        error: 'Service temporarily unavailable. Please try again later.',
+        details: errorMessage 
+      });
+    }
+
+    return res.status(500).json({ 
+      error: 'Failed to fetch data from Yandex Music', 
+      details: errorMessage 
+    });
+  }
+}
+
+/**
+ * Получает список лайкнутых треков
+ */
+async function fetchLikedTracks(token: string): Promise<any[]> {
+  const response = await fetch(`${YANDEX_API_BASE}/users/me/likes/tracks`, {
+    headers: {
+      'Authorization': `OAuth ${token}`,
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
+  });
+
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Invalid or expired token');
+    }
+    throw new Error(`Failed to fetch liked tracks: HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.result?.library?.tracks || [];
+}
+
+/**
+ * Обрабатывает треки батчами
+ */
+async function processTracksInBatches(tracks: any[], token: string): Promise<ProcessedTrack[]> {
+  const processedTracks: ProcessedTrack[] = [];
+  const batchSize = 20; // Обрабатываем по 20 треков за раз
+
+  for (let i = 0; i < tracks.length; i += batchSize) {
+    const batch = tracks.slice(i, Math.min(i + batchSize, tracks.length));
+    
+    // Получаем детальную информацию о треках в батче
+    const trackIds = batch.map(track => track.id).join(',');
+    const detailedTracks = await fetchTrackDetails(trackIds, token);
+    
+    // Обрабатываем каждый трек в батче
+    for (const track of detailedTracks) {
+      try {
+        const processedTrack = await processTrack(track, token);
+        if (processedTrack) {
+          processedTracks.push(processedTrack);
+        }
+      } catch (error) {
+        console.warn(`Ошибка обработки трека ${track.id}:`, error);
+      }
+    }
+
+    // Небольшая пауза между батчами
+    if (i + batchSize < tracks.length) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+
+  return processedTracks;
+}
+
+/**
+ * Получает детальную информацию о треках
+ */
+async function fetchTrackDetails(trackIds: string, token: string): Promise<any[]> {
+  try {
+    const response = await fetch(`${YANDEX_API_BASE}/tracks?track-ids=${trackIds}`, {
+      headers: {
+        'Authorization': `OAuth ${token}`,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.result || [];
+  } catch (error) {
+    console.warn('Ошибка получения деталей треков:', error);
+    return [];
+  }
+}
+
+/**
+ * Обрабатывает один трек
+ */
+async function processTrack(track: any, token: string): Promise<ProcessedTrack | null> {
+  try {
+    const processedTrack: ProcessedTrack = {
+      id: String(track.id),
+      title: track.title || 'Unknown Title',
+      artist: extractArtist(track.artists),
+      album: extractAlbum(track.albums),
+      duration: Math.floor((track.durationMs || 0) / 1000),
+      genre: extractGenre(track),
+      cover_url: extractCoverUrl(track),
+      available: track.available !== false
+    };
+
+    // Пытаемся получить превью (это может быть медленно, поэтому делаем опционально)
+    try {
+      processedTrack.preview_url = await getPreviewUrl(track.id, token);
+    } catch (error) {
+      // Превью не критично, продолжаем без него
+      console.warn(`Не удалось получить превью для трека ${track.id}`);
+    }
+
+    return processedTrack;
+  } catch (error) {
+    console.warn(`Ошибка обработки трека ${track.id}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Извлекает имя исполнителя
+ */
+function extractArtist(artists: any[]): string {
+  if (!artists || !Array.isArray(artists) || artists.length === 0) {
+    return 'Unknown Artist';
+  }
+  return artists[0].name || 'Unknown Artist';
+}
+
+/**
+ * Извлекает название альбома
+ */
+function extractAlbum(albums: any[]): string {
+  if (!albums || !Array.isArray(albums) || albums.length === 0) {
+    return 'Unknown Album';
+  }
+  return albums[0].title || 'Unknown Album';
+}
+
+/**
+ * Извлекает жанр
+ */
+function extractGenre(track: any): string {
+  try {
+    // Пробуем получить жанр из исполнителя
+    if (track.artists && track.artists[0] && track.artists[0].genres && track.artists[0].genres.length > 0) {
+      return track.artists[0].genres[0];
+    }
+    
+    // Пробуем получить жанр из альбома
+    if (track.albums && track.albums[0] && track.albums[0].genre) {
+      return track.albums[0].genre;
+    }
+    
+    return 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+/**
+ * Извлекает URL обложки
+ */
+function extractCoverUrl(track: any): string | undefined {
+  try {
+    // Пробуем получить обложку трека
+    if (track.coverUri) {
+      return `https://${track.coverUri.replace('%%', '400x400')}`;
+    }
+    
+    // Пробуем получить обложку альбома
+    if (track.albums && track.albums[0] && track.albums[0].coverUri) {
+      return `https://${track.albums[0].coverUri.replace('%%', '400x400')}`;
+    }
+    
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Получает URL превью трека
+ */
+async function getPreviewUrl(trackId: string, token: string): Promise<string | undefined> {
+  try {
+    // Получаем информацию о загрузке трека
+    const response = await fetch(`${YANDEX_API_BASE}/tracks/${trackId}/download-info`, {
+      headers: {
+        'Authorization': `OAuth ${token}`,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+
+    if (!response.ok) {
+      return undefined;
+    }
+
+    const data = await response.json();
+    const downloadInfo = data.result;
+
+    if (!downloadInfo || downloadInfo.length === 0) {
+      return undefined;
+    }
+
+    // Ищем превью или самое низкое качество для экономии трафика
+    const previewInfo = downloadInfo.find((info: any) => 
+      info.codec === 'mp3' && (info.bitrateInKbps <= 128 || info.preview)
+    ) || downloadInfo[0];
+
+    if (!previewInfo) {
+      return undefined;
+    }
+
+    // Получаем прямую ссылку на файл
+    const directLinkResponse = await fetch(previewInfo.downloadInfoUrl);
+    if (!directLinkResponse.ok) {
+      return undefined;
+    }
+
+    const directLinkData = await directLinkResponse.text();
+    
+    // Парсим XML ответ для получения прямой ссылки
+    const urlMatch = directLinkData.match(/<host>(.*?)<\/host>.*?<path>(.*?)<\/path>.*?<s>(.*?)<\/s>/s);
+    if (!urlMatch) {
+      return undefined;
+    }
+
+    const [, host, path, s] = urlMatch;
+    return `https://${host}/get-mp3/${s}${path}`;
+
+  } catch (error) {
+    console.warn(`Ошибка получения превью для трека ${trackId}:`, error);
+    return undefined;
+  }
+}
+```
+
+================================================================================
+
+## File: api\test.ts
+
+```
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+
+module.exports = async function handler(req: VercelRequest, res: VercelResponse) {
+  // Устанавливаем CORS заголовки
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Обрабатываем preflight запрос
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  try {
+    console.log('Test API called with method:', req.method);
+    console.log('Request body:', req.body);
+    
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Test API works!',
+      method: req.method,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Test API error:', error);
+    return res.status(500).json({ 
+      error: 'Test API failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+}
+```
+
+================================================================================
+
+## File: api\tsconfig.json
+
+```
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules"]
 }
 ```
 
@@ -1731,7 +2192,11 @@ main();
     "serve": "npx http-server dist -p 8080",
     "test": "vitest --run",
     "test:watch": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "vercel:dev": "vercel dev",
+    "vercel:deploy": "vercel --prod",
+    "test:api": "echo 'Откройте test-vercel-api.html в браузере для тестирования API'",
+    "dev:api": "node server-local.js"
   },
   "keywords": [
     "3d",
@@ -1758,6 +2223,10 @@ main();
     "webpack-dev-server": "^4.15.1"
   },
   "dependencies": {
+    "@vercel/node": "^3.2.29",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "node-fetch": "^2.7.0",
     "three": "^0.158.0"
   }
 }
@@ -1815,15 +2284,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
 ```
 # Music Galaxy 3D 🎵✨
 
-Интерактивная 3D-визуализация музыкальных предпочтений из Яндекс.Музыки с автоматизированной системой сбора данных.
+Интерактивная 3D-визуализация музыкальных предпочтений из Яндекс.Музыки с современной serverless архитектурой на Vercel.
 
 ## ✨ Новые возможности
 
-- 🚀 **Автоматизированная первая загрузка** - интуитивный процесс настройки
-- 🔑 **Управление токенами** - безопасное хранение и обновление токенов авторизации
-- ☰ **Бургер-меню** - удобное управление настройками и данными
-- 🔄 **Автоматическое обновление** - проверка актуальности данных и уведомления
-- � **\*Улучшенная статистика** - детальная информация о коллекции
+- 🌐 **Serverless архитектура** - развертывание на Vercel без серверов
+- 🚀 **Получение данных в реальном времени** - без необходимости запуска Python скриптов
+- 🔑 **Управление токенами в браузере** - безопасное хранение и обновление
+- ☰ **Интуитивный интерфейс** - экран первой загрузки и бургер-меню
+- 🔄 **Автоматическое кэширование** - данные сохраняются в localStorage
+- 📊 **Улучшенная статистика** - детальная информация о коллекции
 
 ## 🎯 Основные возможности
 
@@ -1836,37 +2306,48 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
 ## 🚀 Быстрый старт
 
-### 1. Установка
+### Локальная разработка
 
+1. **Установка:**
 ```bash
 git clone <repository-url>
 cd music-galaxy-3d
 npm install
-pip install -r requirements.txt
 ```
 
-### 2. Запуск
-
+2. **Запуск:**
 ```bash
 npm run dev
 ```
 
-### 3. Первая настройка
+3. **Первая настройка:**
+При первом запуске откроется экран настройки - просто введите токен Session_id и данные загрузятся автоматически!
 
-При первом запуске откроется экран настройки:
+### Развертывание на Vercel (рекомендуется)
 
-1. **Получите токен Session_id:**
+1. **Через GitHub:**
+   - Форкните репозиторий
+   - Подключите к [Vercel](https://vercel.com)
+   - Автоматическое развертывание при каждом push
 
-   - Откройте [music.yandex.ru](https://music.yandex.ru) в новой вкладке
-   - Войдите в свой аккаунт Яндекс
-   - Откройте DevTools (F12)
-   - Перейдите: Application → Cookies → music.yandex.ru
-   - Найдите cookie 'Session_id'
-   - Скопируйте его значение
+2. **Через CLI:**
+```bash
+npm i -g vercel
+vercel
+```
 
-2. **Введите токен** в поле на экране настройки
+3. **Готово!** Ваше приложение доступно на `your-app.vercel.app`
 
-3. **Нажмите "Загрузить данные"** и дождитесь завершения
+### Получение токена Session_id
+
+**Самый простой способ через браузер:**
+
+1. (Опционально) Откройте DevTools в браузере и на вкладке Network включите троттлинг
+2. Перейдите по ссылке https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d
+3. Авторизуйтесь при необходимости и предоставьте доступ
+4. Браузер перенаправит на адрес вида `https://music.yandex.ru/#access_token=AQAAAAAYc***&token_type=bearer&expires_in=31535645`. Очень быстро произойдет редирект на другую страницу, поэтому нужно успеть скопировать ссылку
+5. Ваш токен - то что находится после `access_token=`
+6. Введите токен в приложении - данные загрузятся автоматически!
 
 ## 🔧 Управление данными
 
@@ -1944,15 +2425,17 @@ npm run collect-data    # Сбор данных из Яндекс.Музыки
 
 ```
 music-galaxy-3d/
+├── api/                   # 🌐 Vercel Serverless Functions
+│   └── getYandexData.ts   # Основная функция получения данных
 ├── src/
 │   ├── auth/              # 🔑 Управление токенами
-│   ├── api/               # 🌐 API интеграция
+│   ├── api/               # 🌐 API интеграция (клиентская часть)
 │   ├── ui/                # 🎨 Компоненты интерфейса
 │   │   ├── FirstLoadScreen.ts  # Экран первой загрузки
 │   │   └── BurgerMenu.ts       # Бургер-меню
 │   ├── data/              # 📊 Загрузка и обработка данных
-│   │   ├── DataCollector.ts    # Автоматизированный сбор
-│   │   └── DataLoader.ts       # Загрузка из файлов
+│   │   ├── DataCollector.ts    # Сбор через Serverless API
+│   │   └── DataLoader.ts       # Загрузка из localStorage/файлов
 │   ├── scene/             # 🎭 3D сцена и объекты
 │   ├── audio/             # 🔊 Аудио менеджер
 │   ├── animation/         # ✨ Система анимации
@@ -1960,9 +2443,27 @@ music-galaxy-3d/
 │   ├── interaction/       # 🖱️ Обработка взаимодействий
 │   ├── performance/       # ⚡ Оптимизация производительности
 │   └── types/             # 📝 TypeScript типы
-├── scripts/               # 🐍 Python скрипты
-└── tests/                 # 🧪 Тесты
+├── scripts/               # 🐍 Python скрипты (legacy)
+├── tests/                 # 🧪 Тесты
+├── vercel.json            # ⚙️ Конфигурация Vercel
+└── test-vercel-api.html   # 🧪 Тестирование API
 ```
+
+## 🧪 Тестирование API
+
+Для тестирования новой Serverless архитектуры:
+
+1. **Откройте `test-vercel-api.html`** в браузере
+2. **Введите токен Session_id** в поле ввода
+3. **Нажмите "Тестировать API"** для быстрой проверки
+4. **Нажмите "Загрузить полные данные"** для полного тестирования
+
+Тестовая страница покажет:
+- ✅ Статус подключения к API
+- 📊 Количество загруженных треков
+- 🎵 Превью первых треков с аудио
+- 📈 Статистику по жанрам
+- 💾 Статус сохранения в localStorage
 
 ## 🌈 Цветовая схема жанров
 
@@ -1999,9 +2500,16 @@ music-galaxy-3d/
 
 ## 🛠️ Технологии
 
+### Новая Serverless архитектура
 - **Frontend**: Three.js, TypeScript, Webpack
+- **Backend**: Vercel Serverless Functions (Node.js/TypeScript)
+- **API**: Прямые запросы к Яндекс.Музыке через прокси
+- **Storage**: LocalStorage для кэширования
+- **Deployment**: Vercel с автоматическим CI/CD
+
+### Legacy (для локальной разработки)
 - **Backend**: Python, yandex-music API
-- **Storage**: LocalStorage, JSON файлы
+- **Storage**: JSON файлы
 - **UI**: Vanilla JS/TS (без фреймворков)
 
 ## 📋 Требования
@@ -3853,7 +4361,7 @@ export class DataCollector {
   }
 
   /**
-   * Собирает данные из Яндекс.Музыки
+   * Собирает данные из Яндекс.Музыки через Vercel API
    */
   async collectData(token: string): Promise<CollectionResult> {
     this.abortController = new AbortController();
@@ -3864,67 +4372,94 @@ export class DataCollector {
       
       this.updateProgress({
         stage: 'connecting',
-        message: 'Подключение к Яндекс.Музыке...',
-        progress: 10
+        message: 'Подключаемся к Яндекс.Музыке...',
+        progress: 5
       });
 
-      // Тестируем токен
-      const tokenValidation = await this.testToken(token);
-      if (!tokenValidation.isValid) {
-        throw new Error(tokenValidation.error || 'Неверный токен');
+      // Небольшая задержка для показа анимации подключения
+      await this.delay(800);
+
+      this.updateProgress({
+        stage: 'connecting',
+        message: 'Проверяем токен авторизации...',
+        progress: 15
+      });
+
+      await this.delay(500);
+
+      this.updateProgress({
+        stage: 'fetching',
+        message: 'Получаем ваши любимые треки...',
+        progress: 25
+      });
+
+      // Получаем все данные одним запросом через наш API
+      const response = await fetch('/api/getYandexData', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token }),
+        signal: this.abortController?.signal
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
       this.updateProgress({
         stage: 'fetching',
-        message: 'Получение списка лайкнутых треков...',
-        progress: 20
+        message: 'Загружаем информацию о треках...',
+        progress: 50
       });
 
-      // Получаем треки
-      const tracks = await this.fetchLikedTracks(token);
-      
+      const musicData: MusicDataFile = await response.json();
+
       this.updateProgress({
         stage: 'processing',
-        message: 'Обработка треков...',
-        progress: 40,
-        totalTracks: tracks.length,
+        message: 'Строим вашу галактику...',
+        progress: 65,
+        totalTracks: musicData.tracks.length,
         processedTracks: 0
       });
 
-      // Обрабатываем треки
-      const processedTracks = await this.processTracksWithProgress(tracks, token);
+      // Симулируем обработку треков с прогрессом
+      await this.simulateTrackProcessing(musicData.tracks);
+
+      this.updateProgress({
+        stage: 'processing',
+        message: 'Настраиваем звезды...',
+        progress: 85,
+        totalTracks: musicData.tracks.length,
+        processedTracks: musicData.tracks.length
+      });
+
+      await this.delay(800);
 
       this.updateProgress({
         stage: 'saving',
-        message: 'Сохранение данных...',
-        progress: 90
+        message: 'Сохраняем данные...',
+        progress: 95
       });
 
-      // Создаем финальный объект данных
-      const musicData: MusicDataFile = {
-        metadata: {
-          total_tracks: processedTracks.length,
-          generated_at: new Date().toISOString(),
-          source: 'Yandex Music API'
-        },
-        tracks: processedTracks
-      };
-
-      // Сохраняем данные
+      // Сохраняем данные локально
       await this.saveData(musicData);
+
+      await this.delay(300);
 
       this.updateProgress({
         stage: 'complete',
-        message: 'Данные успешно собраны!',
+        message: 'Галактика создана успешно!',
         progress: 100
       });
 
-      const tracksWithPreview = processedTracks.filter(t => t.preview_url).length;
+      const tracksWithPreview = musicData.tracks.filter(t => t.preview_url).length;
 
       return {
         success: true,
         data: musicData,
-        tracksCollected: processedTracks.length,
+        tracksCollected: musicData.tracks.length,
         tracksWithPreview: tracksWithPreview
       };
 
@@ -3945,6 +4480,43 @@ export class DataCollector {
   }
 
   /**
+   * Симулирует обработку треков с показом прогресса
+   */
+  private async simulateTrackProcessing(tracks: YandexTrackData[]): Promise<void> {
+    const totalTracks = tracks.length;
+    const batchSize = Math.max(1, Math.floor(totalTracks / 20)); // Обрабатываем по батчам
+    
+    for (let i = 0; i < totalTracks; i += batchSize) {
+      if (this.abortController?.signal.aborted) {
+        throw new Error('Операция отменена');
+      }
+
+      const endIndex = Math.min(i + batchSize, totalTracks);
+      const currentTrack = tracks[i];
+      const progress = 65 + (i / totalTracks) * 20; // От 65% до 85%
+
+      this.updateProgress({
+        stage: 'processing',
+        message: 'Обрабатываем треки...',
+        progress: Math.round(progress),
+        totalTracks: totalTracks,
+        processedTracks: endIndex,
+        currentTrack: currentTrack ? `${currentTrack.title} - ${currentTrack.artist}` : undefined
+      });
+
+      // Небольшая задержка для показа прогресса
+      await this.delay(50);
+    }
+  }
+
+  /**
+   * Создает задержку
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
    * Отменяет сбор данных
    */
   abort(): void {
@@ -3954,11 +4526,12 @@ export class DataCollector {
   }
 
   /**
-   * Тестирует токен
+   * Тестирует токен через Vercel API
    */
   private async testToken(token: string): Promise<TokenValidationResult> {
     try {
-      const response = await fetch('/api/yandex-music/test', {
+      // Делаем тестовый запрос к нашему API
+      const response = await fetch('/api/getYandexData', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3992,242 +4565,25 @@ export class DataCollector {
     }
   }
 
-  /**
-   * Получает лайкнутые треки
-   */
-  private async fetchLikedTracks(token: string): Promise<any[]> {
-    try {
-      const response = await fetch('/api/yandex-music/liked-tracks', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token }),
-        signal: this.abortController?.signal
-      });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Ошибка получения треков: HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data.tracks || [];
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error('Операция отменена');
-      }
-      throw error;
-    }
-  }
 
   /**
-   * Обрабатывает треки с отображением прогресса
-   */
-  private async processTracksWithProgress(tracks: any[], token: string): Promise<YandexTrackData[]> {
-    const processedTracks: YandexTrackData[] = [];
-    const batchSize = 10; // Обрабатываем по 10 треков за раз
-    
-    for (let i = 0; i < tracks.length; i += batchSize) {
-      if (this.abortController?.signal.aborted) {
-        throw new Error('Операция отменена');
-      }
-
-      const batch = tracks.slice(i, Math.min(i + batchSize, tracks.length));
-      const batchResults = await Promise.allSettled(
-        batch.map(track => this.processTrack(track, token))
-      );
-
-      // Добавляем успешно обработанные треки
-      batchResults.forEach((result, index) => {
-        if (result.status === 'fulfilled' && result.value) {
-          processedTracks.push(result.value);
-        } else {
-          console.warn(`Не удалось обработать трек ${i + index + 1}:`, 
-            result.status === 'rejected' ? result.reason : 'Неизвестная ошибка');
-        }
-      });
-
-      // Обновляем прогресс
-      const progress = Math.round(((i + batch.length) / tracks.length) * 50) + 40; // 40-90%
-      this.updateProgress({
-        stage: 'processing',
-        message: 'Обработка треков...',
-        progress,
-        totalTracks: tracks.length,
-        processedTracks: processedTracks.length,
-        currentTrack: batch[0]?.title || ''
-      });
-
-      // Небольшая пауза между батчами
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-
-    return processedTracks;
-  }
-
-  /**
-   * Обрабатывает один трек
-   */
-  private async processTrack(track: any, token: string): Promise<YandexTrackData | null> {
-    try {
-      // Получаем детальную информацию о треке
-      const trackDetails = await this.fetchTrackDetails(track.id, token);
-      
-      return {
-        id: String(trackDetails.id || track.id),
-        title: trackDetails.title || track.title || 'Unknown Title',
-        artist: this.extractArtist(trackDetails.artists || track.artists),
-        album: this.extractAlbum(trackDetails.albums || track.albums),
-        duration: Math.floor((trackDetails.duration_ms || track.duration_ms || 0) / 1000),
-        genre: this.extractGenre(trackDetails),
-        cover_url: this.extractCoverUrl(trackDetails),
-        preview_url: await this.getPreviewUrl(trackDetails, token) || undefined,
-        available: trackDetails.available !== false
-      };
-    } catch (error) {
-      console.warn(`Ошибка обработки трека ${track.id}:`, error);
-      return null;
-    }
-  }
-
-  /**
-   * Получает детальную информацию о треке
-   */
-  private async fetchTrackDetails(trackId: string, token: string): Promise<any> {
-    try {
-      const response = await fetch('/api/yandex-music/track-details', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token, trackId }),
-        signal: this.abortController?.signal
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data.track || {};
-    } catch (error) {
-      // Возвращаем базовую информацию, если детали недоступны
-      return { id: trackId };
-    }
-  }
-
-  /**
-   * Получает URL превью трека
-   */
-  private async getPreviewUrl(track: any, token: string): Promise<string | null> {
-    try {
-      const response = await fetch('/api/yandex-music/track-preview', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token, trackId: track.id }),
-        signal: this.abortController?.signal
-      });
-
-      if (!response.ok) {
-        return null;
-      }
-
-      const data = await response.json();
-      return data.preview_url || null;
-    } catch (error) {
-      return null;
-    }
-  }
-
-  /**
-   * Извлекает имя исполнителя
-   */
-  private extractArtist(artists: any[]): string {
-    if (!artists || !Array.isArray(artists) || artists.length === 0) {
-      return 'Unknown Artist';
-    }
-    return artists[0].name || 'Unknown Artist';
-  }
-
-  /**
-   * Извлекает название альбома
-   */
-  private extractAlbum(albums: any[]): string {
-    if (!albums || !Array.isArray(albums) || albums.length === 0) {
-      return 'Unknown Album';
-    }
-    return albums[0].title || 'Unknown Album';
-  }
-
-  /**
-   * Извлекает жанр
-   */
-  private extractGenre(track: any): string {
-    try {
-      // Пробуем получить жанр из исполнителя
-      if (track.artists && track.artists[0] && track.artists[0].genres) {
-        return track.artists[0].genres[0] || 'unknown';
-      }
-      
-      // Пробуем получить жанр из альбома
-      if (track.albums && track.albums[0] && track.albums[0].genre) {
-        return track.albums[0].genre;
-      }
-      
-      return 'unknown';
-    } catch {
-      return 'unknown';
-    }
-  }
-
-  /**
-   * Извлекает URL обложки
-   */
-  private extractCoverUrl(track: any): string | undefined {
-    try {
-      if (track.cover_uri) {
-        return `https://${track.cover_uri.replace('%%', '400x400')}`;
-      }
-      
-      if (track.albums && track.albums[0] && track.albums[0].cover_uri) {
-        return `https://${track.albums[0].cover_uri.replace('%%', '400x400')}`;
-      }
-      
-      return undefined;
-    } catch {
-      return undefined;
-    }
-  }
-
-  /**
-   * Сохраняет данные в файл
+   * Сохраняет данные локально
    */
   private async saveData(data: MusicDataFile): Promise<void> {
     try {
-      const response = await fetch('/api/save-music-data', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-        signal: this.abortController?.signal
-      });
-
-      if (!response.ok) {
-        throw new Error(`Ошибка сохранения: HTTP ${response.status}`);
-      }
+      // Сохраняем в localStorage с кэшированием
+      localStorage.setItem('music_data', JSON.stringify(data));
+      localStorage.setItem('music_data_timestamp', new Date().toISOString());
+      
+      console.log('Данные сохранены в localStorage');
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         throw new Error('Операция отменена');
       }
       
-      // Fallback: сохраняем в localStorage для последующего использования
-      console.warn('Не удалось сохранить на сервер, сохраняем локально');
-      localStorage.setItem('collected_music_data', JSON.stringify(data));
-      throw error;
+      console.error('Ошибка сохранения данных:', error);
+      throw new Error('Не удалось сохранить данные');
     }
   }
 
@@ -4333,13 +4689,26 @@ export class DataLoader {
   private static readonly DEMO_DATA_PATH = '/src/data/demo_data.json';
 
   /**
-   * Загружает данные треков из JSON файла с расширенной информацией о результате
+   * Загружает данные треков из localStorage или файла с расширенной информацией о результате
    */
   static async loadMusicDataWithResult(): Promise<DataLoadResult> {
     try {
       console.log('🔄 Загрузка данных треков...');
       
-      // Пробуем загрузить реальные данные
+      // Сначала пробуем загрузить из localStorage (приоритет)
+      const localData = this.loadFromLocalStorage();
+      if (localData) {
+        console.log(`✅ Загружено из localStorage: ${localData.tracks.length} треков`);
+        const freshness = this.getDataFreshnessFromTimestamp();
+        return {
+          success: true,
+          data: localData,
+          isDemo: false,
+          freshness: freshness
+        };
+      }
+      
+      // Если в localStorage нет данных, пробуем загрузить из файла
       const response = await fetch(this.DATA_FILE_PATH);
       
       if (!response.ok) {
@@ -4364,7 +4733,7 @@ export class DataLoader {
       // Проверяем свежесть данных
       const freshness = await this.getDataFreshness(data);
       
-      console.log(`✅ Загружено ${data.tracks.length} треков`);
+      console.log(`✅ Загружено из файла: ${data.tracks.length} треков`);
       return {
         success: true,
         data: data,
@@ -4653,13 +5022,16 @@ export class DataLoader {
     return `
 Для обновления данных из Яндекс.Музыки:
 
-1. Откройте терминал в корне проекта
-2. Выполните команду: npm run collect-data
-3. Следуйте инструкциям для получения токена
-4. Перезагрузите страницу после завершения
+1. Введите свой токен Session_id в интерфейсе приложения
+2. Нажмите кнопку "Загрузить данные"
+3. Дождитесь завершения загрузки
+4. Данные будут автоматически сохранены и использованы
 
-Альтернативно:
-python scripts/collect_yandex_music_data.py
+Как получить токен:
+1. Откройте music.yandex.ru в браузере
+2. Войдите в свой аккаунт
+3. Откройте DevTools (F12) → Application → Cookies
+4. Найдите cookie 'Session_id' и скопируйте его значение
     `.trim();
   }
 
@@ -4713,6 +5085,76 @@ python scripts/collect_yandex_music_data.py
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Загружает данные из localStorage
+   */
+  private static loadFromLocalStorage(): MusicDataFile | null {
+    try {
+      const dataStr = localStorage.getItem('music_data');
+      if (!dataStr) {
+        return null;
+      }
+
+      const data: MusicDataFile = JSON.parse(dataStr);
+      
+      // Валидация структуры данных
+      const validationResult = this.validateMusicDataDetailed(data);
+      if (!validationResult.isValid) {
+        console.warn('Данные в localStorage повреждены, удаляем их');
+        localStorage.removeItem('music_data');
+        localStorage.removeItem('music_data_timestamp');
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.warn('Ошибка загрузки из localStorage:', error);
+      localStorage.removeItem('music_data');
+      localStorage.removeItem('music_data_timestamp');
+      return null;
+    }
+  }
+
+  /**
+   * Определяет свежесть данных из localStorage по timestamp
+   */
+  private static getDataFreshnessFromTimestamp(): 'fresh' | 'stale' | 'unknown' {
+    try {
+      const timestampStr = localStorage.getItem('music_data_timestamp');
+      if (!timestampStr) {
+        return 'unknown';
+      }
+
+      const timestamp = new Date(timestampStr);
+      const now = new Date();
+      const hoursDiff = (now.getTime() - timestamp.getTime()) / (1000 * 60 * 60);
+
+      if (hoursDiff < 24) {
+        return 'fresh';
+      } else {
+        return 'stale';
+      }
+    } catch {
+      return 'unknown';
+    }
+  }
+
+  /**
+   * Проверяет наличие данных в localStorage
+   */
+  static hasLocalStorageData(): boolean {
+    return localStorage.getItem('music_data') !== null;
+  }
+
+  /**
+   * Очищает данные из localStorage
+   */
+  static clearLocalStorageData(): void {
+    localStorage.removeItem('music_data');
+    localStorage.removeItem('music_data_timestamp');
+    console.log('Данные очищены из localStorage');
   }
 
   /**
@@ -6487,7 +6929,9 @@ import { SceneManager } from './scene/SceneManager';
 import { DataLoader } from './data/DataLoader';
 import { DataProcessor } from './data/DataProcessor';
 import { UIManager } from './ui/UIManager';
-import { FirstLoadScreen } from './ui/FirstLoadScreen';
+import { LandingPage } from './ui/LandingPage';
+import { GalaxyCreationProgress } from './ui/GalaxyCreationProgress';
+import { DataCollector, CollectionProgress, CollectionResult } from './data/DataCollector';
 import { BurgerMenu } from './ui/BurgerMenu';
 import { TokenManager } from './auth/TokenManager';
 import { setupMockAPI } from './api/MockYandexAPI';
@@ -6541,7 +6985,8 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
   private container?: HTMLElement;
   private sceneManager?: SceneManager;
   private uiManager?: UIManager;
-  private firstLoadScreen?: FirstLoadScreen;
+  private landingPage?: LandingPage;
+  private progressScreen?: GalaxyCreationProgress;
   private burgerMenu?: BurgerMenu;
 
   constructor(config: Partial<AppConfig> = {}) {
@@ -6590,51 +7035,144 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
     const hasValidToken = TokenManager.hasValidToken();
     const dataIsFresh = await DataLoader.checkDataFreshness();
 
-    // Показываем экран первой загрузки если:
+    // Показываем лендинг-страницу если:
     // 1. Нет данных вообще
     // 2. Данные устарели и нет валидного токена для обновления
     // 3. Есть токен, но он недействителен
-    const needsFirstLoad = !hasValidData || 
-                          (!dataIsFresh && !hasValidToken) || 
-                          (TokenManager.getToken() && !hasValidToken);
+    const needsOnboarding = !hasValidData || 
+                           (!dataIsFresh && !hasValidToken) || 
+                           (TokenManager.getToken() && !hasValidToken);
 
-    if (needsFirstLoad) {
-      await this.showFirstLoadScreen();
+    if (needsOnboarding) {
+      await this.showLandingPage();
     } else {
       await this.initializeMainApp();
     }
   }
 
   /**
-   * Показывает экран первой загрузки
+   * Показывает лендинг-страницу
    */
-  private async showFirstLoadScreen(): Promise<void> {
-    this.firstLoadScreen = new FirstLoadScreen(this.container!);
+  private async showLandingPage(): Promise<void> {
+    this.landingPage = new LandingPage(this.container!);
+    this.landingPage.show();
     
-    // Настраиваем обработчик завершения первой загрузки
-    window.addEventListener('first-load-completed', (event: any) => {
-      this.handleFirstLoadCompleted(event.detail);
+    // Настраиваем обработчики событий нового онбординга
+    this.setupOnboardingEventHandlers();
+  }
+
+  /**
+   * Настраивает обработчики событий онбординга
+   */
+  private setupOnboardingEventHandlers(): void {
+    // Обработчик начала создания галактики
+    window.addEventListener('galaxy-creation-started', (event: any) => {
+      this.handleGalaxyCreationStarted(event.detail);
+    }, { once: true });
+
+    // Обработчик готовности галактики
+    window.addEventListener('galaxy-ready', (event: any) => {
+      this.handleGalaxyReady(event.detail);
+    }, { once: true });
+
+    // Обработчик повтора создания галактики
+    window.addEventListener('galaxy-creation-retry', () => {
+      this.handleGalaxyCreationRetry();
     });
 
-    const shown = await this.firstLoadScreen.show();
-    if (!shown) {
-      // Экран не был показан, значит данные есть
-      await this.initializeMainApp();
+    // Обработчик использования демо-данных
+    window.addEventListener('galaxy-use-demo', () => {
+      this.handleUseDemoData();
+    });
+  }
+
+  /**
+   * Обрабатывает начало создания галактики
+   */
+  private async handleGalaxyCreationStarted(detail: any): Promise<void> {
+    console.log('Начало создания галактики:', detail);
+    
+    if (this.landingPage) {
+      this.landingPage.hide();
+      this.landingPage = undefined;
+    }
+
+    // Показываем экран прогресса
+    this.progressScreen = new GalaxyCreationProgress(this.container!);
+    this.progressScreen.show();
+
+    // Запускаем сбор данных
+    await this.startDataCollection(detail.token);
+  }
+
+  /**
+   * Запускает сбор данных с отображением прогресса
+   */
+  private async startDataCollection(token: string): Promise<void> {
+    const collector = new DataCollector((progress: CollectionProgress) => {
+      if (this.progressScreen) {
+        this.progressScreen.updateProgress(progress);
+      }
+    });
+
+    try {
+      const result: CollectionResult = await collector.collectData(token);
+      
+      if (result.success && this.progressScreen) {
+        this.progressScreen.showSuccess(
+          result.tracksCollected || 0,
+          result.tracksWithPreview || 0
+        );
+      } else if (this.progressScreen) {
+        this.progressScreen.showError(result.error || 'Неизвестная ошибка');
+      }
+    } catch (error) {
+      if (this.progressScreen) {
+        this.progressScreen.showError(
+          error instanceof Error ? error.message : 'Неизвестная ошибка'
+        );
+      }
     }
   }
 
   /**
-   * Обрабатывает завершение первой загрузки
+   * Обрабатывает готовность галактики
    */
-  private async handleFirstLoadCompleted(detail: any): Promise<void> {
-    console.log('Первая загрузка завершена:', detail);
+  private async handleGalaxyReady(detail: any): Promise<void> {
+    console.log('Галактика готова:', detail);
     
-    if (this.firstLoadScreen) {
-      this.firstLoadScreen.hide();
-      this.firstLoadScreen = undefined;
+    if (this.progressScreen) {
+      this.progressScreen.hide();
+      this.progressScreen = undefined;
     }
 
     // Инициализируем основное приложение
+    await this.initializeMainApp();
+  }
+
+  /**
+   * Обрабатывает повтор создания галактики
+   */
+  private handleGalaxyCreationRetry(): void {
+    if (this.progressScreen) {
+      this.progressScreen.hide();
+      this.progressScreen = undefined;
+    }
+
+    // Возвращаемся к лендинг-странице
+    this.showLandingPage();
+  }
+
+  /**
+   * Обрабатывает использование демо-данных
+   */
+  private async handleUseDemoData(): Promise<void> {
+    if (this.progressScreen) {
+      this.progressScreen.hide();
+      this.progressScreen = undefined;
+    }
+
+    // Инициализируем приложение с демо-данными
     await this.initializeMainApp();
   }
 
@@ -6767,9 +7305,14 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
       this.burgerMenu = undefined;
     }
     
-    if (this.firstLoadScreen) {
-      this.firstLoadScreen.hide();
-      this.firstLoadScreen = undefined;
+    if (this.landingPage) {
+      this.landingPage.dispose();
+      this.landingPage = undefined;
+    }
+    
+    if (this.progressScreen) {
+      this.progressScreen.dispose();
+      this.progressScreen = undefined;
     }
     
     this.state.isInitialized = false;
@@ -25630,6 +26173,2123 @@ export class FirstLoadScreen {
 
 ================================================================================
 
+## File: src\ui\GalaxyCreationProgress.ts
+
+```
+/**
+ * Красивый экран прогресса создания галактики
+ */
+
+import { CollectionProgress } from '../data/DataCollector';
+
+export class GalaxyCreationProgress {
+  private container: HTMLElement;
+  private progressScreen?: HTMLElement;
+  private animationId?: number;
+  private particles: Array<{
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    size: number;
+    opacity: number;
+    color: string;
+  }> = [];
+
+  constructor(container: HTMLElement) {
+    this.container = container;
+  }
+
+  /**
+   * Показывает экран прогресса
+   */
+  show(): void {
+    this.render();
+    this.startBackgroundAnimation();
+  }
+
+  /**
+   * Скрывает экран прогресса
+   */
+  hide(): void {
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId);
+      this.animationId = undefined;
+    }
+
+    if (this.progressScreen) {
+      this.progressScreen.style.animation = 'fadeOut 0.5s ease-out';
+      setTimeout(() => {
+        if (this.progressScreen && this.progressScreen.parentElement) {
+          this.progressScreen.remove();
+        }
+      }, 500);
+    }
+  }
+
+  /**
+   * Обновляет прогресс
+   */
+  updateProgress(progress: CollectionProgress): void {
+    this.updateProgressBar(progress.progress);
+    this.updateStatusMessage(progress.message);
+    this.updateProgressDetails(progress);
+    this.updateStageAnimation(progress.stage);
+  }
+
+  /**
+   * Отрисовывает экран прогресса
+   */
+  private render(): void {
+    this.progressScreen = document.createElement('div');
+    this.progressScreen.id = 'galaxy-creation-progress';
+    this.progressScreen.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 30%, #16213e 70%, #0f3460 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      font-family: 'Arial', sans-serif;
+      overflow: hidden;
+      animation: fadeIn 0.5s ease-out;
+    `;
+
+    this.progressScreen.innerHTML = `
+      <!-- Фоновая анимация -->
+      <canvas id="progress-background" style="
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0.4;
+        z-index: 1;
+      "></canvas>
+
+      <!-- Основной контент -->
+      <div style="
+        position: relative;
+        z-index: 2;
+        text-align: center;
+        max-width: 600px;
+        padding: 40px;
+      ">
+        <!-- Анимированная иконка -->
+        <div id="stage-icon" style="
+          font-size: 4rem;
+          margin-bottom: 30px;
+          animation: pulse 2s ease-in-out infinite;
+        ">🌌</div>
+
+        <!-- Заголовок -->
+        <h1 style="
+          font-size: 2.5rem;
+          font-weight: bold;
+          background: linear-gradient(45deg, #4fc3f7, #29b6f6, #03a9f4);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          margin: 0 0 20px 0;
+          animation: glow 2s ease-in-out infinite alternate;
+        ">
+          Создание галактики
+        </h1>
+
+        <!-- Статус -->
+        <p id="status-message" style="
+          font-size: 1.3rem;
+          color: #e0e0e0;
+          margin: 0 0 40px 0;
+          min-height: 1.5em;
+          animation: fadeInUp 0.5s ease-out;
+        ">
+          Инициализация...
+        </p>
+
+        <!-- Прогресс-бар -->
+        <div style="
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 25px;
+          height: 20px;
+          overflow: hidden;
+          margin-bottom: 20px;
+          box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+        ">
+          <div id="main-progress-bar" style="
+            background: linear-gradient(90deg, #4fc3f7, #29b6f6, #03a9f4, #4fc3f7);
+            background-size: 200% 100%;
+            height: 100%;
+            width: 0%;
+            border-radius: 25px;
+            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            animation: shimmer 2s linear infinite;
+            position: relative;
+            overflow: hidden;
+          ">
+            <div style="
+              position: absolute;
+              top: 0;
+              left: -100%;
+              width: 100%;
+              height: 100%;
+              background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+              animation: slide 2s linear infinite;
+            "></div>
+          </div>
+        </div>
+
+        <!-- Процент -->
+        <div id="progress-percentage" style="
+          font-size: 1.1rem;
+          color: #4fc3f7;
+          font-weight: bold;
+          margin-bottom: 30px;
+        ">0%</div>
+
+        <!-- Детали прогресса -->
+        <div id="progress-details" style="
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 12px;
+          padding: 20px;
+          margin-top: 20px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(10px);
+        ">
+          <div id="tracks-info" style="
+            color: #ccc;
+            font-size: 0.95rem;
+            margin-bottom: 10px;
+          ">
+            Подготовка к загрузке...
+          </div>
+          <div id="current-track" style="
+            color: #4fc3f7;
+            font-size: 0.9rem;
+            font-style: italic;
+            min-height: 1.2em;
+          "></div>
+        </div>
+
+        <!-- Этапы -->
+        <div style="
+          display: flex;
+          justify-content: center;
+          gap: 20px;
+          margin-top: 30px;
+          flex-wrap: wrap;
+        ">
+          <div id="stage-connecting" class="stage-indicator" style="
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            font-size: 0.9rem;
+            color: #999;
+            transition: all 0.3s;
+          ">
+            <div class="stage-dot" style="
+              width: 8px;
+              height: 8px;
+              border-radius: 50%;
+              background: #666;
+              transition: all 0.3s;
+            "></div>
+            Подключение
+          </div>
+
+          <div id="stage-fetching" class="stage-indicator" style="
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            font-size: 0.9rem;
+            color: #999;
+            transition: all 0.3s;
+          ">
+            <div class="stage-dot" style="
+              width: 8px;
+              height: 8px;
+              border-radius: 50%;
+              background: #666;
+              transition: all 0.3s;
+            "></div>
+            Загрузка
+          </div>
+
+          <div id="stage-processing" class="stage-indicator" style="
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            font-size: 0.9rem;
+            color: #999;
+            transition: all 0.3s;
+          ">
+            <div class="stage-dot" style="
+              width: 8px;
+              height: 8px;
+              border-radius: 50%;
+              background: #666;
+              transition: all 0.3s;
+            "></div>
+            Обработка
+          </div>
+
+          <div id="stage-saving" class="stage-indicator" style="
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            font-size: 0.9rem;
+            color: #999;
+            transition: all 0.3s;
+          ">
+            <div class="stage-dot" style="
+              width: 8px;
+              height: 8px;
+              border-radius: 50%;
+              background: #666;
+              transition: all 0.3s;
+            "></div>
+            Сохранение
+          </div>
+        </div>
+
+        <!-- Подсказка -->
+        <p style="
+          color: #999;
+          font-size: 0.85rem;
+          margin-top: 30px;
+          line-height: 1.4;
+        ">
+          Не закрывайте страницу во время создания галактики.<br>
+          Процесс может занять несколько минут в зависимости от размера библиотеки.
+        </p>
+      </div>
+    `;
+
+    // Добавляем стили анимации
+    this.addProgressStyles();
+
+    document.body.appendChild(this.progressScreen);
+
+    // Инициализируем canvas для фоновой анимации
+    this.initializeCanvas();
+  }
+
+  /**
+   * Добавляет стили анимации
+   */
+  private addProgressStyles(): void {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      @keyframes fadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
+      }
+
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes pulse {
+        0%, 100% {
+          transform: scale(1);
+          opacity: 0.8;
+        }
+        50% {
+          transform: scale(1.1);
+          opacity: 1;
+        }
+      }
+
+      @keyframes glow {
+        from {
+          text-shadow: 0 0 20px rgba(79, 195, 247, 0.3);
+        }
+        to {
+          text-shadow: 0 0 30px rgba(79, 195, 247, 0.6), 0 0 40px rgba(79, 195, 247, 0.4);
+        }
+      }
+
+      @keyframes shimmer {
+        0% {
+          background-position: 0% 50%;
+        }
+        100% {
+          background-position: 200% 50%;
+        }
+      }
+
+      @keyframes slide {
+        0% {
+          left: -100%;
+        }
+        100% {
+          left: 100%;
+        }
+      }
+
+      @keyframes spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .stage-indicator.active {
+        background: rgba(79, 195, 247, 0.2) !important;
+        color: #4fc3f7 !important;
+        border: 1px solid rgba(79, 195, 247, 0.3);
+      }
+
+      .stage-indicator.active .stage-dot {
+        background: #4fc3f7 !important;
+        animation: pulse 1s ease-in-out infinite;
+      }
+
+      .stage-indicator.completed {
+        background: rgba(76, 175, 80, 0.2) !important;
+        color: #4caf50 !important;
+        border: 1px solid rgba(76, 175, 80, 0.3);
+      }
+
+      .stage-indicator.completed .stage-dot {
+        background: #4caf50 !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  /**
+   * Инициализирует canvas для фоновой анимации
+   */
+  private initializeCanvas(): void {
+    const canvas = document.getElementById('progress-background') as HTMLCanvasElement;
+    if (!canvas) return;
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // Создаем частицы
+    for (let i = 0; i < 80; i++) {
+      this.particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() - 0.5) * 0.8,
+        vy: (Math.random() - 0.5) * 0.8,
+        size: Math.random() * 3 + 1,
+        opacity: Math.random() * 0.6 + 0.2,
+        color: ['#4fc3f7', '#29b6f6', '#03a9f4', '#81c784', '#ffb74d'][Math.floor(Math.random() * 5)]
+      });
+    }
+  }
+
+  /**
+   * Запускает фоновую анимацию
+   */
+  private startBackgroundAnimation(): void {
+    const canvas = document.getElementById('progress-background') as HTMLCanvasElement;
+    const ctx = canvas?.getContext('2d');
+    
+    if (!canvas || !ctx) return;
+
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      this.particles.forEach(particle => {
+        particle.x += particle.vx;
+        particle.y += particle.vy;
+        
+        // Отражение от границ
+        if (particle.x < 0 || particle.x > canvas.width) particle.vx *= -1;
+        if (particle.y < 0 || particle.y > canvas.height) particle.vy *= -1;
+        
+        // Рисуем частицу
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+        ctx.fillStyle = particle.color + Math.floor(particle.opacity * 255).toString(16).padStart(2, '0');
+        ctx.fill();
+        
+        // Соединяем близкие частицы линиями
+        this.particles.forEach(otherParticle => {
+          const dx = particle.x - otherParticle.x;
+          const dy = particle.y - otherParticle.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (distance < 100) {
+            ctx.beginPath();
+            ctx.moveTo(particle.x, particle.y);
+            ctx.lineTo(otherParticle.x, otherParticle.y);
+            ctx.strokeStyle = `rgba(79, 195, 247, ${0.1 * (1 - distance / 100)})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+        });
+      });
+      
+      this.animationId = requestAnimationFrame(animate);
+    };
+    
+    animate();
+  }
+
+  /**
+   * Обновляет прогресс-бар
+   */
+  private updateProgressBar(progress: number): void {
+    const progressBar = document.getElementById('main-progress-bar');
+    const progressPercentage = document.getElementById('progress-percentage');
+    
+    if (progressBar) {
+      progressBar.style.width = `${Math.max(0, Math.min(100, progress))}%`;
+    }
+    
+    if (progressPercentage) {
+      progressPercentage.textContent = `${Math.round(progress)}%`;
+    }
+  }
+
+  /**
+   * Обновляет сообщение статуса
+   */
+  private updateStatusMessage(message: string): void {
+    const statusElement = document.getElementById('status-message');
+    if (statusElement) {
+      statusElement.style.animation = 'none';
+      statusElement.textContent = message;
+      // Перезапускаем анимацию
+      setTimeout(() => {
+        statusElement.style.animation = 'fadeInUp 0.5s ease-out';
+      }, 10);
+    }
+  }
+
+  /**
+   * Обновляет детали прогресса
+   */
+  private updateProgressDetails(progress: CollectionProgress): void {
+    const tracksInfo = document.getElementById('tracks-info');
+    const currentTrack = document.getElementById('current-track');
+    
+    if (tracksInfo && progress.totalTracks) {
+      const processed = progress.processedTracks || 0;
+      tracksInfo.textContent = `Обработано треков: ${processed} из ${progress.totalTracks}`;
+    }
+    
+    if (currentTrack) {
+      if (progress.currentTrack) {
+        currentTrack.textContent = `♪ ${progress.currentTrack}`;
+        currentTrack.style.animation = 'fadeInUp 0.3s ease-out';
+      } else {
+        currentTrack.textContent = '';
+      }
+    }
+  }
+
+  /**
+   * Обновляет анимацию этапа
+   */
+  private updateStageAnimation(stage: CollectionProgress['stage']): void {
+    // Сбрасываем все этапы
+    const stages = ['connecting', 'fetching', 'processing', 'saving'];
+    stages.forEach(stageName => {
+      const element = document.getElementById(`stage-${stageName}`);
+      if (element) {
+        element.classList.remove('active', 'completed');
+      }
+    });
+
+    // Отмечаем завершенные этапы
+    const stageOrder = ['connecting', 'fetching', 'processing', 'saving'];
+    const currentIndex = stageOrder.indexOf(stage);
+    
+    stageOrder.forEach((stageName, index) => {
+      const element = document.getElementById(`stage-${stageName}`);
+      if (element) {
+        if (index < currentIndex) {
+          element.classList.add('completed');
+        } else if (index === currentIndex) {
+          element.classList.add('active');
+        }
+      }
+    });
+
+    // Обновляем иконку этапа
+    const stageIcon = document.getElementById('stage-icon');
+    if (stageIcon) {
+      const icons = {
+        connecting: '🔗',
+        fetching: '📥',
+        processing: '⚙️',
+        saving: '💾',
+        complete: '✅',
+        error: '❌'
+      };
+      
+      stageIcon.textContent = icons[stage] || '🌌';
+      
+      if (stage === 'complete') {
+        stageIcon.style.animation = 'pulse 0.6s ease-out';
+      } else if (stage === 'error') {
+        stageIcon.style.animation = 'shake 0.5s ease-in-out';
+      }
+    }
+  }
+
+  /**
+   * Показывает экран успешного завершения
+   */
+  showSuccess(tracksCount: number, tracksWithPreview: number): void {
+    const content = this.progressScreen?.querySelector('[style*="z-index: 2"]');
+    if (!content) return;
+
+    content.innerHTML = `
+      <div style="
+        text-align: center;
+        animation: successZoom 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      ">
+        <div style="
+          font-size: 5rem;
+          margin-bottom: 30px;
+          animation: bounce 1s ease-out;
+        ">🎉</div>
+
+        <h1 style="
+          font-size: 2.8rem;
+          font-weight: bold;
+          background: linear-gradient(45deg, #4caf50, #81c784);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          margin: 0 0 20px 0;
+        ">
+          Галактика создана!
+        </h1>
+
+        <p style="
+          font-size: 1.2rem;
+          color: #e0e0e0;
+          margin: 0 0 40px 0;
+          line-height: 1.6;
+        ">
+          Ваша музыкальная вселенная готова к исследованию
+        </p>
+
+        <div style="
+          display: flex;
+          justify-content: center;
+          gap: 40px;
+          margin: 40px 0;
+          flex-wrap: wrap;
+        ">
+          <div style="
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 16px;
+            padding: 20px;
+            min-width: 150px;
+            backdrop-filter: blur(10px);
+          ">
+            <div style="font-size: 2rem; margin-bottom: 10px;">🎵</div>
+            <div style="color: #4caf50; font-size: 1.5rem; font-weight: bold;">${tracksCount}</div>
+            <div style="color: #ccc; font-size: 0.9rem;">треков загружено</div>
+          </div>
+
+          <div style="
+            background: rgba(79, 195, 247, 0.2);
+            border: 1px solid rgba(79, 195, 247, 0.3);
+            border-radius: 16px;
+            padding: 20px;
+            min-width: 150px;
+            backdrop-filter: blur(10px);
+          ">
+            <div style="font-size: 2rem; margin-bottom: 10px;">🎧</div>
+            <div style="color: #4fc3f7; font-size: 1.5rem; font-weight: bold;">${tracksWithPreview}</div>
+            <div style="color: #ccc; font-size: 0.9rem;">с превью</div>
+          </div>
+        </div>
+
+        <button id="enter-galaxy-btn" style="
+          background: linear-gradient(45deg, #4fc3f7, #29b6f6);
+          color: #fff;
+          border: none;
+          padding: 18px 40px;
+          border-radius: 50px;
+          font-size: 1.2rem;
+          font-weight: bold;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          box-shadow: 0 10px 30px rgba(79, 195, 247, 0.4);
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          margin-top: 20px;
+        " onmouseover="
+          this.style.transform = 'translateY(-3px) scale(1.05)';
+          this.style.boxShadow = '0 15px 40px rgba(79, 195, 247, 0.6)';
+        " onmouseout="
+          this.style.transform = 'translateY(0) scale(1)';
+          this.style.boxShadow = '0 10px 30px rgba(79, 195, 247, 0.4)';
+        ">
+          🚀 Войти в галактику
+        </button>
+      </div>
+    `;
+
+    // Добавляем анимацию успеха
+    const successStyle = document.createElement('style');
+    successStyle.textContent = `
+      @keyframes successZoom {
+        0% {
+          transform: scale(0.8);
+          opacity: 0;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+
+      @keyframes bounce {
+        0%, 20%, 53%, 80%, 100% {
+          transform: translate3d(0,0,0);
+        }
+        40%, 43% {
+          transform: translate3d(0, -30px, 0);
+        }
+        70% {
+          transform: translate3d(0, -15px, 0);
+        }
+        90% {
+          transform: translate3d(0, -4px, 0);
+        }
+      }
+    `;
+    document.head.appendChild(successStyle);
+
+    // Настраиваем кнопку входа
+    const enterBtn = document.getElementById('enter-galaxy-btn');
+    if (enterBtn) {
+      enterBtn.addEventListener('click', () => {
+        window.dispatchEvent(new CustomEvent('galaxy-ready', {
+          detail: { tracksCount, tracksWithPreview }
+        }));
+      });
+    }
+  }
+
+  /**
+   * Показывает экран ошибки
+   */
+  showError(error: string): void {
+    const content = this.progressScreen?.querySelector('[style*="z-index: 2"]');
+    if (!content) return;
+
+    content.innerHTML = `
+      <div style="
+        text-align: center;
+        animation: errorShake 0.6s ease-out;
+      ">
+        <div style="
+          font-size: 4rem;
+          margin-bottom: 30px;
+          color: #f44336;
+        ">❌</div>
+
+        <h1 style="
+          font-size: 2.5rem;
+          font-weight: bold;
+          color: #f44336;
+          margin: 0 0 20px 0;
+        ">
+          Ошибка создания галактики
+        </h1>
+
+        <p style="
+          font-size: 1.1rem;
+          color: #e0e0e0;
+          margin: 0 0 30px 0;
+          line-height: 1.6;
+        ">
+          ${error}
+        </p>
+
+        <div style="
+          display: flex;
+          justify-content: center;
+          gap: 15px;
+          flex-wrap: wrap;
+        ">
+          <button id="retry-btn" style="
+            background: linear-gradient(45deg, #f44336, #e57373);
+            color: #fff;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+          ">
+            🔄 Попробовать снова
+          </button>
+
+          <button id="use-demo-btn" style="
+            background: rgba(255, 255, 255, 0.1);
+            color: #ccc;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+          ">
+            📊 Использовать демо-данные
+          </button>
+        </div>
+      </div>
+    `;
+
+    // Добавляем анимацию ошибки
+    const errorStyle = document.createElement('style');
+    errorStyle.textContent = `
+      @keyframes errorShake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-10px); }
+        75% { transform: translateX(10px); }
+      }
+    `;
+    document.head.appendChild(errorStyle);
+
+    // Настраиваем кнопки
+    const retryBtn = document.getElementById('retry-btn');
+    const demoBtn = document.getElementById('use-demo-btn');
+
+    if (retryBtn) {
+      retryBtn.addEventListener('click', () => {
+        window.dispatchEvent(new CustomEvent('galaxy-creation-retry'));
+      });
+    }
+
+    if (demoBtn) {
+      demoBtn.addEventListener('click', () => {
+        window.dispatchEvent(new CustomEvent('galaxy-use-demo'));
+      });
+    }
+  }
+
+  /**
+   * Освобождает ресурсы
+   */
+  dispose(): void {
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId);
+      this.animationId = undefined;
+    }
+    
+    this.hide();
+    this.particles = [];
+  }
+}
+```
+
+================================================================================
+
+## File: src\ui\LandingPage.ts
+
+```
+/**
+ * Красивая лендинг-страница с призывом к действию
+ */
+
+import { TokenInstructionModal } from './TokenInstructionModal';
+
+export class LandingPage {
+  private container: HTMLElement;
+  private tokenModal?: TokenInstructionModal;
+
+  constructor(container: HTMLElement) {
+    this.container = container;
+  }
+
+  /**
+   * Показывает лендинг-страницу
+   */
+  show(): void {
+    this.render();
+    this.setupEventListeners();
+  }
+
+  /**
+   * Скрывает лендинг-страницу
+   */
+  hide(): void {
+    const landing = document.getElementById('landing-page');
+    if (landing) {
+      landing.remove();
+    }
+  }
+
+  /**
+   * Отрисовывает лендинг-страницу
+   */
+  private render(): void {
+    const landing = document.createElement('div');
+    landing.id = 'landing-page';
+    landing.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 30%, #16213e 70%, #0f3460 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      font-family: 'Arial', sans-serif;
+      overflow: hidden;
+    `;
+
+    landing.innerHTML = `
+      <!-- Фоновая анимация -->
+      <div id="background-animation" style="
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0.3;
+        z-index: 1;
+      "></div>
+
+      <!-- Основной контент -->
+      <div style="
+        position: relative;
+        z-index: 2;
+        text-align: center;
+        max-width: 800px;
+        padding: 40px;
+        animation: fadeInUp 1s ease-out;
+      ">
+        <!-- Заголовок -->
+        <h1 style="
+          font-size: 4rem;
+          font-weight: bold;
+          background: linear-gradient(45deg, #4fc3f7, #29b6f6, #03a9f4);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          margin: 0 0 20px 0;
+          text-shadow: 0 0 30px rgba(79, 195, 247, 0.3);
+          animation: glow 2s ease-in-out infinite alternate;
+        ">
+          🌌 Твоя музыкальная вселенная
+        </h1>
+
+        <!-- Подзаголовок -->
+        <p style="
+          font-size: 1.5rem;
+          color: #e0e0e0;
+          margin: 0 0 40px 0;
+          line-height: 1.6;
+          opacity: 0.9;
+        ">
+          Визуализируй любимые треки из Яндекс.Музыки<br>
+          в интерактивной 3D-галактике
+        </p>
+
+        <!-- Особенности -->
+        <div style="
+          display: flex;
+          justify-content: center;
+          gap: 40px;
+          margin: 40px 0 60px 0;
+          flex-wrap: wrap;
+        ">
+          <div style="
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            min-width: 200px;
+            animation: float 3s ease-in-out infinite;
+          ">
+            <div style="font-size: 2rem; margin-bottom: 10px;">🎵</div>
+            <h3 style="color: #4fc3f7; margin: 0 0 8px 0; font-size: 1.1rem;">3D Визуализация</h3>
+            <p style="color: #ccc; margin: 0; font-size: 0.9rem;">Каждый трек — звезда в твоей галактике</p>
+          </div>
+
+          <div style="
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            min-width: 200px;
+            animation: float 3s ease-in-out infinite 0.5s;
+          ">
+            <div style="font-size: 2rem; margin-bottom: 10px;">🎧</div>
+            <h3 style="color: #4fc3f7; margin: 0 0 8px 0; font-size: 1.1rem;">Превью треков</h3>
+            <p style="color: #ccc; margin: 0; font-size: 0.9rem;">Слушай 30-секундные отрывки</p>
+          </div>
+
+          <div style="
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            min-width: 200px;
+            animation: float 3s ease-in-out infinite 1s;
+          ">
+            <div style="font-size: 2rem; margin-bottom: 10px;">🎨</div>
+            <h3 style="color: #4fc3f7; margin: 0 0 8px 0; font-size: 1.1rem;">Цветовое кодирование</h3>
+            <p style="color: #ccc; margin: 0; font-size: 0.9rem;">Жанры отображаются разными цветами</p>
+          </div>
+        </div>
+
+        <!-- Главная кнопка CTA -->
+        <button id="create-galaxy-btn" style="
+          background: linear-gradient(45deg, #ff6b35, #f7931e, #ff6b35);
+          background-size: 200% 200%;
+          color: #fff;
+          border: none;
+          padding: 20px 50px;
+          border-radius: 50px;
+          font-size: 1.3rem;
+          font-weight: bold;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          box-shadow: 0 10px 30px rgba(255, 107, 53, 0.4);
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          animation: pulse-cta 2s ease-in-out infinite;
+          position: relative;
+          overflow: hidden;
+        " onmouseover="
+          this.style.transform = 'translateY(-3px) scale(1.05)';
+          this.style.boxShadow = '0 15px 40px rgba(255, 107, 53, 0.6)';
+        " onmouseout="
+          this.style.transform = 'translateY(0) scale(1)';
+          this.style.boxShadow = '0 10px 30px rgba(255, 107, 53, 0.4)';
+        ">
+          <span style="position: relative; z-index: 2;">🚀 Создать свою галактику</span>
+          <div style="
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+          "></div>
+        </button>
+
+        <!-- Дополнительная информация -->
+        <p style="
+          color: #999;
+          font-size: 0.9rem;
+          margin-top: 30px;
+          line-height: 1.5;
+        ">
+          Безопасно и конфиденциально • Данные обрабатываются локально<br>
+          Работает с любой библиотекой Яндекс.Музыки
+        </p>
+      </div>
+
+      <!-- Декоративные элементы -->
+      <div class="stars"></div>
+    `;
+
+    // Добавляем CSS анимации
+    this.addAnimationStyles();
+    
+    // Создаем фоновую анимацию
+    this.createBackgroundAnimation();
+    
+    // Создаем звезды
+    this.createStars();
+
+    document.body.appendChild(landing);
+  }
+
+  /**
+   * Добавляет CSS анимации
+   */
+  private addAnimationStyles(): void {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(30px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes glow {
+        from {
+          text-shadow: 0 0 30px rgba(79, 195, 247, 0.3);
+        }
+        to {
+          text-shadow: 0 0 50px rgba(79, 195, 247, 0.6), 0 0 70px rgba(79, 195, 247, 0.4);
+        }
+      }
+
+      @keyframes float {
+        0%, 100% {
+          transform: translateY(0px);
+        }
+        50% {
+          transform: translateY(-10px);
+        }
+      }
+
+      @keyframes pulse-cta {
+        0%, 100% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+      }
+
+      @keyframes twinkle {
+        0%, 100% {
+          opacity: 0.3;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.2);
+        }
+      }
+
+      .stars {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      .star {
+        position: absolute;
+        background: #fff;
+        border-radius: 50%;
+        animation: twinkle 2s ease-in-out infinite;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  /**
+   * Создает фоновую анимацию
+   */
+  private createBackgroundAnimation(): void {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('background-animation');
+    
+    if (!ctx || !container) return;
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    
+    container.appendChild(canvas);
+
+    // Создаем частицы для фоновой анимации
+    const particles: Array<{
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      size: number;
+      opacity: number;
+    }> = [];
+
+    for (let i = 0; i < 50; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: (Math.random() - 0.5) * 0.5,
+        size: Math.random() * 2 + 1,
+        opacity: Math.random() * 0.5 + 0.2
+      });
+    }
+
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      particles.forEach(particle => {
+        particle.x += particle.vx;
+        particle.y += particle.vy;
+        
+        if (particle.x < 0 || particle.x > canvas.width) particle.vx *= -1;
+        if (particle.y < 0 || particle.y > canvas.height) particle.vy *= -1;
+        
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(79, 195, 247, ${particle.opacity})`;
+        ctx.fill();
+      });
+      
+      requestAnimationFrame(animate);
+    };
+    
+    animate();
+  }
+
+  /**
+   * Создает декоративные звезды
+   */
+  private createStars(): void {
+    const starsContainer = document.querySelector('.stars');
+    if (!starsContainer) return;
+
+    for (let i = 0; i < 100; i++) {
+      const star = document.createElement('div');
+      star.className = 'star';
+      star.style.cssText = `
+        left: ${Math.random() * 100}%;
+        top: ${Math.random() * 100}%;
+        width: ${Math.random() * 3 + 1}px;
+        height: ${Math.random() * 3 + 1}px;
+        animation-delay: ${Math.random() * 2}s;
+        animation-duration: ${Math.random() * 3 + 2}s;
+      `;
+      starsContainer.appendChild(star);
+    }
+  }
+
+  /**
+   * Настраивает обработчики событий
+   */
+  private setupEventListeners(): void {
+    const createBtn = document.getElementById('create-galaxy-btn');
+    if (createBtn) {
+      createBtn.addEventListener('click', () => this.handleCreateGalaxy());
+    }
+
+    // Обработка изменения размера окна для canvas
+    window.addEventListener('resize', () => {
+      const canvas = document.querySelector('#background-animation canvas') as HTMLCanvasElement;
+      if (canvas) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+    });
+  }
+
+  /**
+   * Обработчик создания галактики
+   */
+  private handleCreateGalaxy(): void {
+    // Создаем и показываем модальное окно с инструкциями
+    this.tokenModal = new TokenInstructionModal();
+    this.tokenModal.show();
+
+    // Слушаем событие завершения настройки токена
+    window.addEventListener('token-setup-completed', (event: any) => {
+      this.handleTokenSetupCompleted(event.detail);
+    }, { once: true });
+  }
+
+  /**
+   * Обработчик завершения настройки токена
+   */
+  private handleTokenSetupCompleted(detail: any): void {
+    if (this.tokenModal) {
+      this.tokenModal.hide();
+      this.tokenModal = undefined;
+    }
+
+    this.hide();
+
+    // Запускаем процесс создания галактики
+    window.dispatchEvent(new CustomEvent('galaxy-creation-started', { 
+      detail 
+    }));
+  }
+
+  /**
+   * Освобождает ресурсы
+   */
+  dispose(): void {
+    this.hide();
+    
+    if (this.tokenModal) {
+      this.tokenModal.dispose();
+      this.tokenModal = undefined;
+    }
+  }
+}
+```
+
+================================================================================
+
+## File: src\ui\TokenInstructionModal.ts
+
+```
+/**
+ * Модальное окно с пошаговыми инструкциями получения токена
+ */
+
+import { TokenManager } from '../auth/TokenManager';
+
+export class TokenInstructionModal {
+  private modal?: HTMLElement;
+  private currentStep: number = 1;
+  private totalSteps: number = 6;
+
+  /**
+   * Показывает модальное окно
+   */
+  show(): void {
+    this.render();
+    this.setupEventListeners();
+  }
+
+  /**
+   * Скрывает модальное окно
+   */
+  hide(): void {
+    if (this.modal) {
+      this.modal.style.animation = 'fadeOut 0.3s ease-out';
+      setTimeout(() => {
+        if (this.modal && this.modal.parentElement) {
+          this.modal.remove();
+        }
+      }, 300);
+    }
+  }
+
+  /**
+   * Отрисовывает модальное окно
+   */
+  private render(): void {
+    this.modal = document.createElement('div');
+    this.modal.id = 'token-instruction-modal';
+    this.modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+      font-family: 'Arial', sans-serif;
+      animation: fadeIn 0.3s ease-out;
+      backdrop-filter: blur(5px);
+    `;
+
+    this.modal.innerHTML = `
+      <div style="
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        border-radius: 20px;
+        padding: 0;
+        max-width: 600px;
+        width: 90%;
+        max-height: 90vh;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+        position: relative;
+        animation: slideIn 0.4s ease-out;
+      ">
+        <!-- Заголовок -->
+        <div style="
+          background: linear-gradient(45deg, #4fc3f7, #29b6f6);
+          padding: 25px 30px;
+          color: white;
+          position: relative;
+          overflow: hidden;
+        ">
+          <button id="close-modal-btn" style="
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s;
+          " onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='none'">×</button>
+          
+          <h2 style="margin: 0 0 8px 0; font-size: 1.8rem; font-weight: bold;">
+            🔑 Получение токена доступа
+          </h2>
+          <p style="margin: 0; opacity: 0.9; font-size: 1rem;">
+            Простые шаги для подключения к Яндекс.Музыке
+          </p>
+        </div>
+
+        <!-- Контент -->
+        <div style="padding: 30px;">
+          <!-- Прогресс-бар -->
+          <div style="margin-bottom: 30px;">
+            <div style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 10px;
+            ">
+              <span style="color: #4fc3f7; font-weight: bold;">Шаг ${this.currentStep} из ${this.totalSteps}</span>
+              <span style="color: #ccc; font-size: 0.9rem;" id="progress-text">Инструкции</span>
+            </div>
+            <div style="
+              background: rgba(255, 255, 255, 0.1);
+              border-radius: 10px;
+              height: 8px;
+              overflow: hidden;
+            ">
+              <div id="step-progress-bar" style="
+                background: linear-gradient(90deg, #4fc3f7, #29b6f6);
+                height: 100%;
+                width: ${(this.currentStep / this.totalSteps) * 100}%;
+                transition: width 0.3s ease;
+                border-radius: 10px;
+              "></div>
+            </div>
+          </div>
+
+          <!-- Шаги инструкции -->
+          <div id="instruction-steps">
+            ${this.getStepContent()}
+          </div>
+
+          <!-- Поле для ввода токена -->
+          <div id="token-input-section" style="display: none; margin-top: 30px;">
+            <div style="
+              background: rgba(255, 255, 255, 0.05);
+              border-radius: 12px;
+              padding: 20px;
+              border: 1px solid rgba(255, 255, 255, 0.1);
+            ">
+              <label style="
+                color: #fff;
+                display: block;
+                margin-bottom: 12px;
+                font-weight: bold;
+                font-size: 1.1rem;
+              ">
+                🎵 Вставьте токен Session_id:
+              </label>
+              <input 
+                type="text" 
+                id="token-input" 
+                placeholder="Например: y0_AgAAAAAj2vgeAAG8XgAAAAEJa-6RAAAdPHm_OlpI_4ludZXEeCSbWupQkA"
+                style="
+                  width: 100%;
+                  padding: 15px;
+                  border: 2px solid rgba(79, 195, 247, 0.3);
+                  border-radius: 8px;
+                  background: rgba(255, 255, 255, 0.1);
+                  color: #fff;
+                  font-size: 14px;
+                  box-sizing: border-box;
+                  transition: border-color 0.3s;
+                  font-family: monospace;
+                "
+                onfocus="this.style.borderColor='#4fc3f7'"
+                onblur="this.style.borderColor='rgba(79, 195, 247, 0.3)'"
+              />
+              <div style="
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin-top: 15px;
+                padding: 10px;
+                background: rgba(255, 193, 7, 0.1);
+                border-radius: 6px;
+                border-left: 4px solid #ffc107;
+              ">
+                <span style="font-size: 1.2rem;">💡</span>
+                <p style="
+                  color: #ffc107;
+                  margin: 0;
+                  font-size: 0.9rem;
+                  line-height: 1.4;
+                ">
+                  Токен может начинаться с y0_ или AQA и обычно довольно длинный (50+ символов).
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Кнопки навигации -->
+          <div style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 30px;
+            gap: 15px;
+          ">
+            <button id="prev-step-btn" style="
+              background: rgba(255, 255, 255, 0.1);
+              border: 1px solid rgba(255, 255, 255, 0.3);
+              color: #ccc;
+              padding: 12px 24px;
+              border-radius: 8px;
+              cursor: pointer;
+              font-size: 14px;
+              transition: all 0.3s;
+              ${this.currentStep === 1 ? 'opacity: 0.5; cursor: not-allowed;' : ''}
+            " ${this.currentStep === 1 ? 'disabled' : ''}>
+              ← Назад
+            </button>
+
+            <div style="flex: 1; text-align: center;">
+              <div style="display: flex; gap: 8px; justify-content: center;">
+                ${Array.from({length: this.totalSteps}, (_, i) => `
+                  <div style="
+                    width: 10px;
+                    height: 10px;
+                    border-radius: 50%;
+                    background: ${i + 1 <= this.currentStep ? '#4fc3f7' : 'rgba(255, 255, 255, 0.3)'};
+                    transition: background 0.3s;
+                  "></div>
+                `).join('')}
+              </div>
+            </div>
+
+            <button id="next-step-btn" style="
+              background: linear-gradient(45deg, #4fc3f7, #29b6f6);
+              border: none;
+              color: white;
+              padding: 12px 24px;
+              border-radius: 8px;
+              cursor: pointer;
+              font-size: 14px;
+              font-weight: bold;
+              transition: all 0.3s;
+            " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+              ${this.currentStep === this.totalSteps ? '🚀 Создать галактику' : 'Далее →'}
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Добавляем стили анимации
+    this.addModalStyles();
+
+    document.body.appendChild(this.modal);
+
+    // Фокусируемся на поле ввода, если оно видимо
+    setTimeout(() => {
+      const tokenInput = document.getElementById('token-input') as HTMLInputElement;
+      if (tokenInput && tokenInput.offsetParent !== null) {
+        tokenInput.focus();
+      }
+    }, 100);
+  }
+
+  /**
+   * Добавляет стили для модального окна
+   */
+  private addModalStyles(): void {
+    if (document.getElementById('modal-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'modal-styles';
+    style.textContent = `
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      @keyframes fadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(-30px) scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      .step-content {
+        animation: stepFadeIn 0.3s ease-out;
+      }
+
+      @keyframes stepFadeIn {
+        from {
+          opacity: 0;
+          transform: translateX(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  /**
+   * Получает контент для текущего шага
+   */
+  private getStepContent(): string {
+    const steps = [
+      {
+        icon: '🔧',
+        title: 'Подготовка (опционально)',
+        content: `
+          <p style="color: #ccc; line-height: 1.6; margin-bottom: 20px;">
+            Откройте DevTools в браузере (F12) и на вкладке <strong style="color: #4fc3f7;">Network</strong> включите троттлинг.
+          </p>
+          <div style="
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+          ">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <span style="font-size: 1.2rem;">💡</span>
+              <strong style="color: #ffc107;">Подсказка:</strong>
+            </div>
+            <p style="color: #ccc; margin: 0; font-size: 0.9rem;">
+              Это поможет замедлить редирект и даст больше времени для копирования токена.
+            </p>
+          </div>
+        `
+      },
+      {
+        icon: '🌐',
+        title: 'Перейдите по OAuth ссылке',
+        content: `
+          <p style="color: #ccc; line-height: 1.6; margin-bottom: 20px;">
+            Перейдите по ссылке: <br>
+            <a href="https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d" 
+               target="_blank" 
+               style="color: #4fc3f7; text-decoration: none; word-break: break-all; font-size: 0.9rem;">
+              https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d
+            </a>
+          </p>
+          <div style="
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+          ">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <span style="font-size: 1.2rem;">✅</span>
+              <strong style="color: #4caf50;">Важно:</strong>
+            </div>
+            <p style="color: #ccc; margin: 0; font-size: 0.9rem;">
+              Ссылка откроется в новой вкладке для удобства.
+            </p>
+          </div>
+        `
+      },
+      {
+        icon: '🔐',
+        title: 'Авторизуйтесь',
+        content: `
+          <p style="color: #ccc; line-height: 1.6; margin-bottom: 20px;">
+            Авторизуйтесь при необходимости и предоставьте доступ приложению к вашему аккаунту Яндекс.Музыки.
+          </p>
+          <div style="
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+          ">
+            <p style="color: #ccc; margin: 0; font-size: 0.9rem;">
+              <strong>Что произойдет:</strong><br>
+              Яндекс попросит разрешение на доступ к вашей музыкальной библиотеке. Нажмите "Разрешить".
+            </p>
+          </div>
+        `
+      },
+      {
+        icon: '⚡',
+        title: 'Скопируйте ссылку быстро!',
+        content: `
+          <p style="color: #ccc; line-height: 1.6; margin-bottom: 20px;">
+            Браузер перенаправит на адрес вида:<br>
+            <code style="background: rgba(255,255,255,0.1); padding: 8px; border-radius: 4px; color: #4fc3f7; font-size: 0.8rem; word-break: break-all;">
+              https://music.yandex.ru/#access_token=AQAAAAAYc***&token_type=bearer&expires_in=31535645
+            </code>
+          </p>
+          <div style="
+            background: rgba(244, 67, 54, 0.1);
+            border: 1px solid rgba(244, 67, 54, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+          ">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <span style="font-size: 1.2rem;">⚠️</span>
+              <strong style="color: #f44336;">Внимание:</strong>
+            </div>
+            <p style="color: #ccc; margin: 0; font-size: 0.9rem;">
+              Очень быстро произойдет редирект на другую страницу! Нужно успеть скопировать ссылку из адресной строки.
+            </p>
+          </div>
+        `
+      },
+      {
+        icon: '🎵',
+        title: 'Извлеките токен',
+        content: `
+          <p style="color: #ccc; line-height: 1.6; margin-bottom: 20px;">
+            Ваш токен - это то, что находится после <strong style="color: #4fc3f7;">access_token=</strong> в скопированной ссылке.
+          </p>
+          <div style="
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            border-left: 4px solid #4fc3f7;
+          ">
+            <p style="color: #ccc; margin: 0; font-size: 0.9rem;">
+              <strong style="color: #4fc3f7;">Пример:</strong><br>
+              Из ссылки <code style="background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 3px;">access_token=AQAAAAAYc123...</code><br>
+              Токен: <code style="background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 3px;">AQAAAAAYc123...</code>
+            </p>
+          </div>
+        `
+      },
+      {
+        icon: '🚀',
+        title: 'Введите токен',
+        content: `
+          <p style="color: #ccc; line-height: 1.6; margin-bottom: 20px;">
+            Вставьте скопированный токен в поле ниже и нажмите кнопку для создания вашей музыкальной галактики.
+          </p>
+          <div style="
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+          ">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <span style="font-size: 1.2rem;">🔒</span>
+              <strong style="color: #4caf50;">Безопасность:</strong>
+            </div>
+            <p style="color: #ccc; margin: 0; font-size: 0.9rem;">
+              Токен сохраняется только локально в вашем браузере и используется исключительно для доступа к вашей музыкальной библиотеке.
+            </p>
+          </div>
+        `
+      }
+    ];
+
+    const step = steps[this.currentStep - 1];
+    return `
+      <div class="step-content">
+        <div style="
+          display: flex;
+          align-items: center;
+          gap: 15px;
+          margin-bottom: 20px;
+        ">
+          <div style="
+            font-size: 2.5rem;
+            width: 60px;
+            height: 60px;
+            background: rgba(79, 195, 247, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid rgba(79, 195, 247, 0.3);
+          ">
+            ${step.icon}
+          </div>
+          <h3 style="
+            color: #fff;
+            margin: 0;
+            font-size: 1.3rem;
+            font-weight: bold;
+          ">
+            ${step.title}
+          </h3>
+        </div>
+        ${step.content}
+      </div>
+    `;
+  }
+
+  /**
+   * Настраивает обработчики событий
+   */
+  private setupEventListeners(): void {
+    // Закрытие модального окна
+    const closeBtn = document.getElementById('close-modal-btn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => this.hide());
+    }
+
+    // Закрытие по клику вне модального окна
+    if (this.modal) {
+      this.modal.addEventListener('click', (e) => {
+        if (e.target === this.modal) {
+          this.hide();
+        }
+      });
+    }
+
+    // Навигация по шагам
+    const prevBtn = document.getElementById('prev-step-btn');
+    const nextBtn = document.getElementById('next-step-btn');
+
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => this.previousStep());
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => this.nextStep());
+    }
+
+    // Обработка ввода токена
+    const tokenInput = document.getElementById('token-input') as HTMLInputElement;
+    if (tokenInput) {
+      tokenInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          this.handleTokenSubmit();
+        }
+      });
+
+      // Валидация токена в реальном времени
+      tokenInput.addEventListener('input', () => {
+        this.validateTokenInput();
+      });
+    }
+
+    // Обработка клавиш
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        this.hide();
+      } else if (e.key === 'ArrowLeft' && this.currentStep > 1) {
+        this.previousStep();
+      } else if (e.key === 'ArrowRight' && this.currentStep < this.totalSteps) {
+        this.nextStep();
+      }
+    });
+  }
+
+  /**
+   * Переход к предыдущему шагу
+   */
+  private previousStep(): void {
+    if (this.currentStep > 1) {
+      this.currentStep--;
+      this.updateStep();
+    }
+  }
+
+  /**
+   * Переход к следующему шагу
+   */
+  private nextStep(): void {
+    if (this.currentStep < this.totalSteps) {
+      this.currentStep++;
+      this.updateStep();
+    } else {
+      // Последний шаг - отправка токена
+      this.handleTokenSubmit();
+    }
+  }
+
+  /**
+   * Обновляет отображение шага
+   */
+  private updateStep(): void {
+    // Обновляем прогресс-бар
+    const progressBar = document.getElementById('step-progress-bar');
+    if (progressBar) {
+      progressBar.style.width = `${(this.currentStep / this.totalSteps) * 100}%`;
+    }
+
+    // Обновляем контент
+    const stepsContainer = document.getElementById('instruction-steps');
+    if (stepsContainer) {
+      stepsContainer.innerHTML = this.getStepContent();
+    }
+
+    // Показываем/скрываем поле ввода токена
+    const tokenSection = document.getElementById('token-input-section');
+    if (tokenSection) {
+      tokenSection.style.display = this.currentStep === this.totalSteps ? 'block' : 'none';
+    }
+
+    // Обновляем кнопки
+    const prevBtn = document.getElementById('prev-step-btn') as HTMLButtonElement;
+    const nextBtn = document.getElementById('next-step-btn');
+
+    if (prevBtn) {
+      prevBtn.disabled = this.currentStep === 1;
+      prevBtn.style.opacity = this.currentStep === 1 ? '0.5' : '1';
+      prevBtn.style.cursor = this.currentStep === 1 ? 'not-allowed' : 'pointer';
+    }
+
+    if (nextBtn) {
+      nextBtn.textContent = this.currentStep === this.totalSteps ? '🚀 Создать галактику' : 'Далее →';
+    }
+
+    // Обновляем индикаторы шагов
+    const indicators = this.modal?.querySelectorAll('[style*="border-radius: 50%"]');
+    if (indicators) {
+      indicators.forEach((indicator, index) => {
+        if (index < this.totalSteps) {
+          (indicator as HTMLElement).style.background = 
+            index + 1 <= this.currentStep ? '#4fc3f7' : 'rgba(255, 255, 255, 0.3)';
+        }
+      });
+    }
+
+    // Фокусируемся на поле ввода, если показан последний шаг
+    if (this.currentStep === this.totalSteps) {
+      setTimeout(() => {
+        const tokenInput = document.getElementById('token-input') as HTMLInputElement;
+        if (tokenInput) {
+          tokenInput.focus();
+        }
+      }, 100);
+    }
+  }
+
+  /**
+   * Валидирует ввод токена
+   */
+  private validateTokenInput(): void {
+    const tokenInput = document.getElementById('token-input') as HTMLInputElement;
+    const nextBtn = document.getElementById('next-step-btn') as HTMLButtonElement;
+    
+    if (!tokenInput || !nextBtn) return;
+
+    const token = tokenInput.value.trim();
+    const isValid = this.isValidTokenFormat(token);
+
+    // Обновляем стиль поля ввода
+    tokenInput.style.borderColor = token.length === 0 ? 
+      'rgba(79, 195, 247, 0.3)' : 
+      (isValid ? '#4caf50' : '#f44336');
+
+    // Обновляем кнопку
+    nextBtn.disabled = !isValid;
+    nextBtn.style.opacity = isValid ? '1' : '0.6';
+    nextBtn.style.cursor = isValid ? 'pointer' : 'not-allowed';
+  }
+
+  /**
+   * Проверяет формат токена
+   */
+  private isValidTokenFormat(token: string): boolean {
+    if (token.length < 20) return false;
+    
+    // Токен может начинаться с y0_ или быть в другом формате
+    // Основная проверка - достаточная длина и отсутствие пробелов
+    return !token.includes(' ') && token.length >= 20;
+  }
+
+  /**
+   * Обрабатывает отправку токена
+   */
+  private handleTokenSubmit(): void {
+    const tokenInput = document.getElementById('token-input') as HTMLInputElement;
+    if (!tokenInput) return;
+
+    const token = tokenInput.value.trim();
+    
+    if (!this.isValidTokenFormat(token)) {
+      this.showTokenError('Неверный формат токена. Убедитесь, что скопировали значение Session_id полностью.');
+      return;
+    }
+
+    try {
+      // Сохраняем токен
+      TokenManager.saveToken(token);
+      
+      // Показываем успех
+      this.showTokenSuccess();
+      
+      // Отправляем событие завершения
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('token-setup-completed', {
+          detail: { token, success: true }
+        }));
+      }, 1500);
+      
+    } catch (error) {
+      this.showTokenError('Ошибка сохранения токена: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'));
+    }
+  }
+
+  /**
+   * Показывает ошибку токена
+   */
+  private showTokenError(message: string): void {
+    const tokenInput = document.getElementById('token-input') as HTMLInputElement;
+    if (!tokenInput) return;
+
+    // Создаем уведомление об ошибке
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = `
+      background: rgba(244, 67, 54, 0.2);
+      border: 1px solid rgba(244, 67, 54, 0.5);
+      border-radius: 6px;
+      padding: 12px;
+      margin-top: 10px;
+      color: #f44336;
+      font-size: 0.9rem;
+      animation: shake 0.5s ease-in-out;
+    `;
+    errorDiv.textContent = message;
+
+    // Удаляем предыдущую ошибку
+    const existingError = tokenInput.parentElement?.querySelector('[style*="244, 67, 54"]');
+    if (existingError) {
+      existingError.remove();
+    }
+
+    tokenInput.parentElement?.appendChild(errorDiv);
+
+    // Добавляем анимацию тряски
+    const shakeStyle = document.createElement('style');
+    shakeStyle.textContent = `
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-5px); }
+        75% { transform: translateX(5px); }
+      }
+    `;
+    document.head.appendChild(shakeStyle);
+
+    // Удаляем ошибку через 5 секунд
+    setTimeout(() => {
+      if (errorDiv.parentElement) {
+        errorDiv.remove();
+      }
+      if (shakeStyle.parentElement) {
+        shakeStyle.remove();
+      }
+    }, 5000);
+  }
+
+  /**
+   * Показывает успешное сохранение токена
+   */
+  private showTokenSuccess(): void {
+    const tokenSection = document.getElementById('token-input-section');
+    if (!tokenSection) return;
+
+    tokenSection.innerHTML = `
+      <div style="
+        background: rgba(76, 175, 80, 0.2);
+        border: 1px solid rgba(76, 175, 80, 0.5);
+        border-radius: 12px;
+        padding: 30px;
+        text-align: center;
+        animation: successPulse 0.6s ease-out;
+      ">
+        <div style="font-size: 3rem; margin-bottom: 15px;">✅</div>
+        <h3 style="color: #4caf50; margin: 0 0 10px 0; font-size: 1.3rem;">
+          Токен успешно сохранен!
+        </h3>
+        <p style="color: #ccc; margin: 0; font-size: 1rem;">
+          Начинаем создание вашей музыкальной галактики...
+        </p>
+      </div>
+    `;
+
+    // Добавляем анимацию успеха
+    const successStyle = document.createElement('style');
+    successStyle.textContent = `
+      @keyframes successPulse {
+        0% {
+          transform: scale(0.8);
+          opacity: 0;
+        }
+        50% {
+          transform: scale(1.05);
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+    `;
+    document.head.appendChild(successStyle);
+  }
+
+  /**
+   * Освобождает ресурсы
+   */
+  dispose(): void {
+    this.hide();
+    
+    // Удаляем стили
+    const modalStyles = document.getElementById('modal-styles');
+    if (modalStyles) {
+      modalStyles.remove();
+    }
+  }
+}
+```
+
+================================================================================
+
 ## File: src\ui\UIManager.ts
 
 ```
@@ -41549,6 +44209,50 @@ Tests for 3D rendering, shaders, materials, and visual effects.
   "exclude": [
     "node_modules",
     "dist"
+  ]
+}
+```
+
+================================================================================
+
+## File: vercel.json
+
+```
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/getYandexData.ts": {
+      "maxDuration": 30
+    },
+    "api/test.ts": {
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
+    }
   ]
 }
 ```

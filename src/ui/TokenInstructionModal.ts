@@ -155,7 +155,7 @@ export class TokenInstructionModal {
               <input 
                 type="text" 
                 id="token-input" 
-                placeholder="Например: y0_AgAAAAAj2vgeAAG8XgAAAAEJa-6RAAAdPHm_OlpI_4ludZXEeCSbWupQkA"
+                placeholder="Например: 3:1234567890.5.0.1234567890123:abcdef..."
                 style="
                   width: 100%;
                   padding: 15px;
@@ -188,7 +188,7 @@ export class TokenInstructionModal {
                   font-size: 0.9rem;
                   line-height: 1.4;
                 ">
-                  Токен может начинаться с y0_ или AQA и обычно довольно длинный (50+ символов).
+                  Session_id обычно начинается с цифры и содержит двоеточия (например: 3:1234567890.5.0...).
                 </p>
               </div>
             </div>
@@ -316,40 +316,11 @@ export class TokenInstructionModal {
   private getStepContent(): string {
     const steps = [
       {
-        icon: '🔧',
-        title: 'Подготовка (опционально)',
-        content: `
-          <p style="color: #ccc; line-height: 1.6; margin-bottom: 20px;">
-            Откройте DevTools в браузере (F12) и на вкладке <strong style="color: #4fc3f7;">Network</strong> включите троттлинг.
-          </p>
-          <div style="
-            background: rgba(255, 193, 7, 0.1);
-            border: 1px solid rgba(255, 193, 7, 0.3);
-            border-radius: 8px;
-            padding: 15px;
-            margin-top: 15px;
-          ">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-              <span style="font-size: 1.2rem;">💡</span>
-              <strong style="color: #ffc107;">Подсказка:</strong>
-            </div>
-            <p style="color: #ccc; margin: 0; font-size: 0.9rem;">
-              Это поможет замедлить редирект и даст больше времени для копирования токена.
-            </p>
-          </div>
-        `
-      },
-      {
         icon: '🌐',
-        title: 'Перейдите по OAuth ссылке',
+        title: 'Откройте Яндекс.Музыку',
         content: `
           <p style="color: #ccc; line-height: 1.6; margin-bottom: 20px;">
-            Перейдите по ссылке: <br>
-            <a href="https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d" 
-               target="_blank" 
-               style="color: #4fc3f7; text-decoration: none; word-break: break-all; font-size: 0.9rem;">
-              https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d
-            </a>
+            Откройте <a href="https://music.yandex.ru" target="_blank" style="color: #4fc3f7; text-decoration: none;">music.yandex.ru</a> в новой вкладке и войдите в свой аккаунт.
           </p>
           <div style="
             background: rgba(76, 175, 80, 0.1);
@@ -363,17 +334,41 @@ export class TokenInstructionModal {
               <strong style="color: #4caf50;">Важно:</strong>
             </div>
             <p style="color: #ccc; margin: 0; font-size: 0.9rem;">
-              Ссылка откроется в новой вкладке для удобства.
+              Убедитесь, что вы полностью авторизованы и можете видеть свою музыкальную библиотеку.
             </p>
           </div>
         `
       },
       {
-        icon: '🔐',
-        title: 'Авторизуйтесь',
+        icon: '🔧',
+        title: 'Откройте инструменты разработчика',
         content: `
           <p style="color: #ccc; line-height: 1.6; margin-bottom: 20px;">
-            Авторизуйтесь при необходимости и предоставьте доступ приложению к вашему аккаунту Яндекс.Музыки.
+            Нажмите клавишу <strong style="color: #4fc3f7;">F12</strong> или щелкните правой кнопкой мыши и выберите "Исследовать элемент".
+          </p>
+          <div style="
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+          ">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <span style="font-size: 1.2rem;">💡</span>
+              <strong style="color: #ffc107;">Подсказка:</strong>
+            </div>
+            <p style="color: #ccc; margin: 0; font-size: 0.9rem;">
+              В разных браузерах: Chrome/Edge - F12, Firefox - F12, Safari - Cmd+Option+I (Mac).
+            </p>
+          </div>
+        `
+      },
+      {
+        icon: '📱',
+        title: 'Перейдите на вкладку Application',
+        content: `
+          <p style="color: #ccc; line-height: 1.6; margin-bottom: 20px;">
+            В открывшихся инструментах разработчика найдите и нажмите на вкладку <strong style="color: #4fc3f7;">Application</strong> (или "Приложение").
           </p>
           <div style="
             background: rgba(255, 255, 255, 0.05);
@@ -382,21 +377,18 @@ export class TokenInstructionModal {
             margin-top: 15px;
           ">
             <p style="color: #ccc; margin: 0; font-size: 0.9rem;">
-              <strong>Что произойдет:</strong><br>
-              Яндекс попросит разрешение на доступ к вашей музыкальной библиотеке. Нажмите "Разрешить".
+              <strong>Если не видите вкладку Application:</strong><br>
+              Попробуйте найти вкладку "Storage" или нажмите на стрелочку ">>" чтобы увидеть скрытые вкладки.
             </p>
           </div>
         `
       },
       {
-        icon: '⚡',
-        title: 'Скопируйте ссылку быстро!',
+        icon: '🍪',
+        title: 'Найдите раздел Cookies',
         content: `
           <p style="color: #ccc; line-height: 1.6; margin-bottom: 20px;">
-            Браузер перенаправит на адрес вида:<br>
-            <code style="background: rgba(255,255,255,0.1); padding: 8px; border-radius: 4px; color: #4fc3f7; font-size: 0.8rem; word-break: break-all;">
-              https://music.yandex.ru/#access_token=AQAAAAAYc***&token_type=bearer&expires_in=31535645
-            </code>
+            В левом меню найдите раздел <strong style="color: #4fc3f7;">Cookies</strong> и разверните его. Выберите <strong>https://music.yandex.ru</strong>.
           </p>
           <div style="
             background: rgba(244, 67, 54, 0.1);
@@ -410,17 +402,17 @@ export class TokenInstructionModal {
               <strong style="color: #f44336;">Внимание:</strong>
             </div>
             <p style="color: #ccc; margin: 0; font-size: 0.9rem;">
-              Очень быстро произойдет редирект на другую страницу! Нужно успеть скопировать ссылку из адресной строки.
+              Если раздел Cookies пустой, убедитесь, что вы авторизованы на сайте music.yandex.ru.
             </p>
           </div>
         `
       },
       {
-        icon: '🎵',
-        title: 'Извлеките токен',
+        icon: '🔑',
+        title: 'Найдите Session_id',
         content: `
           <p style="color: #ccc; line-height: 1.6; margin-bottom: 20px;">
-            Ваш токен - это то, что находится после <strong style="color: #4fc3f7;">access_token=</strong> в скопированной ссылке.
+            В списке cookies найдите cookie с именем <strong style="color: #4fc3f7;">Session_id</strong> и скопируйте его значение (колонка Value).
           </p>
           <div style="
             background: rgba(255, 255, 255, 0.05);
@@ -430,19 +422,19 @@ export class TokenInstructionModal {
             border-left: 4px solid #4fc3f7;
           ">
             <p style="color: #ccc; margin: 0; font-size: 0.9rem;">
-              <strong style="color: #4fc3f7;">Пример:</strong><br>
-              Из ссылки <code style="background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 3px;">access_token=AQAAAAAYc123...</code><br>
-              Токен: <code style="background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 3px;">AQAAAAAYc123...</code>
+              <strong style="color: #4fc3f7;">Как выглядит:</strong><br>
+              Name: <code style="background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 3px;">Session_id</code><br>
+              Value: <code style="background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 3px;">3:1234567890.5.0.1234567890123:abcdef...</code>
             </p>
           </div>
         `
       },
       {
         icon: '🚀',
-        title: 'Введите токен',
+        title: 'Введите Session_id',
         content: `
           <p style="color: #ccc; line-height: 1.6; margin-bottom: 20px;">
-            Вставьте скопированный токен в поле ниже и нажмите кнопку для создания вашей музыкальной галактики.
+            Вставьте скопированное значение Session_id в поле ниже и нажмите кнопку для создания вашей музыкальной галактики.
           </p>
           <div style="
             background: rgba(76, 175, 80, 0.1);
@@ -456,7 +448,7 @@ export class TokenInstructionModal {
               <strong style="color: #4caf50;">Безопасность:</strong>
             </div>
             <p style="color: #ccc; margin: 0; font-size: 0.9rem;">
-              Токен сохраняется только локально в вашем браузере и используется исключительно для доступа к вашей музыкальной библиотеке.
+              Session_id сохраняется только локально в вашем браузере и используется исключительно для доступа к вашей музыкальной библиотеке.
             </p>
           </div>
         `
@@ -667,9 +659,11 @@ export class TokenInstructionModal {
   private isValidTokenFormat(token: string): boolean {
     if (token.length < 20) return false;
     
-    // Токен может начинаться с y0_ или быть в другом формате
-    // Основная проверка - достаточная длина и отсутствие пробелов
-    return !token.includes(' ') && token.length >= 20;
+    // Session_id обычно имеет формат: цифра:число.число.число.число:строка
+    // Например: 3:1234567890.5.0.1234567890123:abcdef...
+    const sessionIdPattern = /^\d+:\d+\.\d+\.\d+\.\d+:[a-zA-Z0-9]+/;
+    
+    return sessionIdPattern.test(token) && !token.includes(' ');
   }
 
   /**
