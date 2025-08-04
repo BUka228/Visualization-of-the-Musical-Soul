@@ -28,7 +28,7 @@ const YANDEX_API_BASE = 'https://api.music.yandex.net';
 /**
  * Serverless-функция для получения данных из Яндекс.Музыки
  */
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+module.exports = async function handler(req: VercelRequest, res: VercelResponse) {
   // Устанавливаем CORS заголовки
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
