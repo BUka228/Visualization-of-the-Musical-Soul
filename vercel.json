@@ -3,12 +3,10 @@
   "outputDirectory": "dist",
   "functions": {
     "api/getYandexData.ts": {
-      "maxDuration": 30,
-      "runtime": "nodejs18.x"
+      "maxDuration": 30
     },
     "api/test.ts": {
-      "maxDuration": 10,
-      "runtime": "nodejs18.x"
+      "maxDuration": 10
     }
   },
   "rewrites": [
