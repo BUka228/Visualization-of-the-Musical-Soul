@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест исправления камеры - Music Galaxy 3D</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        #instructions {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            max-width: 300px;
+        }
+        
+        .highlight {
+            color: #00ff00;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="info">
+            <div>🔮 Music Galaxy 3D - Тест исправления камеры</div>
+            <div>Статус: <span id="status">Загрузка...</span></div>
+            <div>Камера: <span id="camera-status">Инициализация...</span></div>
+        </div>
+        
+        <div id="instructions">
+            <div class="highlight">Инструкции по тестированию:</div>
+            <div>1. Дождитесь загрузки кристаллов</div>
+            <div>2. Кликните на любой кристалл</div>
+            <div>3. Проверьте, что камера фокусируется и НЕ сбрасывается</div>
+            <div>4. Нажмите R для сброса камеры</div>
+            <div>5. Используйте мышь для вращения</div>
+        </div>
+    </div>
+
+    <script src="dist/bundle.js"></script>
+    <script>
+        // Инициализация приложения
+        document.addEventListener('DOMContentLoaded', async () => {
+            const container = document.getElementById('container');
+            const statusElement = document.getElementById('status');
+            const cameraStatusElement = document.getElementById('camera-status');
+            
+            try {
+                statusElement.textContent = 'Инициализация...';
+                
+                // Создаем приложение
+                const app = new window.MusicGalaxy3D.Application(container, {
+                    cameraDistance: 50,
+                    enableShadows: true,
+                    enableEffects: true
+                });
+                
+                // Инициализируем приложение
+                await app.initialize();
+                statusElement.textContent = 'Загрузка данных...';
+                
+                // Загружаем данные
+                await app.loadData();
+                statusElement.textContent = 'Готово!';
+                
+                // Мониторинг состояния камеры
+                const sceneManager = app.getSceneManager();
+                const cameraController = sceneManager.getCinematicCameraController();
+                
+                setInterval(() => {
+                    if (cameraController) {
+                        const isFocused = cameraController.isFocused();
+                        const isAnimating = cameraController.isCameraAnimating();
+                        const focusedCrystal = cameraController.getFocusedCrystal();
+                        
+                        let status = 'Свободная';
+                        if (isAnimating) {
+                            status = 'Анимация...';
+                        } else if (isFocused && focusedCrystal) {
+                            status = `Фокус: ${focusedCrystal.name}`;
+                        }
+                        
+                        cameraStatusElement.textContent = status;
+                    }
+                }, 100);
+                
+                console.log('✅ Тест исправления камеры готов к использованию');
+                
+            } catch (error) {
+                console.error('❌ Ошибка инициализации:', error);
+                statusElement.textContent = `Ошибка: ${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html>

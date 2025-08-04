@@ -7,6 +7,7 @@ import { CrystalShaderMaterial } from '../materials/CrystalShaderMaterial';
 import { AlbumTextureManager } from '../materials/AlbumTextureManager';
 import { CrystalHoverSystem } from '../interaction/CrystalHoverSystem';
 import { SoulGalaxyAudioIntegration } from '../audio/SoulGalaxyAudioIntegration';
+import { CinematicCameraController } from '../camera/CinematicCameraController';
 
 /**
  * Система управления кристаллическими треками
@@ -23,6 +24,7 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
   private albumTextureManager: AlbumTextureManager;
   private hoverSystem: CrystalHoverSystem;
   private audioIntegration: SoulGalaxyAudioIntegration;
+  private cameraController?: CinematicCameraController;
 
   constructor() {
     this.pulseSystem = new CrystalPulseSystem();
@@ -196,6 +198,14 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
   }
 
   /**
+   * Устанавливает контроллер камеры для кинематографических переходов
+   */
+  setCameraController(cameraController: CinematicCameraController): void {
+    this.cameraController = cameraController;
+    console.log('📹 Camera controller integrated with Crystal Track System');
+  }
+
+  /**
    * Обрабатывает клик по кристаллу для воспроизведения аудио
    */
   async handleCrystalClick(trackId: string): Promise<void> {
@@ -213,15 +223,104 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
       // Убираем подсветку при клике
       this.clearHover();
       
+      // Используем кинематографический переход камеры если доступен
+      if (this.cameraController) {
+        await this.focusOnCrystalWithAnimation(crystalTrack);
+      } else {
+        // Fallback на базовый фокус
+        this.focusOnCrystal(crystalTrack);
+      }
+      
       // Воспроизводим трек с кинематографическим переходом
       await this.audioIntegration.playTrackWithTransition(crystalTrack, crystalMesh);
-      
-      // Фокусируемся на кристалле
-      this.focusOnCrystal(crystalTrack);
       
     } catch (error) {
       console.error(`❌ Failed to play crystal: ${crystalTrack.name}`, error);
     }
+  }
+
+  /**
+   * Фокусируется на кристалле с кинематографической анимацией камеры
+   */
+  async focusOnCrystalWithAnimation(crystal: CrystalTrack): Promise<void> {
+    if (!this.cameraController) {
+      console.warn('⚠️ Camera controller not available, using basic focus');
+      this.focusOnCrystal(crystal);
+      return;
+    }
+
+    console.log(`🎬 Starting cinematic focus on crystal: ${crystal.name} by ${crystal.artist}`);
+
+    try {
+      // Запускаем кинематографический переход камеры
+      await this.cameraController.focusOnCrystal(crystal);
+      
+      // Обновляем состояние кристалла
+      crystal.isFocused = true;
+      
+      // Увеличиваем интенсивность свечения сфокусированного кристалла
+      const mesh = this.findCrystalMesh(crystal.id);
+      if (mesh && mesh.material instanceof CrystalShaderMaterial) {
+        mesh.material.setFocused(true);
+        mesh.material.setEmissiveIntensity(0.8);
+      }
+      
+      console.log(`✅ Cinematic focus completed on crystal: ${crystal.name}`);
+      
+    } catch (error) {
+      console.error(`❌ Failed to focus on crystal with animation: ${crystal.name}`, error);
+      // Fallback на базовый фокус
+      this.focusOnCrystal(crystal);
+    }
+  }
+
+  /**
+   * Возвращает камеру к предыдущей позиции
+   */
+  async returnCameraToPreviousPosition(): Promise<void> {
+    if (!this.cameraController) {
+      console.warn('⚠️ Camera controller not available');
+      return;
+    }
+
+    console.log('🔄 Returning camera to previous position');
+
+    try {
+      // Убираем фокус с текущего кристалла
+      const focusedCrystal = this.cameraController.getFocusedCrystal();
+      if (focusedCrystal) {
+        focusedCrystal.isFocused = false;
+        
+        // Возвращаем нормальную интенсивность свечения
+        const mesh = this.findCrystalMesh(focusedCrystal.id);
+        if (mesh && mesh.material instanceof CrystalShaderMaterial) {
+          mesh.material.setFocused(false);
+          mesh.material.setEmissiveIntensity(0.3);
+        }
+      }
+      
+      // Запускаем анимацию возврата камеры
+      await this.cameraController.returnToPreviousPosition();
+      
+      console.log('✅ Camera returned to previous position');
+      
+    } catch (error) {
+      console.error('❌ Failed to return camera to previous position:', error);
+    }
+  }
+
+  /**
+   * Проверяет, находится ли камера в состоянии фокуса
+   */
+  isCameraFocused(): boolean {
+    return this.cameraController ? this.cameraController.isFocused() : false;
+  }
+
+  /**
+   * Получает текущий сфокусированный кристалл (через камеру)
+   */
+  getFocusedCrystal(): CrystalTrack | undefined {
+    return this.cameraController ? this.cameraController.getFocusedCrystal() : undefined;
   }
 
   /**

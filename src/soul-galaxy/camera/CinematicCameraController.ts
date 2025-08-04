@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { FocusAnimationSystem } from './FocusAnimationSystem';
+import { DepthOfFieldSystem } from './DepthOfFieldSystem';
+import { CrystalTrack } from '../types';
 
 /**
  * Кинематографический контроллер камеры с плавной инерцией как в космосиме
@@ -9,6 +12,10 @@ export class CinematicCameraController {
     private camera: THREE.PerspectiveCamera;
     private orbitControls: OrbitControls;
     private renderer: THREE.WebGLRenderer;
+    
+    // Системы кинематографических эффектов
+    private focusAnimationSystem: FocusAnimationSystem;
+    private depthOfFieldSystem?: DepthOfFieldSystem;
     
     // Система инерции
     private velocity: THREE.Vector3 = new THREE.Vector3();
@@ -34,9 +41,15 @@ export class CinematicCameraController {
     private zoomSensitivity: number = 1.0;
     private panSensitivity: number = 0.8;
     
-    constructor(camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer) {
+    constructor(camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer, scene?: THREE.Scene) {
         this.camera = camera;
         this.renderer = renderer;
+        
+        // Создаем системы кинематографических эффектов
+        if (scene) {
+            this.depthOfFieldSystem = new DepthOfFieldSystem(renderer, scene, camera);
+        }
+        this.focusAnimationSystem = new FocusAnimationSystem(camera, this.depthOfFieldSystem);
         
         // Создаем OrbitControls для совместимости
         this.orbitControls = new OrbitControls(camera, renderer.domElement);
@@ -332,13 +345,138 @@ export class CinematicCameraController {
     }
     
     /**
+     * Фокусировка на кристалле с кинематографическим переходом
+     */
+    public async focusOnCrystal(crystal: CrystalTrack): Promise<void> {
+        console.log(`🎯 Focusing camera on crystal: ${crystal.name} by ${crystal.artist}`);
+        
+        // Сохраняем текущий режим, но НЕ переключаем его во время анимации
+        const wasInertialMode = this.isInertialMode;
+        
+        // Останавливаем инерцию, но не переключаем на OrbitControls
+        this.velocity.set(0, 0, 0);
+        this.angularVelocity.set(0, 0, 0);
+        
+        try {
+            // Запускаем анимацию фокуса
+            await this.focusAnimationSystem.focusOnCrystal(crystal);
+            
+            console.log(`✅ Camera focused on crystal: ${crystal.name}`);
+        } catch (error) {
+            console.error('❌ Failed to focus on crystal:', error);
+        }
+        // Не восстанавливаем режим - оставляем как есть
+    }
+    
+    /**
+     * Возврат к предыдущей позиции камеры
+     */
+    public async returnToPreviousPosition(): Promise<void> {
+        console.log('🔄 Returning camera to previous position');
+        
+        // Останавливаем инерцию, но не переключаем режимы
+        this.velocity.set(0, 0, 0);
+        this.angularVelocity.set(0, 0, 0);
+        
+        try {
+            // Запускаем анимацию возврата
+            await this.focusAnimationSystem.returnToPreviousPosition();
+            
+            console.log('✅ Camera returned to previous position');
+        } catch (error) {
+            console.error('❌ Failed to return to previous position:', error);
+        }
+        // Не переключаем режимы - оставляем как есть
+    }
+    
+    /**
+     * Проверяет, находится ли камера в состоянии фокуса
+     */
+    public isFocused(): boolean {
+        return this.focusAnimationSystem.isFocused();
+    }
+    
+    /**
+     * Проверяет, выполняется ли анимация камеры
+     */
+    public isCameraAnimating(): boolean {
+        return this.focusAnimationSystem.isAnimating();
+    }
+    
+    /**
+     * Получает текущий сфокусированный кристалл
+     */
+    public getFocusedCrystal(): CrystalTrack | undefined {
+        return this.focusAnimationSystem.getFocusedCrystal();
+    }
+    
+    /**
+     * Настройка параметров анимации фокуса
+     */
+    public setFocusAnimationSettings(settings: {
+        transitionDuration?: number;
+        easing?: 'linear' | 'easeInOut' | 'easeOut' | 'easeIn';
+        optimalDistance?: number;
+        optimalAngle?: number;
+        returnDuration?: number;
+        enableDepthOfField?: boolean;
+    }): void {
+        this.focusAnimationSystem.setSettings(settings);
+    }
+    
+    /**
+     * Применение предустановки анимации фокуса
+     */
+    public applyFocusPreset(preset: 'fast' | 'smooth' | 'cinematic' | 'dramatic'): void {
+        this.focusAnimationSystem.applyPreset(preset);
+    }
+    
+    /**
+     * Установка коллбэков для событий фокуса
+     */
+    public setFocusCallbacks(callbacks: {
+        onFocusStart?: (crystal: CrystalTrack) => void;
+        onFocusComplete?: (crystal: CrystalTrack) => void;
+        onReturnStart?: () => void;
+        onReturnComplete?: () => void;
+    }): void {
+        this.focusAnimationSystem.setCallbacks(callbacks);
+    }
+    
+    /**
+     * Получение системы depth of field
+     */
+    public getDepthOfFieldSystem(): DepthOfFieldSystem | undefined {
+        return this.depthOfFieldSystem;
+    }
+    
+    /**
+     * Получение системы анимации фокуса
+     */
+    public getFocusAnimationSystem(): FocusAnimationSystem {
+        return this.focusAnimationSystem;
+    }
+    
+    /**
      * Обновление (вызывается в цикле рендеринга)
      */
     public update(deltaTime: number = 0.016): void {
-        if (this.isInertialMode) {
-            this.updateInertia(deltaTime);
-        } else {
-            this.orbitControls.update();
+        // Обновляем систему анимации фокуса
+        this.focusAnimationSystem.update(deltaTime);
+        
+        // Обновляем depth of field если включен
+        if (this.depthOfFieldSystem) {
+            // Рендеринг будет выполнен через depth of field систему
+            this.depthOfFieldSystem.render(deltaTime);
+        }
+        
+        // Обновляем управление камерой только если не идет анимация фокуса
+        if (!this.focusAnimationSystem.isAnimating()) {
+            if (this.isInertialMode) {
+                this.updateInertia(deltaTime);
+            } else {
+                this.orbitControls.update();
+            }
         }
     }
     
@@ -353,6 +491,12 @@ export class CinematicCameraController {
         domElement.removeEventListener('mousemove', this.onMouseMove.bind(this));
         domElement.removeEventListener('mouseup', this.onMouseUp.bind(this));
         domElement.removeEventListener('wheel', this.onWheel.bind(this));
+        
+        // Освобождаем системы кинематографических эффектов
+        this.focusAnimationSystem.dispose();
+        if (this.depthOfFieldSystem) {
+            this.depthOfFieldSystem.dispose();
+        }
         
         // Освобождаем OrbitControls
         this.orbitControls.dispose();

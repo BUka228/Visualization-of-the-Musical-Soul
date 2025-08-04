@@ -2,10 +2,12 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { InteractionManager as IInteractionManager, SceneManager, AudioManager } from '../types';
 import { AudioManager as AudioManagerImpl } from '../audio/AudioManager';
+import { CinematicCameraController } from '../soul-galaxy/camera/CinematicCameraController';
 
 export class InteractionManager implements IInteractionManager {
   private sceneManager?: SceneManager;
   private controls?: OrbitControls;
+  private cinematicCameraController?: CinematicCameraController;
   private raycaster: THREE.Raycaster;
   private mouse: THREE.Vector2;
   private container?: HTMLElement;

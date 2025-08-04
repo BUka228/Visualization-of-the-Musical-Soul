@@ -6,6 +6,7 @@ import { EffectsManager } from '../effects/EffectsManager';
 import { PerformanceOptimizer } from '../performance/PerformanceOptimizer';
 import { PerformanceWarning } from '../performance/PerformanceMonitor';
 import { SoulGalaxyRenderer } from '../soul-galaxy/core/SoulGalaxyRenderer';
+import { CinematicCameraController } from '../soul-galaxy/camera/CinematicCameraController';
 
 export class SceneManager implements ISceneManager {
   private scene: THREE.Scene;
@@ -37,6 +38,9 @@ export class SceneManager implements ISceneManager {
 
   // Soul Galaxy система
   private soulGalaxyRenderer: SoulGalaxyRenderer;
+  
+  // Кинематографический контроллер камеры
+  private cinematicCameraController!: CinematicCameraController;
 
   constructor(container: HTMLElement, config: SceneConfig) {
     this.container = container;
@@ -94,8 +98,21 @@ export class SceneManager implements ISceneManager {
     // Инициализация менеджера эффектов
     this.effectsManager.initialize(this.scene, this.camera, this.interactionManager.getAudioManager());
     
+    // Создание кинематографического контроллера камеры
+    this.cinematicCameraController = new CinematicCameraController(
+      this.camera, 
+      this.renderer, 
+      this.scene
+    );
+    
     // Инициализация Soul Galaxy рендерера (единственный режим) с контейнером для HUD
     this.soulGalaxyRenderer.initialize(this.scene, this.camera, this.container);
+    
+    // Интеграция кинематографического контроллера с системой кристаллов
+    const crystalTrackSystem = this.soulGalaxyRenderer.getCrystalTrackSystem();
+    crystalTrackSystem.setCameraController(this.cinematicCameraController);
+    
+    console.log('📹 Cinematic camera controller integrated with Soul Galaxy system');
     
     // Запуск цикла рендеринга
     this.startRenderLoop();
@@ -290,6 +307,11 @@ export class SceneManager implements ISceneManager {
   }
 
   updateScene(): void {
+    // Обновляем кинематографический контроллер камеры
+    if (this.cinematicCameraController) {
+      this.cinematicCameraController.update(16 / 1000); // Конвертируем в секунды
+    }
+    
     // AnimationManager теперь управляет всеми анимациями
     // Обновляем эффекты
     this.effectsManager.update(16); // ~60 FPS
@@ -303,6 +325,11 @@ export class SceneManager implements ISceneManager {
 
   dispose(): void {
     console.log('Освобождение ресурсов SceneManager...');
+    
+    // Освобождение ресурсов кинематографического контроллера камеры
+    if (this.cinematicCameraController) {
+      this.cinematicCameraController.dispose();
+    }
     
     // Освобождение ресурсов Soul Galaxy рендерера
     this.soulGalaxyRenderer.dispose();
@@ -384,5 +411,9 @@ export class SceneManager implements ISceneManager {
 
   getSoulGalaxyRenderer(): SoulGalaxyRenderer {
     return this.soulGalaxyRenderer;
+  }
+
+  getCinematicCameraController(): CinematicCameraController {
+    return this.cinematicCameraController;
   }
 }

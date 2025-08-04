@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Focus Animation System Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            color: white;
+            min-width: 300px;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #ccc;
+        }
+        
+        .control-group button {
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            padding: 8px 16px;
+            margin: 2px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .control-group button:hover {
+            background: #555;
+        }
+        
+        .control-group button.active {
+            background: #0066cc;
+            border-color: #0088ff;
+        }
+        
+        .control-group select {
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            padding: 5px;
+            border-radius: 3px;
+            width: 100%;
+        }
+        
+        #info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            color: white;
+            font-size: 12px;
+            max-width: 400px;
+        }
+        
+        .info-item {
+            margin-bottom: 5px;
+        }
+        
+        .info-label {
+            color: #aaa;
+            display: inline-block;
+            width: 120px;
+        }
+        
+        .info-value {
+            color: #fff;
+        }
+        
+        .status-animating {
+            color: #ff6600;
+        }
+        
+        .status-focused {
+            color: #00cc66;
+        }
+        
+        .status-idle {
+            color: #666;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="loading">Loading Focus Animation Test...</div>
+        
+        <div id="controls" style="display: none;">
+            <h3>Focus Animation System Test</h3>
+            
+            <div class="control-group">
+                <label>Crystal Selection:</label>
+                <select id="crystalSelect">
+                    <option value="">Select a crystal to focus on...</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label>Animation Presets:</label>
+                <button id="presetFast">Fast</button>
+                <button id="presetSmooth" class="active">Smooth</button>
+                <button id="presetCinematic">Cinematic</button>
+                <button id="presetDramatic">Dramatic</button>
+            </div>
+            
+            <div class="control-group">
+                <label>Actions:</label>
+                <button id="focusBtn" disabled>Focus on Crystal</button>
+                <button id="returnBtn" disabled>Return to Overview</button>
+                <button id="resetBtn">Reset Camera</button>
+            </div>
+            
+            <div class="control-group">
+                <label>Camera Mode:</label>
+                <button id="inertialBtn" class="active">Inertial</button>
+                <button id="orbitBtn">Orbit Controls</button>
+            </div>
+            
+            <div class="control-group">
+                <label>Depth of Field:</label>
+                <button id="dofToggle">Toggle DoF</button>
+            </div>
+        </div>
+        
+        <div id="info" style="display: none;">
+            <div class="info-item">
+                <span class="info-label">Animation Status:</span>
+                <span class="info-value" id="animationStatus">Idle</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Camera State:</span>
+                <span class="info-value" id="cameraState">Overview</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Focused Crystal:</span>
+                <span class="info-value" id="focusedCrystal">None</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Animation Progress:</span>
+                <span class="info-value" id="animationProgress">0%</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Camera Position:</span>
+                <span class="info-value" id="cameraPosition">0, 0, 0</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Depth of Field:</span>
+                <span class="info-value" id="dofStatus">Disabled</span>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { CrystalTrackSystem } from '../../src/soul-galaxy/core/CrystalTrackSystem.js';
+        import { CinematicCameraController } from '../../src/soul-galaxy/camera/CinematicCameraController.js';
+        import { DeepSpaceEnvironment } from '../../src/soul-galaxy/environment/DeepSpaceEnvironment.js';
+
+        class FocusAnimationTest {
+            constructor() {
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.crystalSystem = null;
+                this.cameraController = null;
+                this.spaceEnvironment = null;
+                this.animationId = null;
+                this.clock = new THREE.Clock();
+                
+                this.init();
+            }
+            
+            async init() {
+                try {
+                    console.log('🚀 Initializing Focus Animation Test...');
+                    
+                    // Создаем базовую 3D сцену
+                    this.setupScene();
+                    
+                    // Создаем космическое окружение
+                    await this.setupEnvironment();
+                    
+                    // Создаем тестовые кристаллы
+                    await this.setupCrystals();
+                    
+                    // Настраиваем контролы
+                    this.setupControls();
+                    
+                    // Запускаем цикл рендеринга
+                    this.startRenderLoop();
+                    
+                    // Показываем интерфейс
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('controls').style.display = 'block';
+                    document.getElementById('info').style.display = 'block';
+                    
+                    console.log('✅ Focus Animation Test initialized successfully');
+                    
+                } catch (error) {
+                    console.error('❌ Failed to initialize test:', error);
+                    document.getElementById('loading').textContent = 'Failed to load test: ' + error.message;
+                }
+            }
+            
+            setupScene() {
+                // Создаем сцену
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x000011);
+                
+                // Создаем камеру
+                this.camera = new THREE.PerspectiveCamera(
+                    75,
+                    window.innerWidth / window.innerHeight,
+                    0.1,
+                    1000
+                );
+                this.camera.position.set(0, 0, 80);
+                
+                // Создаем рендерер
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                document.getElementById('container').appendChild(this.renderer.domElement);
+                
+                // Создаем контроллер камеры
+                this.cameraController = new CinematicCameraController(
+                    this.camera, 
+                    this.renderer, 
+                    this.scene
+                );
+                
+                // Настраиваем коллбэки для отслеживания состояния
+                this.cameraController.setFocusCallbacks({
+                    onFocusStart: (crystal) => {
+                        console.log(`🎯 Focus started on: ${crystal.name}`);
+                        this.updateInfo();
+                    },
+                    onFocusComplete: (crystal) => {
+                        console.log(`✅ Focus completed on: ${crystal.name}`);
+                        this.updateInfo();
+                    },
+                    onReturnStart: () => {
+                        console.log('🔄 Return started');
+                        this.updateInfo();
+                    },
+                    onReturnComplete: () => {
+                        console.log('✅ Return completed');
+                        this.updateInfo();
+                    }
+                });
+                
+                // Добавляем освещение
+                const ambientLight = new THREE.AmbientLight(0x404040, 0.3);
+                this.scene.add(ambientLight);
+                
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(50, 50, 50);
+                directionalLight.castShadow = true;
+                this.scene.add(directionalLight);
+                
+                // Обработка изменения размера окна
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                    
+                    const dofSystem = this.cameraController.getDepthOfFieldSystem();
+                    if (dofSystem) {
+                        dofSystem.handleResize(window.innerWidth, window.innerHeight);
+                    }
+                });
+            }
+            
+            async setupEnvironment() {
+                // Создаем космическое окружение (если доступно)
+                try {
+                    this.spaceEnvironment = new DeepSpaceEnvironment();
+                    this.spaceEnvironment.initialize(this.scene, this.camera);
+                    console.log('🌌 Deep space environment created');
+                } catch (error) {
+                    console.warn('⚠️ Deep space environment not available:', error);
+                }
+            }
+            
+            async setupCrystals() {
+                // Создаем систему кристаллов
+                this.crystalSystem = new CrystalTrackSystem();
+                this.crystalSystem.initialize(this.scene, this.camera, document.getElementById('container'));
+                
+                // Интегрируем с контроллером камеры
+                this.crystalSystem.setCameraController(this.cameraController);
+                
+                // Создаем тестовые треки
+                const testTracks = this.generateTestTracks();
+                
+                // Создаем кластер кристаллов
+                await this.crystalSystem.createCrystalCluster(testTracks);
+                
+                // Заполняем селектор кристаллов
+                this.populateCrystalSelector(testTracks);
+                
+                // Настраиваем обработку кликов мыши
+                this.setupMouseInteraction();
+            }
+            
+            generateTestTracks() {
+                const genres = ['metal', 'rock', 'punk', 'electronic', 'jazz', 'classical', 'pop', 'indie'];
+                const colors = ['#FF0040', '#0080FF', '#00FF40', '#8000FF', '#FFD700', '#E0E0FF', '#FF0080', '#00FFFF'];
+                
+                return Array.from({ length: 20 }, (_, i) => ({
+                    id: `test-track-${i}`,
+                    name: `Test Crystal ${i + 1}`,
+                    artist: `Test Artist ${Math.floor(i / 3) + 1}`,
+                    album: `Test Album ${Math.floor(i / 5) + 1}`,
+                    genre: genres[i % genres.length],
+                    color: colors[i % colors.length],
+                    duration: 180 + Math.random() * 120,
+                    energy: Math.random(),
+                    valence: Math.random(),
+                    danceability: Math.random(),
+                    acousticness: Math.random(),
+                    instrumentalness: Math.random(),
+                    liveness: Math.random(),
+                    speechiness: Math.random(),
+                    tempo: 80 + Math.random() * 120,
+                    loudness: -20 + Math.random() * 15,
+                    position: new THREE.Vector3()
+                }));
+            }
+            
+            populateCrystalSelector(tracks) {
+                const selector = document.getElementById('crystalSelect');
+                tracks.forEach(track => {
+                    const option = document.createElement('option');
+                    option.value = track.id;
+                    option.textContent = `${track.name} - ${track.artist} (${track.genre})`;
+                    selector.appendChild(option);
+                });
+            }
+            
+            setupMouseInteraction() {
+                const raycaster = new THREE.Raycaster();
+                const mouse = new THREE.Vector2();
+                
+                // Обработка движения мыши для подсветки
+                this.renderer.domElement.addEventListener('mousemove', (event) => {
+                    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                    
+                    this.crystalSystem.updateMousePosition(mouse.x, mouse.y);
+                });
+                
+                // Обработка кликов для фокуса
+                this.renderer.domElement.addEventListener('click', async (event) => {
+                    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                    
+                    raycaster.setFromCamera(mouse, this.camera);
+                    const crystalCluster = this.crystalSystem.getCrystalCluster();
+                    
+                    if (crystalCluster) {
+                        const intersects = raycaster.intersectObjects(crystalCluster.children, false);
+                        
+                        if (intersects.length > 0) {
+                            const clickedMesh = intersects[0].object;
+                            const trackId = clickedMesh.userData.trackId;
+                            
+                            if (trackId) {
+                                await this.crystalSystem.handleCrystalClick(trackId);
+                                this.updateInfo();
+                            }
+                        }
+                    }
+                });
+            }
+            
+            setupControls() {
+                // Селектор кристаллов
+                const crystalSelect = document.getElementById('crystalSelect');
+                crystalSelect.addEventListener('change', () => {
+                    const focusBtn = document.getElementById('focusBtn');
+                    focusBtn.disabled = !crystalSelect.value;
+                });
+                
+                // Кнопка фокуса
+                document.getElementById('focusBtn').addEventListener('click', async () => {
+                    const trackId = crystalSelect.value;
+                    if (trackId) {
+                        await this.crystalSystem.handleCrystalClick(trackId);
+                        this.updateInfo();
+                    }
+                });
+                
+                // Кнопка возврата
+                document.getElementById('returnBtn').addEventListener('click', async () => {
+                    await this.crystalSystem.returnCameraToPreviousPosition();
+                    this.updateInfo();
+                });
+                
+                // Кнопка сброса
+                document.getElementById('resetBtn').addEventListener('click', () => {
+                    this.cameraController.resetCamera();
+                    this.updateInfo();
+                });
+                
+                // Предустановки анимации
+                document.getElementById('presetFast').addEventListener('click', () => {
+                    this.cameraController.applyFocusPreset('fast');
+                    this.setActivePreset('presetFast');
+                });
+                
+                document.getElementById('presetSmooth').addEventListener('click', () => {
+                    this.cameraController.applyFocusPreset('smooth');
+                    this.setActivePreset('presetSmooth');
+                });
+                
+                document.getElementById('presetCinematic').addEventListener('click', () => {
+                    this.cameraController.applyFocusPreset('cinematic');
+                    this.setActivePreset('presetCinematic');
+                });
+                
+                document.getElementById('presetDramatic').addEventListener('click', () => {
+                    this.cameraController.applyFocusPreset('dramatic');
+                    this.setActivePreset('presetDramatic');
+                });
+                
+                // Режимы камеры
+                document.getElementById('inertialBtn').addEventListener('click', () => {
+                    this.cameraController.setInertialMode(true);
+                    this.setActiveCameraMode('inertialBtn');
+                });
+                
+                document.getElementById('orbitBtn').addEventListener('click', () => {
+                    this.cameraController.setInertialMode(false);
+                    this.setActiveCameraMode('orbitBtn');
+                });
+                
+                // Переключение Depth of Field
+                document.getElementById('dofToggle').addEventListener('click', () => {
+                    const dofSystem = this.cameraController.getDepthOfFieldSystem();
+                    if (dofSystem) {
+                        if (dofSystem.isDepthOfFieldEnabled()) {
+                            dofSystem.disableDepthOfField();
+                        } else {
+                            dofSystem.enableDepthOfField();
+                        }
+                        this.updateInfo();
+                    }
+                });
+            }
+            
+            setActivePreset(activeId) {
+                ['presetFast', 'presetSmooth', 'presetCinematic', 'presetDramatic'].forEach(id => {
+                    document.getElementById(id).classList.toggle('active', id === activeId);
+                });
+            }
+            
+            setActiveCameraMode(activeId) {
+                ['inertialBtn', 'orbitBtn'].forEach(id => {
+                    document.getElementById(id).classList.toggle('active', id === activeId);
+                });
+            }
+            
+            startRenderLoop() {
+                const animate = () => {
+                    this.animationId = requestAnimationFrame(animate);
+                    
+                    const deltaTime = this.clock.getDelta();
+                    
+                    // Обновляем контроллер камеры
+                    this.cameraController.update(deltaTime);
+                    
+                    // Обновляем систему кристаллов
+                    this.crystalSystem.updatePulsation(deltaTime);
+                    this.crystalSystem.rotateCluster(deltaTime);
+                    
+                    // Обновляем космическое окружение
+                    if (this.spaceEnvironment) {
+                        this.spaceEnvironment.updateParallax(this.camera.position);
+                    }
+                    
+                    // Рендерим сцену
+                    const dofSystem = this.cameraController.getDepthOfFieldSystem();
+                    if (dofSystem && dofSystem.isDepthOfFieldEnabled()) {
+                        dofSystem.render(deltaTime);
+                    } else {
+                        this.renderer.render(this.scene, this.camera);
+                    }
+                    
+                    // Обновляем информацию
+                    this.updateInfo();
+                };
+                
+                animate();
+            }
+            
+            updateInfo() {
+                const focusSystem = this.cameraController.getFocusAnimationSystem();
+                const stats = focusSystem.getPerformanceStats();
+                const dofSystem = this.cameraController.getDepthOfFieldSystem();
+                
+                // Статус анимации
+                let statusText = 'Idle';
+                let statusClass = 'status-idle';
+                
+                if (stats.isAnimating) {
+                    statusText = 'Animating';
+                    statusClass = 'status-animating';
+                } else if (stats.isFocused) {
+                    statusText = 'Focused';
+                    statusClass = 'status-focused';
+                }
+                
+                const statusElement = document.getElementById('animationStatus');
+                statusElement.textContent = statusText;
+                statusElement.className = `info-value ${statusClass}`;
+                
+                // Состояние камеры
+                document.getElementById('cameraState').textContent = 
+                    stats.isFocused ? 'Focused' : 'Overview';
+                
+                // Сфокусированный кристалл
+                document.getElementById('focusedCrystal').textContent = 
+                    stats.focusedCrystal || 'None';
+                
+                // Прогресс анимации
+                document.getElementById('animationProgress').textContent = 
+                    `${Math.round(stats.animationProgress * 100)}%`;
+                
+                // Позиция камеры
+                const pos = this.camera.position;
+                document.getElementById('cameraPosition').textContent = 
+                    `${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}`;
+                
+                // Статус Depth of Field
+                document.getElementById('dofStatus').textContent = 
+                    dofSystem && dofSystem.isDepthOfFieldEnabled() ? 'Enabled' : 'Disabled';
+                
+                // Обновляем доступность кнопок
+                document.getElementById('returnBtn').disabled = !stats.isFocused;
+            }
+            
+            dispose() {
+                if (this.animationId) {
+                    cancelAnimationFrame(this.animationId);
+                }
+                
+                if (this.crystalSystem) {
+                    this.crystalSystem.dispose();
+                }
+                
+                if (this.cameraController) {
+                    this.cameraController.dispose();
+                }
+                
+                if (this.spaceEnvironment) {
+                    this.spaceEnvironment.dispose();
+                }
+                
+                if (this.renderer) {
+                    this.renderer.dispose();
+                }
+            }
+        }
+        
+        // Запускаем тест
+        const test = new FocusAnimationTest();
+        
+        // Очистка при закрытии страницы
+        window.addEventListener('beforeunload', () => {
+            test.dispose();
+        });
+    </script>
+</body>
+</html>
