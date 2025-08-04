@@ -1,32 +1,10 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-
-// Интерфейсы для данных Яндекс.Музыки
-interface ProcessedTrack {
-  id: string;
-  title: string;
-  artist: string;
-  album: string;
-  duration: number;
-  genre: string;
-  cover_url?: string;
-  preview_url?: string;
-  available: boolean;
-}
-
-interface YandexMusicData {
-  metadata: {
-    total_tracks: number;
-    generated_at: string;
-    source: string;
-  };
-  tracks: ProcessedTrack[];
-}
+// JavaScript версия API функции для тестирования
 
 /**
  * Главная Serverless-функция для получения данных из Яндекс.Музыки
  * Использует прямые HTTP запросы к API
  */
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req, res) {
   // Обработка CORS для локальной разработки и preflight-запросов
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -86,7 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const likesData = await likesResponse.json();
-    const trackIds = likesData.result.library.tracks.map((track: any) => track.id);
+    const trackIds = likesData.result.library.tracks.map(track => track.id);
 
     if (trackIds.length === 0) {
       console.log('No liked tracks found.');
@@ -104,7 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Получаем полную информацию о треках (батчами по 100)
     const batchSize = 100;
-    const allTracks: any[] = [];
+    const allTracks = [];
 
     for (let i = 0; i < trackIds.length; i += batchSize) {
       const batch = trackIds.slice(i, i + batchSize);
@@ -126,13 +104,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`Fetched full info for ${allTracks.length} tracks.`);
 
     // Обрабатываем треки
-    const processedTracks: ProcessedTrack[] = allTracks
-      .filter((track: any) => track.available)
-      .map((track: any): ProcessedTrack => {
+    const processedTracks = allTracks
+      .filter(track => track.available)
+      .map(track => {
         return {
           id: String(track.id),
           title: track.title || 'Unknown Title',
-          artist: track.artists?.map((a: any) => a.name).join(', ') || 'Unknown Artist',
+          artist: track.artists?.map(a => a.name).join(', ') || 'Unknown Artist',
           album: track.albums?.[0]?.title || 'Unknown Album',
           duration: Math.floor((track.durationMs || 0) / 1000),
           genre: track.albums?.[0]?.genre || 'unknown',
@@ -145,7 +123,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`Processed ${processedTracks.length} available tracks.`);
 
     // Формируем и отправляем успешный ответ
-    const result: YandexMusicData = {
+    const result = {
       metadata: {
         total_tracks: processedTracks.length,
         generated_at: new Date().toISOString(),
@@ -179,3 +157,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+module.exports = { default: handler };
