@@ -9,6 +9,7 @@ import { TextureClaritySystem } from '../materials/TextureClaritySystem';
 import { CrystalHoverSystem } from '../interaction/CrystalHoverSystem';
 import { SoulGalaxyAudioIntegration } from '../audio/SoulGalaxyAudioIntegration';
 import { CinematicCameraController } from '../camera/CinematicCameraController';
+import { CrystalRotationSystem } from '../effects/CrystalRotationSystem';
 
 /**
  * Система управления кристаллическими треками
@@ -27,6 +28,7 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
   private hoverSystem: CrystalHoverSystem;
   private audioIntegration: SoulGalaxyAudioIntegration;
   private cameraController?: CinematicCameraController;
+  private rotationSystem: CrystalRotationSystem;
 
   constructor() {
     this.pulseSystem = new CrystalPulseSystem();
@@ -46,6 +48,13 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
     });
     this.hoverSystem = new CrystalHoverSystem();
     this.audioIntegration = new SoulGalaxyAudioIntegration();
+    this.rotationSystem = new CrystalRotationSystem({
+      baseRotationSpeed: 0.3,
+      bpmSpeedMultiplier: 0.005,
+      transitionDuration: 2000,
+      useEnergyFallback: true,
+      rotationAxes: new THREE.Vector3(0.2, 1.0, 0.3)
+    });
   }
 
   // Конфигурация кластера
@@ -68,6 +77,9 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
     
     // Инициализируем аудио интеграцию
     this.audioIntegration.initialize();
+    
+    // Настраиваем коллбэки для вращения кристаллов
+    this.setupRotationCallbacks();
     
     console.log('✅ Crystal Track System initialized');
   }
@@ -362,6 +374,13 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
   }
 
   /**
+   * Получает систему вращения кристаллов
+   */
+  getRotationSystem(): CrystalRotationSystem {
+    return this.rotationSystem;
+  }
+
+  /**
    * Получает текущий воспроизводимый трек
    */
   getCurrentPlayingTrack(): CrystalTrack | undefined {
@@ -385,6 +404,9 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
 
   dispose(): void {
     console.log('🗑️ Disposing Crystal Track System...');
+    
+    // Dispose of the rotation system
+    this.rotationSystem.dispose();
     
     // Dispose of the audio integration
     this.audioIntegration.dispose();
@@ -586,6 +608,25 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
 
   setClusterRotationSpeed(speed: number): void {
     this.clusterRotationSpeed = speed;
+  }
+
+  /**
+   * Настраивает коллбэки для интеграции системы вращения с аудио
+   */
+  private setupRotationCallbacks(): void {
+    // Настраиваем коллбэк для начала вращения при воспроизведении
+    this.audioIntegration.setOnRotationStart((track: CrystalTrack, mesh: THREE.Mesh) => {
+      console.log(`🔄 Starting rotation for playing crystal: ${track.name} by ${track.artist}`);
+      this.rotationSystem.startRotation(track, mesh);
+    });
+
+    // Настраиваем коллбэк для остановки вращения при окончании воспроизведения
+    this.audioIntegration.setOnRotationStop((track: CrystalTrack) => {
+      console.log(`⏹️ Stopping rotation for crystal: ${track.name} by ${track.artist}`);
+      this.rotationSystem.stopRotation(track.id);
+    });
+
+    console.log('🔗 Crystal rotation callbacks configured');
   }
 
   /**

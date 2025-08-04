@@ -30,6 +30,8 @@ export class SoulGalaxyAudioIntegration {
   private onAudioError?: (track: CrystalTrack, error: Error) => void;
   private onTransitionStart?: (track: CrystalTrack) => void;
   private onTransitionEnd?: (track: CrystalTrack) => void;
+  private onRotationStart?: (track: CrystalTrack, mesh: THREE.Mesh) => void;
+  private onRotationStop?: (track: CrystalTrack) => void;
 
   constructor() {
     this.audioManager = new AudioManager();
@@ -204,6 +206,11 @@ export class SoulGalaxyAudioIntegration {
       // Добавляем специальный индикатор воспроизведения
       this.addPlaybackIndicator();
     }
+
+    // Запускаем вращение кристалла во время воспроизведения
+    if (this.onRotationStart) {
+      this.onRotationStart(this.currentPlayingTrack, this.currentPlayingMesh);
+    }
   }
 
   /**
@@ -230,6 +237,11 @@ export class SoulGalaxyAudioIntegration {
 
       // Убираем индикатор воспроизведения
       this.removePlaybackIndicator();
+    }
+
+    // Останавливаем вращение кристалла при окончании воспроизведения
+    if (this.onRotationStop) {
+      this.onRotationStop(this.currentPlayingTrack);
     }
   }
 
@@ -375,6 +387,20 @@ export class SoulGalaxyAudioIntegration {
   }
 
   /**
+   * Устанавливает коллбэк для начала вращения кристалла
+   */
+  setOnRotationStart(callback: (track: CrystalTrack, mesh: THREE.Mesh) => void): void {
+    this.onRotationStart = callback;
+  }
+
+  /**
+   * Устанавливает коллбэк для остановки вращения кристалла
+   */
+  setOnRotationStop(callback: (track: CrystalTrack) => void): void {
+    this.onRotationStop = callback;
+  }
+
+  /**
    * Получает статистику аудио интеграции
    */
   getAudioStats(): {
@@ -421,6 +447,8 @@ export class SoulGalaxyAudioIntegration {
     this.onAudioError = undefined;
     this.onTransitionStart = undefined;
     this.onTransitionEnd = undefined;
+    this.onRotationStart = undefined;
+    this.onRotationStop = undefined;
 
     // Сбрасываем состояние
     this.currentPlayingTrack = undefined;
