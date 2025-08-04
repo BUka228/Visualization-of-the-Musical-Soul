@@ -17,6 +17,11 @@ export class CinematicCameraController {
     private focusAnimationSystem: FocusAnimationSystem;
     private depthOfFieldSystem?: DepthOfFieldSystem;
     
+    // Ссылки на другие системы для управления конфликтами
+    private hoverSystem?: any;
+    private animationManager?: any;
+    private performanceOptimizer?: any;
+    
     // Система инерции
     private velocity: THREE.Vector3 = new THREE.Vector3();
     private angularVelocity: THREE.Euler = new THREE.Euler();
@@ -53,7 +58,7 @@ export class CinematicCameraController {
         if (scene) {
             this.depthOfFieldSystem = new DepthOfFieldSystem(renderer, scene, camera);
         }
-        this.focusAnimationSystem = new FocusAnimationSystem(camera, this.depthOfFieldSystem);
+        this.focusAnimationSystem = new FocusAnimationSystem(camera, this.depthOfFieldSystem, scene);
         
         // Создаем OrbitControls для совместимости
         this.orbitControls = new OrbitControls(camera, renderer.domElement);
@@ -61,6 +66,12 @@ export class CinematicCameraController {
         
         // Настраиваем кинематографическое управление
         this.setupCinematicControls();
+        
+        // Регистрируем контроллер в глобальном пространстве для доступа из других систем
+        if (typeof window !== 'undefined') {
+            (window as any).cameraController = this;
+            (window as any).focusAnimationSystem = this.focusAnimationSystem;
+        }
         
         console.log('CinematicCameraController инициализирован');
     }
@@ -382,6 +393,10 @@ export class CinematicCameraController {
     public async focusOnCrystal(crystal: CrystalTrack): Promise<void> {
         console.log(`🎯 Focusing camera on crystal: ${crystal.name} by ${crystal.artist}`);
         
+        // Устанавливаем глобальные флаги защиты фокуса
+        this.setGlobalFocusState(true);
+        this.setGlobalFocusProtection(true);
+        
         // Останавливаем инерцию и отключаем управление на время анимации
         this.velocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
@@ -392,11 +407,18 @@ export class CinematicCameraController {
         
         this.orbitControls.enabled = false;
         
+        // Уведомляем другие системы о начале фокуса
+        this.notifyFocusStart();
+        
         try {
             // Запускаем анимацию фокуса
             await this.focusAnimationSystem.focusOnCrystal(crystal);
             
             console.log(`✅ Camera focused on crystal: ${crystal.name}`);
+            
+            // Дополнительная задержка после завершения анимации для стабилизации
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
         } catch (error) {
             console.error('❌ Failed to focus on crystal:', error);
         } finally {
@@ -405,6 +427,17 @@ export class CinematicCameraController {
             if (!wasInertialEnabled) {
                 this.orbitControls.enabled = wasOrbitEnabled;
             }
+            
+            // Уведомляем другие системы о завершении фокуса
+            this.notifyFocusComplete();
+            
+            // Значительно увеличенная задержка для полной стабилизации всех систем
+            setTimeout(() => {
+                this.setGlobalFocusState(false);
+                this.setGlobalFocusProtection(false);
+                this.markFocusEndForOptimizer();
+                console.log('🔓 Focus protection fully disabled after extended period');
+            }, 5000); // 5 секунд задержка для завершения всех переходов
         }
     }
     
@@ -414,6 +447,10 @@ export class CinematicCameraController {
     public async returnToPreviousPosition(): Promise<void> {
         console.log('🔄 Returning camera to previous position');
         
+        // Устанавливаем глобальные флаги состояния фокуса
+        this.setGlobalFocusState(true);
+        this.setGlobalFocusProtection(true);
+        
         // Останавливаем инерцию и отключаем управление на время анимации
         this.velocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
@@ -424,11 +461,18 @@ export class CinematicCameraController {
         
         this.orbitControls.enabled = false;
         
+        // Уведомляем другие системы о начале анимации возврата
+        this.notifyFocusStart();
+        
         try {
             // Запускаем анимацию возврата
             await this.focusAnimationSystem.returnToPreviousPosition();
             
             console.log('✅ Camera returned to previous position');
+            
+            // Дополнительная задержка после завершения анимации для стабилизации
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
         } catch (error) {
             console.error('❌ Failed to return to previous position:', error);
         } finally {
@@ -437,6 +481,17 @@ export class CinematicCameraController {
             if (!wasInertialEnabled) {
                 this.orbitControls.enabled = wasOrbitEnabled;
             }
+            
+            // Уведомляем другие системы о завершении анимации возврата
+            this.notifyFocusComplete();
+            
+            // Увеличенная задержка перед сбросом глобальных флагов
+            setTimeout(() => {
+                this.setGlobalFocusState(false);
+                this.setGlobalFocusProtection(false);
+                this.markFocusEndForOptimizer();
+                console.log('🔓 Return focus protection fully disabled');
+            }, 3000); // 3 секунды задержка
         }
     }
     
@@ -531,6 +586,141 @@ export class CinematicCameraController {
         }
     }
     
+    /**
+     * Регистрирует системы для управления конфликтами
+     */
+    public registerSystems(systems: {
+        hoverSystem?: any;
+        animationManager?: any;
+        performanceOptimizer?: any;
+    }): void {
+        this.hoverSystem = systems.hoverSystem;
+        this.animationManager = systems.animationManager;
+        this.performanceOptimizer = systems.performanceOptimizer;
+        
+        console.log('🔗 Systems registered for focus conflict management');
+    }
+
+    /**
+     * Устанавливает глобальный флаг состояния фокуса
+     */
+    private setGlobalFocusState(isFocusing: boolean): void {
+        if (typeof window !== 'undefined') {
+            (window as any).isCameraFocusAnimating = isFocusing;
+            console.log(`🌐 Global focus state set to: ${isFocusing}`);
+        }
+    }
+
+    /**
+     * Устанавливает глобальную защиту фокуса
+     */
+    private setGlobalFocusProtection(enabled: boolean): void {
+        if (typeof window !== 'undefined') {
+            (window as any).globalFocusProtection = enabled;
+            console.log(`🛡️ Global focus protection set to: ${enabled}`);
+        }
+    }
+
+    /**
+     * Отмечает завершение фокуса для системы оптимизации
+     */
+    private markFocusEndForOptimizer(): void {
+        if (typeof window !== 'undefined') {
+            (window as any).lastFocusEndTime = performance.now();
+            console.log('📝 Focus end time marked for performance optimizer');
+        }
+        
+        // Также уведомляем напрямую через ссылку на оптимизатор
+        if (this.performanceOptimizer && typeof this.performanceOptimizer.markFocusEnd === 'function') {
+            this.performanceOptimizer.markFocusEnd();
+        }
+    }
+
+    /**
+     * Уведомляет другие системы о начале фокуса
+     */
+    private notifyFocusStart(): void {
+        console.log('🔇 Disabling conflicting systems during focus...');
+        
+        // Отключаем систему hover
+        if (this.hoverSystem && typeof this.hoverSystem.clearHover === 'function') {
+            this.hoverSystem.clearHover();
+            console.log('🔇 Crystal hover system disabled during focus');
+        }
+        
+        // Останавливаем менеджер анимаций
+        if (this.animationManager && typeof this.animationManager.stopAnimation === 'function') {
+            this.animationManager.stopAnimation();
+            console.log('🔇 Animation manager paused during focus');
+        }
+        
+        // Отключаем автооптимизацию
+        if (this.performanceOptimizer && typeof this.performanceOptimizer.updateConfig === 'function') {
+            this.performanceOptimizer.updateConfig({ autoOptimization: false });
+            console.log('🔇 Performance auto-optimization disabled during focus');
+        }
+        
+        // Fallback через глобальные переменные если прямые ссылки не работают
+        if (typeof window !== 'undefined') {
+            const hoverSystem = (window as any).crystalHoverSystem;
+            if (hoverSystem && typeof hoverSystem.clearHover === 'function') {
+                hoverSystem.clearHover();
+                console.log('🔇 Crystal hover system disabled during focus (fallback)');
+            }
+            
+            const animationManager = (window as any).animationManager;
+            if (animationManager && typeof animationManager.stopAnimation === 'function') {
+                animationManager.stopAnimation();
+                console.log('🔇 Animation manager paused during focus (fallback)');
+            }
+            
+            const performanceOptimizer = (window as any).performanceOptimizer;
+            if (performanceOptimizer && typeof performanceOptimizer.updateConfig === 'function') {
+                performanceOptimizer.updateConfig({ autoOptimization: false });
+                console.log('🔇 Performance auto-optimization disabled during focus (fallback)');
+            }
+        }
+    }
+    
+    /**
+     * Уведомляет другие системы о завершении фокуса
+     */
+    private notifyFocusComplete(): void {
+        console.log('🔊 Re-enabling systems after focus...');
+        
+        // Восстанавливаем менеджер анимаций
+        if (this.animationManager && typeof this.animationManager.startAnimation === 'function') {
+            this.animationManager.startAnimation();
+            console.log('🔊 Animation manager resumed after focus');
+        }
+        
+        // Восстанавливаем автооптимизацию с задержкой
+        if (this.performanceOptimizer && typeof this.performanceOptimizer.updateConfig === 'function') {
+            // Задержка для стабилизации после фокуса
+            setTimeout(() => {
+                this.performanceOptimizer.updateConfig({ autoOptimization: true });
+                console.log('🔊 Performance auto-optimization re-enabled after focus (delayed)');
+            }, 2000); // 2 секунды задержка
+        }
+        
+        // Fallback через глобальные переменные если прямые ссылки не работают
+        if (typeof window !== 'undefined') {
+            // Восстанавливаем менеджер анимаций
+            const animationManager = (window as any).animationManager;
+            if (animationManager && typeof animationManager.startAnimation === 'function') {
+                animationManager.startAnimation();
+                console.log('🔊 Animation manager resumed after focus (fallback)');
+            }
+            
+            // Восстанавливаем автооптимизацию
+            const performanceOptimizer = (window as any).performanceOptimizer;
+            if (performanceOptimizer && typeof performanceOptimizer.updateConfig === 'function') {
+                performanceOptimizer.updateConfig({ autoOptimization: true });
+                console.log('🔊 Performance auto-optimization re-enabled after focus (fallback)');
+            }
+        }
+    }
+
     /**
      * Освобождение ресурсов
      */

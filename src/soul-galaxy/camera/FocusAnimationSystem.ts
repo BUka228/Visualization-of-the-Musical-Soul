@@ -69,9 +69,14 @@ export class FocusAnimationSystem {
     private onReturnStart?: () => void;
     private onReturnComplete?: () => void;
     
-    constructor(camera: THREE.PerspectiveCamera, depthOfFieldSystem?: DepthOfFieldSystem) {
+    constructor(camera: THREE.PerspectiveCamera, depthOfFieldSystem?: DepthOfFieldSystem, scene?: THREE.Scene) {
         this.camera = camera;
         this.depthOfFieldSystem = depthOfFieldSystem;
+        
+        // Сохраняем ссылку на сцену для поиска кристаллов
+        if (scene) {
+            (this.camera as any).scene = scene;
+        }
         
         console.log('🎯 Focus Animation System created');
     }
@@ -232,21 +237,44 @@ export class FocusAnimationSystem {
      */
     private getCrystalWorldPosition(crystal: CrystalTrack): THREE.Vector3 {
         // Пытаемся найти mesh кристалла в сцене для получения точной позиции
-        const scene = (this.camera.parent as THREE.Scene) || 
-                     (this.camera as any).scene ||
-                     this.findSceneFromCamera();
+        const scene = this.findSceneFromCamera();
         
         if (scene) {
             const crystalMesh = this.findCrystalMeshInScene(scene, crystal.id);
             if (crystalMesh) {
                 const worldPosition = new THREE.Vector3();
                 crystalMesh.getWorldPosition(worldPosition);
+                console.log(`✅ Found crystal mesh for ${crystal.name}, world position:`, worldPosition);
+                return worldPosition;
+            } else {
+                console.warn(`⚠️ Crystal mesh not found in scene for ${crystal.name} (ID: ${crystal.id})`);
+                // Попробуем найти по имени трека как fallback
+                const meshByName = this.findCrystalMeshByName(scene, crystal.name, crystal.artist);
+                if (meshByName) {
+                    const worldPosition = new THREE.Vector3();
+                    meshByName.getWorldPosition(worldPosition);
+                    console.log(`✅ Found crystal mesh by name for ${crystal.name}, world position:`, worldPosition);
+                    return worldPosition;
+                }
+            }
+        } else {
+            console.warn('⚠️ Could not find scene from camera');
+        }
+        
+        // Fallback: если кристалл находится в группе, учитываем трансформацию группы
+        if (crystal.position) {
+            // Попробуем найти группу кристаллов в сцене
+            const crystalCluster = this.findCrystalClusterInScene();
+            if (crystalCluster) {
+                const worldPosition = crystal.position.clone();
+                crystalCluster.localToWorld(worldPosition);
+                console.log(`🔄 Using cluster-transformed position for ${crystal.name}:`, worldPosition);
                 return worldPosition;
             }
         }
         
-        // Fallback на локальную позицию кристалла
-        console.warn(`⚠️ Could not find crystal mesh for ${crystal.name}, using local position`);
+        // Последний fallback на локальную позицию кристалла
+        console.warn(`⚠️ Using local position for ${crystal.name} as final fallback`);
         return crystal.position.clone();
     }
     
@@ -254,6 +282,7 @@ export class FocusAnimationSystem {
      * Находит сцену через иерархию объектов
      */
     private findSceneFromCamera(): THREE.Scene | null {
+        // Сначала пытаемся найти через иерархию родителей
         let current: THREE.Object3D | null = this.camera;
         while (current && current.parent) {
             current = current.parent;
@@ -261,6 +290,26 @@ export class FocusAnimationSystem {
                 return current;
             }
         }
+        
+        // Если не нашли через родителей, пытаемся найти через userData камеры
+        if ((this.camera as any).scene) {
+            return (this.camera as any).scene;
+        }
+        
+        // Последний способ - поиск через глобальные переменные (если они есть)
+        if (typeof window !== 'undefined') {
+            // Проверяем глобальные переменные, которые могут содержать сцену
+            const globalVars = ['scene', 'mainScene', 'threeScene'];
+            for (const varName of globalVars) {
+                const globalScene = (window as any)[varName];
+                if (globalScene && globalScene instanceof THREE.Scene) {
+                    console.log(`🔍 Found scene through global variable: ${varName}`);
+                    return globalScene;
+                }
+            }
+        }
+        
+        console.warn('⚠️ Could not find scene from camera - all methods failed');
         return null;
     }
     
@@ -279,6 +328,43 @@ export class FocusAnimationSystem {
         });
         
         return foundMesh;
+    }
+    
+    /**
+     * Находит mesh кристалла в сцене по имени трека и исполнителю
+     */
+    private findCrystalMeshByName(scene: THREE.Scene, trackName: string, artist: string): THREE.Mesh | null {
+        let foundMesh: THREE.Mesh | null = null;
+        
+        scene.traverse((object) => {
+            if (object instanceof THREE.Mesh && 
+                object.userData.isCrystal &&
+                object.userData.trackName === trackName &&
+                object.userData.artist === artist) {
+                foundMesh = object;
+            }
+        });
+        
+        return foundMesh;
+    }
+    
+    /**
+     * Находит группу кристаллов в сцене
+     */
+    private findCrystalClusterInScene(): THREE.Group | null {
+        const scene = this.findSceneFromCamera();
+        if (!scene) return null;
+        
+        let crystalCluster: THREE.Group | null = null;
+        
+        scene.traverse((object) => {
+            if (object instanceof THREE.Group && 
+                (object.name === 'CrystalCluster' || object.userData.isCrystalCluster)) {
+                crystalCluster = object;
+            }
+        });
+        
+        return crystalCluster;
     }
     
     /**
@@ -330,7 +416,21 @@ export class FocusAnimationSystem {
      */
     public update(deltaTime: number): void {
         if (!this.focusState.isAnimating) {
+            // Сбрасываем глобальные флаги если анимация не активна
+            if (typeof window !== 'undefined') {
+                if ((window as any).isCameraFocusAnimating === true) {
+                    (window as any).isCameraFocusAnimating = false;
+                }
+                // НЕ сбрасываем globalFocusProtection здесь, так как он может быть нужен
+                // для защиты после завершения анимации
+            }
             return;
+        }
+        
+        // Устанавливаем глобальные флаги во время анимации для защиты от прерываний
+        if (typeof window !== 'undefined') {
+            (window as any).isCameraFocusAnimating = true;
+            (window as any).globalFocusProtection = true;
         }
         
         const currentTime = performance.now();

@@ -62,6 +62,11 @@ export class AlbumTextureManager {
    * Loads or retrieves album texture for a track
    */
   async getAlbumTexture(track: ProcessedTrack): Promise<THREE.Texture> {
+    // If no image URL, return fallback immediately
+    if (!track.imageUrl) {
+      return this.getFallbackTexture(track.genre);
+    }
+
     // Check cache first
     const cacheKey = this.getCacheKey(track);
     if (this.textureCache.has(cacheKey)) {
@@ -109,6 +114,11 @@ export class AlbumTextureManager {
    * Gets high-quality texture for focused crystals
    */
   async getHighQualityTexture(track: ProcessedTrack): Promise<THREE.Texture> {
+    // If no image URL, return fallback immediately
+    if (!track.imageUrl) {
+      return this.getFallbackTexture(track.genre);
+    }
+
     const cacheKey = this.getHighQualityCacheKey(track);
     
     // Check high-quality cache first

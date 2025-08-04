@@ -113,12 +113,13 @@ export async function testSceneManager(): Promise<void> {
   }
 }
 
-// Автоматический запуск теста при загрузке модуля в режиме разработки
-if (process.env.NODE_ENV === 'development') {
-  // Запуск теста после загрузки DOM
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', testSceneManager);
-  } else {
-    testSceneManager();
-  }
-}
+// Автоматический запуск теста отключен для предотвращения конфликтов с основным приложением
+// Для запуска теста вручную используйте: testSceneManager()
+// if (process.env.NODE_ENV === 'development') {
+//   // Запуск теста после загрузки DOM
+//   if (document.readyState === 'loading') {
+//     document.addEventListener('DOMContentLoaded', testSceneManager);
+//   } else {
+//     testSceneManager();
+//   }
+// }

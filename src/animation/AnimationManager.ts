@@ -120,6 +120,12 @@ export class AnimationManager implements IAnimationManager {
       return;
     }
     
+    // Не обновляем анимацию камеры если идет фокус на кристалл
+    if (this.isFocusAnimationActive()) {
+      console.log('⏸️ Camera animation paused due to focus animation');
+      return;
+    }
+    
     this.cameraAnimationProgress += 16; // deltaTime
     const progress = Math.min(this.cameraAnimationProgress / this.cameraAnimationDuration, 1);
     const easedProgress = this.easeInOutCubic(progress);
@@ -182,6 +188,31 @@ export class AnimationManager implements IAnimationManager {
 
   private easeInOutCubic(t: number): number {
     return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+
+  /**
+   * Проверяет, активна ли анимация фокуса на кристалл
+   */
+  private isFocusAnimationActive(): boolean {
+    // Проверяем глобальный флаг состояния фокуса
+    if (typeof window !== 'undefined' && (window as any).isCameraFocusAnimating === true) {
+      return true;
+    }
+    
+    // Fallback проверки через системы
+    if (typeof window !== 'undefined') {
+      const cameraController = (window as any).cameraController;
+      if (cameraController && typeof cameraController.isCameraAnimating === 'function') {
+        return cameraController.isCameraAnimating();
+      }
+      
+      const focusAnimationSystem = (window as any).focusAnimationSystem;
+      if (focusAnimationSystem && typeof focusAnimationSystem.isAnimating === 'function') {
+        return focusAnimationSystem.isAnimating();
+      }
+    }
+    
+    return false;
   }
 
   // Геттеры для состояния

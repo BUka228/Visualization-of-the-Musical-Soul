@@ -69,6 +69,10 @@ export class PerformanceOptimizer {
   private autoOptimizationEnabled: boolean = true;
   private lastOptimizationTime: number = 0;
   private optimizationInterval: number = 5000; // 5 секунд
+  
+  // Отслеживание недавнего фокуса
+  private lastFocusEndTime: number = 0;
+  private focusStabilizationPeriod: number = 15000; // 15 секунд после завершения фокуса
 
   constructor(scene: THREE.Scene, camera: THREE.Camera, renderer: THREE.WebGLRenderer) {
     this.scene = scene;
@@ -83,6 +87,11 @@ export class PerformanceOptimizer {
     
     // Настройка коллбэков
     this.setupCallbacks();
+    
+    // Регистрируем оптимизатор в глобальном пространстве для доступа из других систем
+    if (typeof window !== 'undefined') {
+      (window as any).performanceOptimizer = this;
+    }
     
     console.log('🚀 PerformanceOptimizer инициализирован');
   }
@@ -207,9 +216,169 @@ export class PerformanceOptimizer {
   }
 
   /**
+   * Проверяет, выполняется ли анимация фокуса камеры
+   */
+  private isCameraFocusAnimating(): boolean {
+    // Основная проверка через глобальный флаг
+    if (typeof window !== 'undefined') {
+      const globalFlag = (window as any).isCameraFocusAnimating;
+      if (globalFlag === true) {
+        console.log('🛡️ Focus protection: isCameraFocusAnimating = true');
+        return true;
+      }
+      
+      // Проверка через глобальную защиту фокуса
+      const globalFocusProtection = (window as any).globalFocusProtection;
+      if (globalFocusProtection === true) {
+        console.log('🛡️ Focus protection: globalFocusProtection = true');
+        return true;
+      }
+      
+      // Дополнительные проверки через системы
+      const cameraController = (window as any).cameraController;
+      if (cameraController) {
+        if (typeof cameraController.isCameraAnimating === 'function' && cameraController.isCameraAnimating()) {
+          console.log('🛡️ Focus protection: cameraController.isCameraAnimating = true');
+          return true;
+        }
+        if (typeof cameraController.isFocused === 'function' && cameraController.isFocused()) {
+          console.log('🛡️ Focus protection: cameraController.isFocused = true');
+          return true;
+        }
+      }
+      
+      const focusAnimationSystem = (window as any).focusAnimationSystem;
+      if (focusAnimationSystem) {
+        if (typeof focusAnimationSystem.isAnimating === 'function' && focusAnimationSystem.isAnimating()) {
+          console.log('🛡️ Focus protection: focusAnimationSystem.isAnimating = true');
+          return true;
+        }
+        if (typeof focusAnimationSystem.isFocused === 'function' && focusAnimationSystem.isFocused()) {
+          console.log('🛡️ Focus protection: focusAnimationSystem.isFocused = true');
+          return true;
+        }
+      }
+      
+      const crystalTrackSystem = (window as any).crystalTrackSystem;
+      if (crystalTrackSystem) {
+        if (typeof crystalTrackSystem.isCameraFocused === 'function' && crystalTrackSystem.isCameraFocused()) {
+          console.log('🛡️ Focus protection: crystalTrackSystem.isCameraFocused = true');
+          return true;
+        }
+        if (typeof crystalTrackSystem.isInFocusMode === 'function' && crystalTrackSystem.isInFocusMode()) {
+          console.log('🛡️ Focus protection: crystalTrackSystem.isInFocusMode = true');
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Проверяет, было ли недавно завершение фокуса
+   */
+  private isRecentlyFocused(): boolean {
+    const currentTime = performance.now();
+    
+    // Проверяем, был ли недавно завершен фокус
+    if (this.lastFocusEndTime > 0 && (currentTime - this.lastFocusEndTime) < this.focusStabilizationPeriod) {
+      return true;
+    }
+    
+    // Дополнительная проверка через глобальные переменные
+    if (typeof window !== 'undefined') {
+      const lastFocusEnd = (window as any).lastFocusEndTime;
+      if (lastFocusEnd && (currentTime - lastFocusEnd) < this.focusStabilizationPeriod) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Отмечает завершение фокуса для отслеживания периода стабилизации
+   */
+  private markFocusEndInternal(): void {
+    this.lastFocusEndTime = performance.now();
+    
+    // Также устанавливаем глобальную переменную для синхронизации
+    if (typeof window !== 'undefined') {
+      (window as any).lastFocusEndTime = this.lastFocusEndTime;
+    }
+    
+    console.log('📝 Focus end time marked for stabilization period');
+  }
+
+  /**
+   * Публичный метод для отметки завершения фокуса (вызывается извне)
+   */
+  public markFocusEnd(): void {
+    this.markFocusEndInternal();
+  }
+
+  /**
+   * Проверяет наличие активного сфокусированного кристалла
+   */
+  private hasActiveFocusedCrystal(): boolean {
+    if (typeof window !== 'undefined') {
+      // Проверяем через CrystalTrackSystem
+      const crystalTrackSystem = (window as any).crystalTrackSystem;
+      if (crystalTrackSystem) {
+        if (typeof crystalTrackSystem.getFocusedCrystal === 'function') {
+          const focusedCrystal = crystalTrackSystem.getFocusedCrystal();
+          if (focusedCrystal) {
+            return true;
+          }
+        }
+        
+        if (typeof crystalTrackSystem.isCameraFocused === 'function' && crystalTrackSystem.isCameraFocused()) {
+          return true;
+        }
+      }
+      
+      // Проверяем через CameraController
+      const cameraController = (window as any).cameraController;
+      if (cameraController) {
+        if (typeof cameraController.getFocusedCrystal === 'function') {
+          const focusedCrystal = cameraController.getFocusedCrystal();
+          if (focusedCrystal) {
+            return true;
+          }
+        }
+        
+        if (typeof cameraController.isFocused === 'function' && cameraController.isFocused()) {
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  /**
    * Выполняет автоматическую оптимизацию на основе текущей производительности
    */
   private performAutoOptimization(): void {
+    // Не выполняем автооптимизацию во время анимации фокуса
+    if (this.isCameraFocusAnimating()) {
+      console.log('⏸️ Auto-optimization paused during camera focus animation');
+      return;
+    }
+    
+    // Дополнительная проверка на недавнее завершение фокуса
+    if (this.isRecentlyFocused()) {
+      console.log('⏸️ Auto-optimization paused - recently focused');
+      return;
+    }
+    
+    // Проверяем наличие активного сфокусированного кристалла
+    if (this.hasActiveFocusedCrystal()) {
+      console.log('⏸️ Auto-optimization paused - crystal is currently focused');
+      return;
+    }
+    
     const performanceStats = this.performanceMonitor.getStats();
     
     // Если FPS слишком низкий, применяем более агрессивную оптимизацию
@@ -241,6 +410,12 @@ export class PerformanceOptimizer {
   private handlePerformanceWarning(warning: PerformanceWarning): void {
     if (!this.config.autoOptimization) return;
     
+    // Не обрабатываем предупреждения во время анимации фокуса
+    if (this.isCameraFocusAnimating()) {
+      console.log('⏸️ Performance warning handling paused during camera focus animation');
+      return;
+    }
+    
     switch (warning.type) {
       case 'low_fps':
         this.handleLowFpsWarning(warning);
@@ -269,8 +444,13 @@ export class PerformanceOptimizer {
       maxChecksPerFrame: 30
     });
     
-    // Принудительное обновление всех объектов
-    this.frustumCullingManager.forceUpdateAll();
+    // НЕ выполняем принудительное обновление во время фокуса камеры
+    // так как это может сбросить анимацию фокуса
+    if (!this.isCameraFocusAnimating() && !this.hasActiveFocusedCrystal()) {
+      this.frustumCullingManager.forceUpdateAll();
+    } else {
+      console.log('⏸️ Skipping forceUpdateAll during camera focus to prevent animation interruption');
+    }
   }
 
   /**

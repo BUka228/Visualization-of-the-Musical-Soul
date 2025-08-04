@@ -102,6 +102,18 @@ export class FrustumCullingManager {
       return;
     }
     
+    // Проверяем, не выполняется ли анимация фокуса камеры
+    if (typeof window !== 'undefined') {
+      const isFocusAnimating = (window as any).isCameraFocusAnimating;
+      const globalFocusProtection = (window as any).globalFocusProtection;
+      
+      if (isFocusAnimating || globalFocusProtection) {
+        // Во время фокуса выполняем только минимальные обновления
+        this.lastUpdateTime = currentTime;
+        return;
+      }
+    }
+    
     // Обновляем матрицу камеры и фрустум
     this.updateCameraFrustum();
     
@@ -238,6 +250,17 @@ export class FrustumCullingManager {
    * Принудительно обновляет видимость всех объектов
    */
   public forceUpdateAll(): void {
+    // Проверяем, не выполняется ли анимация фокуса камеры
+    if (typeof window !== 'undefined') {
+      const isFocusAnimating = (window as any).isCameraFocusAnimating;
+      const globalFocusProtection = (window as any).globalFocusProtection;
+      
+      if (isFocusAnimating || globalFocusProtection) {
+        console.log('⏸️ FrustumCulling forceUpdateAll skipped during camera focus animation');
+        return;
+      }
+    }
+    
     this.updateCameraFrustum();
     
     const currentTime = performance.now();

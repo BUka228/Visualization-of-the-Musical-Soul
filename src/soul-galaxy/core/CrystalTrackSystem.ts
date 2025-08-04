@@ -82,6 +82,11 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
     // Настраиваем коллбэки для вращения кристаллов
     this.setupRotationCallbacks();
     
+    // Регистрируем систему в глобальном пространстве для доступа из других систем
+    if (typeof window !== 'undefined') {
+      (window as any).crystalTrackSystem = this;
+    }
+    
     console.log('✅ Crystal Track System initialized');
   }
 
@@ -99,6 +104,7 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
     // Создаем новую группу для кластера
     this.crystalCluster = new THREE.Group();
     this.crystalCluster.name = 'CrystalCluster';
+    this.crystalCluster.userData.isCrystalCluster = true;
 
     // Предзагружаем текстуры альбомов для оптимизации
     console.log('🖼️ Preloading album textures...');
@@ -286,6 +292,13 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
     console.log(`🎬 Starting cinematic focus on crystal: ${crystal.name} by ${crystal.artist}`);
 
     try {
+      // Устанавливаем глобальные флаги состояния фокуса для защиты от прерываний
+      if (typeof window !== 'undefined') {
+        (window as any).isCameraFocusAnimating = true;
+        (window as any).globalFocusProtection = true;
+        console.log('🛡️ Global focus protection enabled');
+      }
+      
       // Запускаем кинематографический переход камеры
       await this.cameraController.focusOnCrystal(crystal);
       
@@ -312,6 +325,14 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
       
     } catch (error) {
       console.error(`❌ Failed to focus on crystal with animation: ${crystal.name}`, error);
+      
+      // Сбрасываем глобальные флаги в случае ошибки
+      if (typeof window !== 'undefined') {
+        (window as any).isCameraFocusAnimating = false;
+        (window as any).globalFocusProtection = false;
+        console.log('🛡️ Global focus protection disabled due to error');
+      }
+      
       // Fallback на базовый фокус
       this.focusOnCrystal(crystal);
     }
@@ -366,6 +387,16 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
    */
   isCameraFocused(): boolean {
     return this.cameraController ? this.cameraController.isFocused() : false;
+  }
+
+  /**
+   * Проверяет, находится ли система в режиме фокуса (включая анимацию)
+   */
+  isInFocusMode(): boolean {
+    if (this.cameraController) {
+      return this.cameraController.isFocused() || this.cameraController.isCameraAnimating();
+    }
+    return false;
   }
 
   /**
@@ -511,6 +542,9 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
       genre: crystalTrack.genre,
       isCrystal: true
     };
+    
+    // Добавляем имя для отладки
+    mesh.name = `Crystal_${crystalTrack.name}_${crystalTrack.artist}`.replace(/[^a-zA-Z0-9_]/g, '_');
     
     return mesh;
   }

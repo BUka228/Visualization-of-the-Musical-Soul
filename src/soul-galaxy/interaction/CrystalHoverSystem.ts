@@ -106,6 +106,11 @@ export class CrystalHoverSystem {
   updateMousePosition(mouseX: number, mouseY: number): void {
     if (!this.initialized) return;
     
+    // Не обрабатываем события мыши во время анимации фокуса камеры
+    if (this.isCameraFocusAnimating()) {
+      return;
+    }
+    
     this.mouse.set(mouseX, mouseY);
     
     // Оптимизированное обновление с ограничением частоты
@@ -123,6 +128,11 @@ export class CrystalHoverSystem {
    */
   private checkHoverIntersections(): void {
     if (!this.scene || !this.camera || this.crystalMeshes.length === 0) {
+      return;
+    }
+
+    // Не обрабатываем hover во время анимации фокуса камеры
+    if (this.isCameraFocusAnimating()) {
       return;
     }
 
@@ -387,6 +397,31 @@ export class CrystalHoverSystem {
     console.log(`  Frustum culling: ${CrystalHoverSystem.RAYCAST_CONFIG.frustumCulling ? 'enabled' : 'disabled'}`);
     console.log(`  Hover glow intensity: ${CrystalHoverSystem.HOVER_CONFIG.glowIntensity}x`);
     console.log(`  Transition duration: ${CrystalHoverSystem.HOVER_CONFIG.transitionDuration}ms`);
+  }
+
+  /**
+   * Проверяет, выполняется ли анимация фокуса камеры
+   */
+  private isCameraFocusAnimating(): boolean {
+    // Проверяем глобальный флаг состояния фокуса
+    if (typeof window !== 'undefined' && (window as any).isCameraFocusAnimating === true) {
+      return true;
+    }
+    
+    // Fallback проверки через системы
+    if (typeof window !== 'undefined') {
+      const cameraController = (window as any).cameraController;
+      if (cameraController && typeof cameraController.isCameraAnimating === 'function') {
+        return cameraController.isCameraAnimating();
+      }
+      
+      const focusAnimationSystem = (window as any).focusAnimationSystem;
+      if (focusAnimationSystem && typeof focusAnimationSystem.isAnimating === 'function') {
+        return focusAnimationSystem.isAnimating();
+      }
+    }
+    
+    return false;
   }
 
   /**
