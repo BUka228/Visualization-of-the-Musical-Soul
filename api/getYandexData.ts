@@ -45,20 +45,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    console.log('API called with method:', req.method);
+    console.log('Request headers:', req.headers);
+    console.log('Request body type:', typeof req.body);
+    
     const { token } = req.body;
 
     if (!token) {
+      console.log('No token provided');
       return res.status(400).json({ error: 'Token is required' });
     }
 
+    console.log('Token received, length:', token.length);
     console.log('Получение данных из Яндекс.Музыки...');
+
+    // Сначала просто проверим токен
+    try {
+      const testResponse = await fetch(`${YANDEX_API_BASE}/account/status`, {
+        headers: {
+          'Authorization': `OAuth ${token}`,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+      
+      console.log('Token test response status:', testResponse.status);
+      
+      if (!testResponse.ok) {
+        throw new Error(`Token validation failed: HTTP ${testResponse.status}`);
+      }
+      
+      const accountData = await testResponse.json();
+      console.log('Account data received:', !!accountData.result);
+      
+    } catch (tokenError) {
+      console.error('Token validation error:', tokenError);
+      throw tokenError;
+    }
 
     // Получаем лайкнутые треки
     const likedTracks = await fetchLikedTracks(token);
     console.log(`Найдено ${likedTracks.length} лайкнутых треков`);
 
+    // Для начала вернем только первые 5 треков для тестирования
+    const limitedTracks = likedTracks.slice(0, 5);
+    console.log(`Обрабатываем ${limitedTracks.length} треков для тестирования`);
+
     // Обрабатываем треки батчами для лучшей производительности
-    const processedTracks = await processTracksInBatches(likedTracks, token);
+    const processedTracks = await processTracksInBatches(limitedTracks, token);
     console.log(`Обработано ${processedTracks.length} треков`);
 
     // Формируем ответ
@@ -66,7 +99,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       metadata: {
         total_tracks: processedTracks.length,
         generated_at: new Date().toISOString(),
-        source: 'Yandex Music API (via Vercel)'
+        source: 'Yandex Music API (via Vercel) - Test Mode'
       },
       tracks: processedTracks
     };
