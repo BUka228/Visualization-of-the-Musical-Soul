@@ -13,6 +13,7 @@ export class SoulGalaxyAudioIntegration {
   private currentPlayingMesh?: THREE.Mesh;
   private isTransitioning: boolean = false;
   private initialized: boolean = false;
+  private uiManager?: any; // UIManager для показа панели воспроизведения
 
   // Настройки аудио интеграции
   private static readonly AUDIO_CONFIG = {
@@ -59,6 +60,7 @@ export class SoulGalaxyAudioIntegration {
       
       if (this.currentPlayingTrack) {
         this.startVisualPlaybackIndicator();
+        this.showNowPlayingPanel();
         
         if (this.onTrackPlayStart) {
           this.onTrackPlayStart(this.currentPlayingTrack);
@@ -71,6 +73,7 @@ export class SoulGalaxyAudioIntegration {
       
       if (this.currentPlayingTrack) {
         this.stopVisualPlaybackIndicator();
+        this.hideNowPlayingPanel();
         
         if (this.onTrackPlayEnd) {
           this.onTrackPlayEnd(this.currentPlayingTrack);
@@ -86,6 +89,7 @@ export class SoulGalaxyAudioIntegration {
       
       if (this.currentPlayingTrack) {
         this.stopVisualPlaybackIndicator();
+        this.hideNowPlayingPanel();
         
         if (this.onAudioError) {
           this.onAudioError(this.currentPlayingTrack, error);
@@ -398,6 +402,55 @@ export class SoulGalaxyAudioIntegration {
    */
   setOnRotationStop(callback: (track: CrystalTrack) => void): void {
     this.onRotationStop = callback;
+  }
+
+  /**
+   * Устанавливает UI Manager для показа панели воспроизведения
+   */
+  setUIManager(uiManager: any): void {
+    this.uiManager = uiManager;
+    console.log('🎨 UI Manager integrated with Soul Galaxy Audio Integration');
+  }
+
+  /**
+   * Показывает панель воспроизведения с информацией о треке
+   */
+  private showNowPlayingPanel(): void {
+    if (!this.uiManager || !this.currentPlayingTrack) {
+      return;
+    }
+
+    console.log('🎵 Showing now playing panel');
+
+    const trackData = {
+      title: this.currentPlayingTrack.name,
+      artist: this.currentPlayingTrack.artist,
+      album: this.currentPlayingTrack.album,
+      coverUrl: this.currentPlayingTrack.imageUrl
+    };
+
+    if (typeof this.uiManager.showNowPlayingPanel === 'function') {
+      this.uiManager.showNowPlayingPanel(trackData);
+    } else {
+      console.warn('⚠️ UIManager.showNowPlayingPanel method not available');
+    }
+  }
+
+  /**
+   * Скрывает панель воспроизведения
+   */
+  private hideNowPlayingPanel(): void {
+    if (!this.uiManager) {
+      return;
+    }
+
+    console.log('🎵 Hiding now playing panel');
+
+    if (typeof this.uiManager.hideNowPlayingPanel === 'function') {
+      this.uiManager.hideNowPlayingPanel();
+    } else {
+      console.warn('⚠️ UIManager.hideNowPlayingPanel method not available');
+    }
   }
 
   /**

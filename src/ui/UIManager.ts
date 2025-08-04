@@ -113,6 +113,72 @@ export class UIManager {
     }
   }
 
+  /**
+   * Показывает панель воспроизведения трека вверху экрана
+   */
+  showNowPlayingPanel(trackData: {
+    title: string;
+    artist: string;
+    album: string;
+    coverUrl?: string;
+  }): void {
+    const panel = document.getElementById('now-playing-panel');
+    const titleEl = document.getElementById('now-playing-title');
+    const artistEl = document.getElementById('now-playing-artist');
+    const albumEl = document.getElementById('now-playing-album');
+    const coverEl = document.getElementById('now-playing-cover') as HTMLImageElement;
+
+    if (!panel || !titleEl || !artistEl || !albumEl || !coverEl) {
+      console.warn('⚠️ Now playing panel elements not found');
+      return;
+    }
+
+    // Заполняем данные
+    titleEl.textContent = trackData.title;
+    artistEl.textContent = trackData.artist;
+    albumEl.textContent = trackData.album;
+
+    // Устанавливаем обложку альбома
+    if (trackData.coverUrl) {
+      coverEl.src = trackData.coverUrl;
+      coverEl.style.display = 'block';
+    } else {
+      // Используем заглушку если нет обложки
+      coverEl.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjMzMzIiByeD0iOCIvPgo8cGF0aCBkPSJNMzAgMTVWNDVNMTUgMzBINDUiIHN0cm9rZT0iIzY2NiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPHN2Zz4K';
+      coverEl.style.display = 'block';
+    }
+
+    // Убираем класс fade-out если есть
+    panel.classList.remove('fade-out');
+    
+    // Показываем панель
+    panel.style.display = 'block';
+
+    console.log(`🎵 Now playing panel shown: ${trackData.title} by ${trackData.artist}`);
+  }
+
+  /**
+   * Скрывает панель воспроизведения трека
+   */
+  hideNowPlayingPanel(): void {
+    const panel = document.getElementById('now-playing-panel');
+    
+    if (!panel || panel.style.display === 'none') {
+      return;
+    }
+
+    // Добавляем анимацию исчезновения
+    panel.classList.add('fade-out');
+    
+    // Скрываем панель после анимации
+    setTimeout(() => {
+      panel.style.display = 'none';
+      panel.classList.remove('fade-out');
+    }, 300);
+
+    console.log('🎵 Now playing panel hidden');
+  }
+
   dispose(): void {
     console.log('Освобождение ресурсов UI Manager...');
     
@@ -124,6 +190,9 @@ export class UIManager {
     
     // Удаляем уведомление о фокусе
     this.hideFocusExitHint();
+    
+    // Скрываем панель воспроизведения
+    this.hideNowPlayingPanel();
     
     // Удаляем стили
     const styles = document.getElementById('focus-hint-styles');

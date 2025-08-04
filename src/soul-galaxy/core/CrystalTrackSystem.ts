@@ -454,7 +454,11 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
    */
   setUIManager(uiManager: any): void {
     this.uiManager = uiManager;
-    console.log('🎨 UI Manager integrated with Crystal Track System');
+    
+    // Также передаем UI Manager в аудио интеграцию для показа панели воспроизведения
+    this.audioIntegration.setUIManager(uiManager);
+    
+    console.log('🎨 UI Manager integrated with Crystal Track System and Audio Integration');
   }
 
   /**
