@@ -23,10 +23,10 @@ export class DepthOfFieldSystem {
     private camera: THREE.PerspectiveCamera;
     
     // Post-processing компоненты
-    private composer: EffectComposer;
-    private renderPass: RenderPass;
-    private bokehPass: BokehPass;
-    private outputPass: OutputPass;
+    private composer!: EffectComposer;
+    private renderPass!: RenderPass;
+    private bokehPass!: BokehPass;
+    private outputPass!: OutputPass;
     
     // Настройки эффекта
     private settings: DepthOfFieldSettings = {
@@ -74,9 +74,7 @@ export class DepthOfFieldSystem {
             this.bokehPass = new BokehPass(this.scene, this.camera, {
                 focus: this.settings.focus,
                 aperture: this.settings.aperture,
-                maxblur: this.settings.maxblur,
-                width: this.renderer.domElement.width,
-                height: this.renderer.domElement.height
+                maxblur: this.settings.maxblur
             });
             
             // Изначально отключаем эффект
@@ -211,10 +209,10 @@ export class DepthOfFieldSystem {
         if (!this.bokehPass) return;
         
         // Обновляем uniforms bokeh pass
-        if (this.bokehPass.uniforms) {
-            this.bokehPass.uniforms['focus'].value = this.settings.focus;
-            this.bokehPass.uniforms['aperture'].value = this.settings.aperture;
-            this.bokehPass.uniforms['maxblur'].value = this.settings.maxblur;
+        if (this.bokehPass.uniforms && 'focus' in this.bokehPass.uniforms) {
+            (this.bokehPass.uniforms as any)['focus'].value = this.settings.focus;
+            (this.bokehPass.uniforms as any)['aperture'].value = this.settings.aperture;
+            (this.bokehPass.uniforms as any)['maxblur'].value = this.settings.maxblur;
         }
     }
     
@@ -279,9 +277,9 @@ export class DepthOfFieldSystem {
         this.composer.setSize(width, height);
         
         // Обновляем размеры в bokeh pass
-        if (this.bokehPass.uniforms) {
-            this.bokehPass.uniforms['textureWidth'].value = width;
-            this.bokehPass.uniforms['textureHeight'].value = height;
+        if (this.bokehPass.uniforms && 'textureWidth' in this.bokehPass.uniforms) {
+            (this.bokehPass.uniforms as any)['textureWidth'].value = width;
+            (this.bokehPass.uniforms as any)['textureHeight'].value = height;
         }
         
         console.log(`DepthOfFieldSystem размер обновлен: ${width}x${height}`);

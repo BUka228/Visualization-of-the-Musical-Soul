@@ -13,14 +13,14 @@ export class SoulGalaxyRenderer implements ISoulGalaxyRenderer {
     this.crystalTrackSystem = new CrystalTrackSystem();
   }
 
-  initialize(scene: THREE.Scene, camera: THREE.Camera): void {
+  initialize(scene: THREE.Scene, camera: THREE.Camera, container?: HTMLElement): void {
     console.log('🌌 Initializing Soul Galaxy Renderer...');
     
     this.scene = scene;
     this.camera = camera;
     
-    // Initialize the crystal track system
-    this.crystalTrackSystem.initialize(scene, camera);
+    // Initialize the crystal track system with container for HUD
+    this.crystalTrackSystem.initialize(scene, camera, container);
     
     this.initialized = true;
     
@@ -49,6 +49,24 @@ export class SoulGalaxyRenderer implements ISoulGalaxyRenderer {
     // Update crystal track system animations
     this.crystalTrackSystem.updatePulsation(deltaTime);
     this.crystalTrackSystem.rotateCluster(deltaTime);
+  }
+
+  /**
+   * Обновляет позицию мыши для системы подсветки
+   */
+  updateMousePosition(mouseX: number, mouseY: number): void {
+    if (!this.initialized) {
+      return;
+    }
+
+    this.crystalTrackSystem.updateMousePosition(mouseX, mouseY);
+  }
+
+  /**
+   * Получает систему кристаллических треков для дополнительной настройки
+   */
+  getCrystalTrackSystem(): CrystalTrackSystem {
+    return this.crystalTrackSystem;
   }
 
   // Visual mode methods removed - Soul Galaxy is now the only mode

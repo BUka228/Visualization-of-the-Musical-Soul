@@ -92,6 +92,7 @@ export interface SceneManager {
   getInteractionManager(): InteractionManager;
   getEffectsManager(): EffectsManager;
   getPerformanceOptimizer(): any; // PerformanceOptimizer type will be imported separately
+  getSoulGalaxyRenderer(): any; // SoulGalaxyRenderer type will be imported separately
 }
 
 // Интерфейсы для взаимодействия

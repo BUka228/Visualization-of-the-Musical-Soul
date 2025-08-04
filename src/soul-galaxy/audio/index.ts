@@ -1,0 +1,1 @@
+export { SoulGalaxyAudioIntegration } from './SoulGalaxyAudioIntegration';

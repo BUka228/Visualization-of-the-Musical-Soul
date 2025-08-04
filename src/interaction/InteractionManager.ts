@@ -218,15 +218,15 @@ export class InteractionManager implements IInteractionManager {
   private getIntersectedTrack(): string | null {
     if (!this.sceneManager) return null;
     
-    const camera = this.sceneManager.getCamera();
+    // Обновляем позицию мыши в Soul Galaxy рендерере для системы подсветки
+    const soulGalaxyRenderer = this.sceneManager.getSoulGalaxyRenderer();
+    soulGalaxyRenderer.updateMousePosition(this.mouse.x, this.mouse.y);
     
-    // Настройка raycaster
-    this.raycaster.setFromCamera(this.mouse, camera);
+    // Получаем наведенный кристалл из системы подсветки
+    const crystalTrackSystem = soulGalaxyRenderer.getCrystalTrackSystem();
+    const hoveredCrystal = crystalTrackSystem.getHoveredCrystal();
     
-    // Soul Galaxy renderer handles its own intersection detection
-    // Classic track object intersection detection is no longer needed
-    
-    return null;
+    return hoveredCrystal ? hoveredCrystal.id : null;
   }
 
   private hoverTrack(trackId: string): void {
@@ -267,8 +267,17 @@ export class InteractionManager implements IInteractionManager {
     
     this.selectedTrackId = trackId;
     
-    // Делегируем анимацию выбора AnimationManager
+    // Обрабатываем клик через Soul Galaxy систему
     if (this.sceneManager) {
+      const soulGalaxyRenderer = this.sceneManager.getSoulGalaxyRenderer();
+      const crystalTrackSystem = soulGalaxyRenderer.getCrystalTrackSystem();
+      
+      // Воспроизводим трек с кинематографическим переходом
+      crystalTrackSystem.handleCrystalClick(trackId).catch((error: Error) => {
+        console.error('❌ Failed to handle crystal click:', error);
+      });
+      
+      // Делегируем анимацию выбора AnimationManager
       const animationManager = this.sceneManager.getAnimationManager();
       if (animationManager) {
         animationManager.animateTrackSelection(trackId);
@@ -281,9 +290,6 @@ export class InteractionManager implements IInteractionManager {
       }
     }
     
-    // Soul Galaxy renderer handles its own UI updates
-    // Classic track object UI updates are no longer needed
-    
     console.log('Трек выбран:', trackId);
     
     // Вызов коллбэка
@@ -295,11 +301,17 @@ export class InteractionManager implements IInteractionManager {
   deselectTrack(): void {
     if (!this.selectedTrackId) return;
     
-    // Останавливаем воспроизведение аудио
-    this.audioManager.stopPreview();
-    
-    // Делегируем анимацию отмены выбора AnimationManager
+    // Останавливаем воспроизведение через Soul Galaxy аудио интеграцию
     if (this.sceneManager) {
+      const soulGalaxyRenderer = this.sceneManager.getSoulGalaxyRenderer();
+      const crystalTrackSystem = soulGalaxyRenderer.getCrystalTrackSystem();
+      
+      // Останавливаем текущее воспроизведение
+      crystalTrackSystem.stopCurrentPlayback().catch((error: Error) => {
+        console.error('❌ Failed to stop current playback:', error);
+      });
+      
+      // Делегируем анимацию отмены выбора AnimationManager
       const animationManager = this.sceneManager.getAnimationManager();
       if (animationManager) {
         animationManager.animateTrackDeselection();
@@ -312,8 +324,8 @@ export class InteractionManager implements IInteractionManager {
       }
     }
     
-    // Soul Galaxy renderer handles its own UI updates
-    // Classic track object UI updates are no longer needed
+    // Также останавливаем старый аудио менеджер для совместимости
+    this.audioManager.stopPreview();
     
     // Сбрасываем состояние выбора
     this.selectedTrackId = undefined;

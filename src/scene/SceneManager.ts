@@ -94,8 +94,8 @@ export class SceneManager implements ISceneManager {
     // Инициализация менеджера эффектов
     this.effectsManager.initialize(this.scene, this.camera, this.interactionManager.getAudioManager());
     
-    // Инициализация Soul Galaxy рендерера (единственный режим)
-    this.soulGalaxyRenderer.initialize(this.scene, this.camera);
+    // Инициализация Soul Galaxy рендерера (единственный режим) с контейнером для HUD
+    this.soulGalaxyRenderer.initialize(this.scene, this.camera, this.container);
     
     // Запуск цикла рендеринга
     this.startRenderLoop();

@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crystal Hover System Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            max-width: 300px;
+        }
+        
+        #hover-info {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            z-index: 100;
+            background: rgba(0, 50, 100, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            min-height: 60px;
+            min-width: 250px;
+            border: 1px solid rgba(0, 100, 200, 0.5);
+        }
+        
+        .hover-active {
+            background: rgba(0, 100, 50, 0.8) !important;
+            border-color: rgba(0, 200, 100, 0.5) !important;
+        }
+        
+        #performance {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 100;
+            background: rgba(50, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 11px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div id="info">
+        <h3>🎯 Crystal Hover System Test</h3>
+        <p><strong>Instructions:</strong></p>
+        <ul>
+            <li>Move mouse over crystals to see hover effects</li>
+            <li>Crystals should glow brighter when hovered</li>
+            <li>Hover info should appear at bottom</li>
+            <li>Performance stats shown at top-right</li>
+        </ul>
+        <p><strong>Controls:</strong> Mouse to orbit, Wheel to zoom</p>
+    </div>
+    
+    <div id="hover-info">
+        <strong>Hover Status:</strong> No crystal hovered<br>
+        <span id="hover-details">Move mouse over a crystal to see details</span>
+    </div>
+    
+    <div id="performance">
+        <div>FPS: <span id="fps">--</span></div>
+        <div>Crystals: <span id="crystal-count">--</span></div>
+        <div>Visible: <span id="visible-count">--</span></div>
+        <div>Update Freq: <span id="update-freq">--</span></div>
+    </div>
+
+    <script type="module">
+        import { SceneManager } from '../../src/scene/SceneManager.js';
+        
+        // Test data - создаем несколько тестовых треков
+        const testTracks = [
+            {
+                id: 'test-1',
+                name: 'Test Metal Track',
+                artist: 'Metal Artist',
+                genre: 'metal',
+                color: '#FF0040',
+                energy: 0.8,
+                valence: 0.6,
+                danceability: 0.7,
+                acousticness: 0.1,
+                instrumentalness: 0.3,
+                liveness: 0.4,
+                speechiness: 0.1,
+                tempo: 140,
+                duration: 240000,
+                popularity: 75,
+                imageUrl: null,
+                previewUrl: null,
+                position: { x: -10, y: 5, z: 0 }
+            },
+            {
+                id: 'test-2',
+                name: 'Test Rock Track',
+                artist: 'Rock Artist',
+                genre: 'rock',
+                color: '#0080FF',
+                energy: 0.7,
+                valence: 0.8,
+                danceability: 0.6,
+                acousticness: 0.2,
+                instrumentalness: 0.1,
+                liveness: 0.3,
+                speechiness: 0.05,
+                tempo: 120,
+                duration: 200000,
+                popularity: 80,
+                imageUrl: null,
+                previewUrl: null,
+                position: { x: 10, y: -5, z: 0 }
+            },
+            {
+                id: 'test-3',
+                name: 'Test Electronic Track',
+                artist: 'Electronic Artist',
+                genre: 'electronic',
+                color: '#8000FF',
+                energy: 0.9,
+                valence: 0.7,
+                danceability: 0.9,
+                acousticness: 0.05,
+                instrumentalness: 0.8,
+                liveness: 0.1,
+                speechiness: 0.02,
+                tempo: 128,
+                duration: 300000,
+                popularity: 85,
+                imageUrl: null,
+                previewUrl: null,
+                position: { x: 0, y: 10, z: -10 }
+            },
+            {
+                id: 'test-4',
+                name: 'Test Punk Track',
+                artist: 'Punk Artist',
+                genre: 'punk',
+                color: '#00FF40',
+                energy: 0.95,
+                valence: 0.4,
+                danceability: 0.8,
+                acousticness: 0.1,
+                instrumentalness: 0.2,
+                liveness: 0.6,
+                speechiness: 0.3,
+                tempo: 180,
+                duration: 150000,
+                popularity: 60,
+                imageUrl: null,
+                previewUrl: null,
+                position: { x: -5, y: -10, z: 10 }
+            },
+            {
+                id: 'test-5',
+                name: 'Test Jazz Track',
+                artist: 'Jazz Artist',
+                genre: 'jazz',
+                color: '#FFD700',
+                energy: 0.4,
+                valence: 0.6,
+                danceability: 0.5,
+                acousticness: 0.7,
+                instrumentalness: 0.6,
+                liveness: 0.8,
+                speechiness: 0.1,
+                tempo: 90,
+                duration: 280000,
+                popularity: 70,
+                imageUrl: null,
+                previewUrl: null,
+                position: { x: 15, y: 0, z: 5 }
+            }
+        ];
+
+        // Инициализация сцены
+        const container = document.getElementById('container');
+        const sceneManager = new SceneManager(container, {
+            cameraDistance: 50,
+            enableShadows: true,
+            enablePostProcessing: false
+        });
+
+        // Инициализация
+        sceneManager.initializeScene();
+
+        // Создание кристаллов
+        await sceneManager.createTrackObjects(testTracks);
+
+        // Настройка системы подсветки
+        const soulGalaxyRenderer = sceneManager.getSoulGalaxyRenderer();
+        const crystalTrackSystem = soulGalaxyRenderer.getCrystalTrackSystem();
+        const hoverSystem = crystalTrackSystem.getHoverSystem();
+
+        // Элементы UI
+        const hoverInfo = document.getElementById('hover-info');
+        const hoverDetails = document.getElementById('hover-details');
+        const fpsElement = document.getElementById('fps');
+        const crystalCountElement = document.getElementById('crystal-count');
+        const visibleCountElement = document.getElementById('visible-count');
+        const updateFreqElement = document.getElementById('update-freq');
+
+        // Настройка коллбэков для системы подсветки
+        hoverSystem.setOnCrystalHovered((crystal) => {
+            console.log('✨ Crystal hovered:', crystal.name);
+            
+            hoverInfo.classList.add('hover-active');
+            hoverInfo.innerHTML = `
+                <strong>🎯 Hovered Crystal:</strong><br>
+                <strong>Track:</strong> ${crystal.name}<br>
+                <strong>Artist:</strong> ${crystal.artist}<br>
+                <strong>Genre:</strong> ${crystal.genre}<br>
+                <strong>Energy:</strong> ${(crystal.energy * 100).toFixed(0)}%<br>
+                <strong>Tempo:</strong> ${crystal.tempo} BPM
+            `;
+        });
+
+        hoverSystem.setOnCrystalUnhovered((crystal) => {
+            console.log('💫 Crystal unhovered:', crystal.name);
+            
+            hoverInfo.classList.remove('hover-active');
+            hoverInfo.innerHTML = `
+                <strong>Hover Status:</strong> No crystal hovered<br>
+                <span id="hover-details">Move mouse over a crystal to see details</span>
+            `;
+        });
+
+        // Статистика производительности
+        let frameCount = 0;
+        let lastTime = performance.now();
+        let fps = 0;
+
+        function updatePerformanceStats() {
+            const currentTime = performance.now();
+            frameCount++;
+            
+            if (currentTime - lastTime >= 1000) {
+                fps = Math.round((frameCount * 1000) / (currentTime - lastTime));
+                frameCount = 0;
+                lastTime = currentTime;
+                
+                // Обновляем UI
+                fpsElement.textContent = fps;
+                
+                // Получаем статистику от системы подсветки
+                const perfStats = hoverSystem.getPerformanceStats();
+                crystalCountElement.textContent = perfStats.totalCrystals;
+                visibleCountElement.textContent = perfStats.visibleCrystals;
+                updateFreqElement.textContent = perfStats.updateFrequency + ' Hz';
+            }
+            
+            requestAnimationFrame(updatePerformanceStats);
+        }
+        
+        updatePerformanceStats();
+
+        // Логирование для отладки
+        console.log('🎯 Crystal Hover System Test initialized');
+        console.log('📊 Test tracks created:', testTracks.length);
+        console.log('🔮 Crystal track system:', crystalTrackSystem);
+        console.log('✨ Hover system:', hoverSystem);
+        
+        // Дополнительная информация в консоль
+        setTimeout(() => {
+            const crystalTracks = crystalTrackSystem.getCrystalTracks();
+            console.log('🌟 Crystal tracks loaded:', crystalTracks.length);
+            console.log('📈 Performance stats:', hoverSystem.getPerformanceStats());
+        }, 2000);
+
+        // Обработка ошибок
+        window.addEventListener('error', (event) => {
+            console.error('❌ Test error:', event.error);
+            
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = `
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(255, 0, 0, 0.9);
+                color: white;
+                padding: 20px;
+                border-radius: 10px;
+                z-index: 1000;
+                max-width: 500px;
+                text-align: center;
+            `;
+            errorDiv.innerHTML = `
+                <h3>❌ Test Error</h3>
+                <p><strong>Message:</strong> ${event.error?.message || 'Unknown error'}</p>
+                <p><strong>File:</strong> ${event.filename || 'Unknown'}</p>
+                <p><strong>Line:</strong> ${event.lineno || 'Unknown'}</p>
+                <button onclick="location.reload()" style="margin-top: 10px; padding: 5px 15px;">Reload Test</button>
+            `;
+            
+            document.body.appendChild(errorDiv);
+        });
+    </script>
+</body>
+</html>

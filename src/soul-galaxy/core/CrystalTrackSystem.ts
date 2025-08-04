@@ -5,6 +5,8 @@ import { CrystalGeometryGenerator } from './CrystalGeometryGenerator';
 import { CrystalPulseSystem } from '../effects/CrystalPulseSystem';
 import { CrystalShaderMaterial } from '../materials/CrystalShaderMaterial';
 import { AlbumTextureManager } from '../materials/AlbumTextureManager';
+import { CrystalHoverSystem } from '../interaction/CrystalHoverSystem';
+import { SoulGalaxyAudioIntegration } from '../audio/SoulGalaxyAudioIntegration';
 
 /**
  * Система управления кристаллическими треками
@@ -19,6 +21,8 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
   private initialized: boolean = false;
   private pulseSystem: CrystalPulseSystem;
   private albumTextureManager: AlbumTextureManager;
+  private hoverSystem: CrystalHoverSystem;
+  private audioIntegration: SoulGalaxyAudioIntegration;
 
   constructor() {
     this.pulseSystem = new CrystalPulseSystem();
@@ -29,6 +33,8 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
       blurIntensity: 0.3,
       distortionStrength: 0.1
     });
+    this.hoverSystem = new CrystalHoverSystem();
+    this.audioIntegration = new SoulGalaxyAudioIntegration();
   }
 
   // Конфигурация кластера
@@ -39,12 +45,18 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
     rotationSpeed: 0.001  // Скорость вращения кластера
   };
 
-  initialize(scene: THREE.Scene, camera: THREE.Camera): void {
+  initialize(scene: THREE.Scene, camera: THREE.Camera, container?: HTMLElement): void {
     console.log('🔮 Initializing Crystal Track System...');
     
     this.scene = scene;
     this.camera = camera;
     this.initialized = true;
+    
+    // Инициализируем систему подсветки с контейнером для HUD
+    this.hoverSystem.initialize(scene, camera, container);
+    
+    // Инициализируем аудио интеграцию
+    this.audioIntegration.initialize();
     
     console.log('✅ Crystal Track System initialized');
   }
@@ -85,6 +97,9 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
     // Инициализируем систему пульсации
     this.pulseSystem.initialize(this.scene, this.crystalTracks);
 
+    // Настраиваем систему подсветки для кристаллов
+    this.hoverSystem.setCrystalTracks(this.crystalTracks, this.crystalCluster);
+
     console.log(`✅ Crystal cluster created with ${this.crystalTracks.length} crystals`);
     this.logClusterStats();
     this.logTextureStats();
@@ -117,6 +132,9 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
 
     // Используем продвинутую систему пульсации
     this.pulseSystem.updatePulsation(deltaTime);
+    
+    // Обновляем систему подсветки
+    this.hoverSystem.update(deltaTime);
   }
 
   setPulsationFromBPM(track: ProcessedTrack, bpm?: number): void {
@@ -149,8 +167,100 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
     }
   }
 
+  /**
+   * Обновляет позицию мыши для системы подсветки
+   */
+  updateMousePosition(mouseX: number, mouseY: number): void {
+    this.hoverSystem.updateMousePosition(mouseX, mouseY);
+  }
+
+  /**
+   * Получает систему подсветки для настройки коллбэков
+   */
+  getHoverSystem(): CrystalHoverSystem {
+    return this.hoverSystem;
+  }
+
+  /**
+   * Получает текущий наведенный кристалл
+   */
+  getHoveredCrystal(): CrystalTrack | undefined {
+    return this.hoverSystem.getHoveredCrystal();
+  }
+
+  /**
+   * Принудительно убирает подсветку (например, при фокусе)
+   */
+  clearHover(): void {
+    this.hoverSystem.clearHover();
+  }
+
+  /**
+   * Обрабатывает клик по кристаллу для воспроизведения аудио
+   */
+  async handleCrystalClick(trackId: string): Promise<void> {
+    const crystalTrack = this.crystalTracks.find(ct => ct.id === trackId);
+    const crystalMesh = this.findCrystalMesh(trackId);
+    
+    if (!crystalTrack || !crystalMesh) {
+      console.warn(`⚠️ Crystal not found for track ID: ${trackId}`);
+      return;
+    }
+
+    console.log(`🎵 Crystal clicked: ${crystalTrack.name} by ${crystalTrack.artist}`);
+
+    try {
+      // Убираем подсветку при клике
+      this.clearHover();
+      
+      // Воспроизводим трек с кинематографическим переходом
+      await this.audioIntegration.playTrackWithTransition(crystalTrack, crystalMesh);
+      
+      // Фокусируемся на кристалле
+      this.focusOnCrystal(crystalTrack);
+      
+    } catch (error) {
+      console.error(`❌ Failed to play crystal: ${crystalTrack.name}`, error);
+    }
+  }
+
+  /**
+   * Получает аудио интеграцию для настройки коллбэков
+   */
+  getAudioIntegration(): SoulGalaxyAudioIntegration {
+    return this.audioIntegration;
+  }
+
+  /**
+   * Получает текущий воспроизводимый трек
+   */
+  getCurrentPlayingTrack(): CrystalTrack | undefined {
+    return this.audioIntegration.getCurrentPlayingTrack();
+  }
+
+  /**
+   * Останавливает текущее воспроизведение
+   */
+  async stopCurrentPlayback(): Promise<void> {
+    await this.audioIntegration.stopCurrentTrack();
+  }
+
+  /**
+   * Проверяет, воспроизводится ли трек
+   */
+  isTrackPlaying(trackId: string): boolean {
+    const crystalTrack = this.crystalTracks.find(ct => ct.id === trackId);
+    return crystalTrack ? this.audioIntegration.isTrackPlaying(crystalTrack) : false;
+  }
+
   dispose(): void {
     console.log('🗑️ Disposing Crystal Track System...');
+    
+    // Dispose of the audio integration
+    this.audioIntegration.dispose();
+    
+    // Dispose of the hover system
+    this.hoverSystem.dispose();
     
     // Dispose of the pulse system
     this.pulseSystem.dispose();
