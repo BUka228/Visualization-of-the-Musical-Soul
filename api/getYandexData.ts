@@ -177,30 +177,72 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const trackIds = batch.map(track => track.id);
       
       try {
-        // Получаем информацию о скачивании
-        const downloadInfoResponse = await fetch(`${baseURL}/tracks/${trackIds.join(',')}/download-info`, {
-          method: 'GET',
-          headers
-        });
+        // Получаем информацию о скачивании для каждого трека отдельно
+        const batchWithDownloadInfo = await Promise.all(
+          batch.map(async (track) => {
+            try {
+              const downloadInfoResponse = await fetch(`${baseURL}/tracks/${track.id}/download-info`, {
+                method: 'GET',
+                headers
+              });
 
-        if (downloadInfoResponse.ok) {
-          const downloadInfoData = await downloadInfoResponse.json();
-          const downloadInfos = downloadInfoData.result || [];
-          
-          // Объединяем информацию о треках с информацией о скачивании
-          batch.forEach((track, index) => {
-            const downloadInfo = downloadInfos.find((info: any) => info.trackId === track.id);
-            tracksWithDownloadInfo.push({
-              ...track,
-              downloadInfo: downloadInfo
-            });
-          });
-        } else {
-          // Если не удалось получить download info, добавляем треки без него
-          tracksWithDownloadInfo.push(...batch);
-        }
+              if (downloadInfoResponse.ok) {
+                const downloadInfoData = await downloadInfoResponse.json();
+                const downloadInfos = downloadInfoData.result || [];
+                
+                // Получаем прямые ссылки для первых 2 форматов (для производительности)
+                const downloadInfosWithDirectLinks = await Promise.all(
+                  downloadInfos.slice(0, 2).map(async (info: any) => {
+                    try {
+                      if (info.downloadInfoUrl) {
+                        const directLinkResponse = await fetch(info.downloadInfoUrl, {
+                          method: 'GET',
+                          headers
+                        });
+                        
+                        if (directLinkResponse.ok) {
+                          const xmlData = await directLinkResponse.text();
+                          
+                          // Парсим XML для получения прямой ссылки
+                          const hostMatch = xmlData.match(/<host>([^<]+)<\/host>/);
+                          const pathMatch = xmlData.match(/<path>([^<]+)<\/path>/);
+                          const tsMatch = xmlData.match(/<ts>([^<]+)<\/ts>/);
+                          const sMatch = xmlData.match(/<s>([^<]+)<\/s>/);
+                          
+                          if (hostMatch && pathMatch && tsMatch && sMatch) {
+                            const directUrl = `https://${hostMatch[1]}${pathMatch[1]}?ts=${tsMatch[1]}&s=${sMatch[1]}`;
+                            return {
+                              ...info,
+                              directUrl: directUrl
+                            };
+                          }
+                        }
+                      }
+                      return info;
+                    } catch (directLinkError) {
+                      console.log(`Error getting direct link for track ${track.id}:`, directLinkError instanceof Error ? directLinkError.message : 'Unknown error');
+                      return info;
+                    }
+                  })
+                );
+                
+                return {
+                  ...track,
+                  downloadInfo: downloadInfosWithDirectLinks
+                };
+              } else {
+                return track;
+              }
+            } catch (trackDownloadError) {
+              console.log(`Error getting download info for track ${track.id}:`, trackDownloadError instanceof Error ? trackDownloadError.message : 'Unknown error');
+              return track;
+            }
+          })
+        );
+        
+        tracksWithDownloadInfo.push(...batchWithDownloadInfo);
       } catch (downloadError) {
-        console.log(`Error fetching download info for batch ${Math.floor(i/downloadBatchSize) + 1}:`, downloadError);
+        console.log(`Error fetching download info for batch ${Math.floor(i/downloadBatchSize) + 1}:`, downloadError instanceof Error ? downloadError.message : 'Unknown error');
         // Добавляем треки без download info
         tracksWithDownloadInfo.push(...batch);
       }
@@ -231,11 +273,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           
           // Ищем превью среди доступных форматов (низкое качество для превью)
           const previewInfo = track.downloadInfo.find((info: any) => 
-            info.codec === 'mp3' && info.bitrateInKbps <= 128
-          ) || track.downloadInfo.find((info: any) => info.codec === 'mp3') || track.downloadInfo[0];
+            info.codec === 'mp3' && info.bitrateInKbps <= 192 && info.directUrl
+          ) || track.downloadInfo.find((info: any) => info.codec === 'mp3' && info.directUrl) || track.downloadInfo.find((info: any) => info.directUrl);
           
-          if (previewInfo && previewInfo.downloadInfoUrl) {
-            previewUrl = previewInfo.downloadInfoUrl;
+          if (previewInfo && previewInfo.directUrl) {
+            previewUrl = previewInfo.directUrl;
           }
         }
 
