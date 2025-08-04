@@ -5,6 +5,7 @@ import { CrystalGeometryGenerator } from './CrystalGeometryGenerator';
 import { CrystalPulseSystem } from '../effects/CrystalPulseSystem';
 import { CrystalShaderMaterial } from '../materials/CrystalShaderMaterial';
 import { AlbumTextureManager } from '../materials/AlbumTextureManager';
+import { TextureClaritySystem } from '../materials/TextureClaritySystem';
 import { CrystalHoverSystem } from '../interaction/CrystalHoverSystem';
 import { SoulGalaxyAudioIntegration } from '../audio/SoulGalaxyAudioIntegration';
 import { CinematicCameraController } from '../camera/CinematicCameraController';
@@ -22,6 +23,7 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
   private initialized: boolean = false;
   private pulseSystem: CrystalPulseSystem;
   private albumTextureManager: AlbumTextureManager;
+  private textureClaritySystem: TextureClaritySystem;
   private hoverSystem: CrystalHoverSystem;
   private audioIntegration: SoulGalaxyAudioIntegration;
   private cameraController?: CinematicCameraController;
@@ -33,7 +35,14 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
       cacheSize: 100,
       enableCompression: true,
       blurIntensity: 0.3,
-      distortionStrength: 0.1
+      distortionStrength: 0.1,
+      highQualityTextureSize: 1024,
+      enableHighQualityPreload: true
+    });
+    this.textureClaritySystem = new TextureClaritySystem(this.albumTextureManager, {
+      transitionDuration: 1500,
+      enableSmoothInterpolation: true,
+      preloadHighQuality: true
     });
     this.hoverSystem = new CrystalHoverSystem();
     this.audioIntegration = new SoulGalaxyAudioIntegration();
@@ -81,6 +90,10 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
     // Предзагружаем текстуры альбомов для оптимизации
     console.log('🖼️ Preloading album textures...');
     await this.albumTextureManager.preloadTextures(tracks);
+    
+    // Предзагружаем высококачественные текстуры для фокуса
+    console.log('🎨 Preloading high-quality textures for focus...');
+    await this.textureClaritySystem.preloadHighQualityTextures(tracks);
 
     // Конвертируем ProcessedTrack в CrystalTrack и создаем кристаллы
     this.crystalTracks = await Promise.all(
@@ -263,6 +276,15 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
       if (mesh && mesh.material instanceof CrystalShaderMaterial) {
         mesh.material.setFocused(true);
         mesh.material.setEmissiveIntensity(0.8);
+        
+        // Запускаем переход к высококачественной текстуре
+        await this.textureClaritySystem.transitionToHighQuality(
+          crystal,
+          mesh.material,
+          () => {
+            console.log(`🎨 High-quality texture transition completed for ${crystal.name}`);
+          }
+        );
       }
       
       console.log(`✅ Cinematic focus completed on crystal: ${crystal.name}`);
@@ -291,11 +313,20 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
       if (focusedCrystal) {
         focusedCrystal.isFocused = false;
         
-        // Возвращаем нормальную интенсивность свечения
+        // Возвращаем нормальную интенсивность свечения и текстуру
         const mesh = this.findCrystalMesh(focusedCrystal.id);
         if (mesh && mesh.material instanceof CrystalShaderMaterial) {
           mesh.material.setFocused(false);
           mesh.material.setEmissiveIntensity(0.3);
+          
+          // Запускаем переход к средней качественной текстуре
+          await this.textureClaritySystem.transitionToMediumQuality(
+            focusedCrystal,
+            mesh.material,
+            () => {
+              console.log(`🎨 Medium-quality texture transition completed for ${focusedCrystal.name}`);
+            }
+          );
         }
       }
       
@@ -363,6 +394,9 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
     
     // Dispose of the pulse system
     this.pulseSystem.dispose();
+    
+    // Dispose of the texture clarity system
+    this.textureClaritySystem.dispose();
     
     // Dispose of the album texture manager
     this.albumTextureManager.dispose();

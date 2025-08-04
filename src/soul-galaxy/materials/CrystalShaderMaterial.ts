@@ -127,6 +127,8 @@ const crystalFragmentShader = `
   uniform float opacity;
   uniform float metallic;
   uniform float roughness;
+  uniform float textureClarity;
+  uniform float focusTransition;
   
   // Varyings
   varying vec3 vNormal;
@@ -160,36 +162,42 @@ const crystalFragmentShader = `
     // Base genre color with neon intensity
     vec3 baseColor = genreColor;
     
-    // Album texture overlay with distortion effect
+    // Album texture overlay with dynamic clarity effect
     vec3 textureColor = baseColor;
     if (hasAlbumTexture) {
-      // Create distorted UV coordinates for "memory" effect
-      vec2 distortedUv = vUv;
+      // Calculate dynamic distortion based on clarity and focus transition
+      float dynamicClarity = mix(textureClarity, 1.0, focusTransition);
+      float distortionStrength = mix(0.15, 0.005, dynamicClarity);
+      float aberrationStrength = mix(0.03, 0.001, dynamicClarity);
       
-      if (!isFocused) {
-        // Heavy distortion when not focused (blurry memory)
-        float distortionStrength = 0.1;
-        distortedUv += vec2(
-          noise(vUv * 8.0 + time * 0.1) * distortionStrength,
-          noise(vUv * 8.0 + time * 0.15 + 100.0) * distortionStrength
-        );
-        
-        // Add chromatic aberration for memory effect
-        float aberration = 0.02;
-        float r = texture2D(albumTexture, distortedUv + vec2(aberration, 0.0)).r;
-        float g = texture2D(albumTexture, distortedUv).g;
-        float b = texture2D(albumTexture, distortedUv - vec2(aberration, 0.0)).b;
-        textureColor = vec3(r, g, b);
-        
-        // Heavily blend with genre color for blurry effect
-        textureColor = mix(baseColor, textureColor, 0.2);
-      } else {
-        // Sharp, clear texture when focused
-        vec2 focusedUv = vUv + sin(vUv * 20.0 + time) * 0.005; // Subtle distortion
-        textureColor = texture2D(albumTexture, focusedUv).rgb;
-        
-        // Blend more prominently with genre color
-        textureColor = mix(baseColor, textureColor, 0.6);
+      // Create distorted UV coordinates for "memory" effect
+      vec2 distortedUv = vUv + vec2(
+        noise(vUv * 8.0 + time * 0.1) * distortionStrength,
+        noise(vUv * 8.0 + time * 0.15 + 100.0) * distortionStrength
+      );
+      
+      // Apply chromatic aberration based on clarity
+      float r = texture2D(albumTexture, distortedUv + vec2(aberrationStrength, 0.0)).r;
+      float g = texture2D(albumTexture, distortedUv).g;
+      float b = texture2D(albumTexture, distortedUv - vec2(aberrationStrength, 0.0)).b;
+      vec3 distortedTexture = vec3(r, g, b);
+      
+      // Get sharp texture for high clarity
+      vec2 sharpUv = vUv + sin(vUv * 20.0 + time) * 0.002; // Minimal distortion
+      vec3 sharpTexture = texture2D(albumTexture, sharpUv).rgb;
+      
+      // Interpolate between distorted and sharp texture based on clarity
+      vec3 finalTexture = mix(distortedTexture, sharpTexture, dynamicClarity);
+      
+      // Blend with genre color - more texture visible at higher clarity
+      float textureBlend = mix(0.15, 0.7, dynamicClarity);
+      textureColor = mix(baseColor, finalTexture, textureBlend);
+      
+      // Add focus transition enhancement
+      if (focusTransition > 0.0) {
+        // During focus transition, enhance texture visibility
+        float focusEnhancement = focusTransition * 0.3;
+        textureColor = mix(textureColor, finalTexture, focusEnhancement);
       }
     }
     
@@ -325,6 +333,8 @@ export class CrystalShaderMaterial extends THREE.ShaderMaterial {
         // Texture
         albumTexture: { value: albumTexture || null },
         hasAlbumTexture: { value: !!albumTexture },
+        textureClarity: { value: 0.5 }, // 0 = blurry, 1 = sharp
+        focusTransition: { value: 0.0 }, // 0-1 transition progress
         
         // State
         isFocused: { value: false },
@@ -426,7 +436,33 @@ export class CrystalShaderMaterial extends THREE.ShaderMaterial {
     this.uniforms.isHovered.value = hovered;
   }
 
+  /**
+   * Sets texture clarity level (0 = blurry, 1 = sharp)
+   */
+  setTextureClarity(clarity: number): void {
+    this.uniforms.textureClarity.value = Math.max(0, Math.min(1, clarity));
+  }
 
+  /**
+   * Sets focus transition progress (0-1)
+   */
+  setFocusTransition(progress: number): void {
+    this.uniforms.focusTransition.value = Math.max(0, Math.min(1, progress));
+  }
+
+  /**
+   * Gets current texture clarity level
+   */
+  getTextureClarity(): number {
+    return this.uniforms.textureClarity.value;
+  }
+
+  /**
+   * Gets current focus transition progress
+   */
+  getFocusTransition(): number {
+    return this.uniforms.focusTransition.value;
+  }
 
   /**
    * Sets material opacity
