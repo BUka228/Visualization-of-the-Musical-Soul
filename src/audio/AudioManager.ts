@@ -6,6 +6,8 @@ export class AudioManager implements IAudioManager {
   private fadeInDuration: number = 500; // ms
   private fadeOutDuration: number = 300; // ms
   private isCurrentlyPlaying: boolean = false;
+  private isTransitioning: boolean = false; // Флаг для предотвращения наложения
+  private currentTrackId?: string; // ID текущего трека для отслеживания
   
   // Коллбэки для событий
   private onPlayStart?: () => void;
@@ -27,12 +29,29 @@ export class AudioManager implements IAudioManager {
     return originalUrl;
   }
 
-  async playPreview(url: string): Promise<void> {
+  async playPreview(url: string, trackId?: string): Promise<void> {
     console.log(`🎵 Попытка воспроизведения превью: ${url}`);
     
+    // Предотвращаем наложение треков при быстром переключении
+    if (this.isTransitioning) {
+      console.log('⚠️ Переключение уже в процессе, игнорируем запрос');
+      return;
+    }
+
+    // Если это тот же трек, что уже играет, не делаем ничего
+    if (trackId && this.currentTrackId === trackId && this.isCurrentlyPlaying) {
+      console.log('🔄 Трек уже воспроизводится');
+      return;
+    }
+
+    this.isTransitioning = true;
+    
     try {
-      // Останавливаем текущее воспроизведение
-      await this.stopPreview();
+      // Останавливаем текущее воспроизведение и ждем завершения
+      await this.stopPreviewSync();
+      
+      // Устанавливаем ID нового трека
+      this.currentTrackId = trackId;
       
       // Преобразуем URL для использования прокси
       const proxyUrl = this.convertToProxyUrl(url);
@@ -57,6 +76,7 @@ export class AudioManager implements IAudioManager {
       this.fadeIn();
       
       this.isCurrentlyPlaying = true;
+      this.isTransitioning = false;
       
       if (this.onPlayStart) {
         this.onPlayStart();
@@ -70,6 +90,7 @@ export class AudioManager implements IAudioManager {
       
       // Очищаем состояние при ошибке
       this.cleanup();
+      this.isTransitioning = false;
       
       if (this.onError) {
         this.onError(audioError);
@@ -102,7 +123,11 @@ export class AudioManager implements IAudioManager {
         if (playPromise !== undefined) {
           playPromise
             .then(() => resolve())
-            .catch((error) => reject(new Error(`Ошибка воспроизведения: ${error.message}`)));
+            .catch((error) => {
+              // Сбрасываем флаг перехода при ошибке воспроизведения
+              this.isTransitioning = false;
+              reject(new Error(`Ошибка воспроизведения: ${error.message}`));
+            });
         } else {
           resolve();
         }
@@ -116,6 +141,9 @@ export class AudioManager implements IAudioManager {
         
         const error = this.currentAudio.error;
         const errorMessage = error ? `Код ошибки: ${error.code}` : 'Неизвестная ошибка загрузки';
+        
+        // Сбрасываем флаг перехода при ошибке загрузки
+        this.isTransitioning = false;
         reject(new Error(`Ошибка загрузки аудио: ${errorMessage}`));
       };
 
@@ -152,6 +180,7 @@ export class AudioManager implements IAudioManager {
       console.error('❌ Ошибка во время воспроизведения:', errorMessage);
       
       this.isCurrentlyPlaying = false;
+      this.isTransitioning = false; // Сбрасываем флаг перехода при ошибке
       
       if (this.onError) {
         this.onError(new Error(`Ошибка воспроизведения: ${errorMessage}`));
@@ -185,6 +214,22 @@ export class AudioManager implements IAudioManager {
       this.cleanup();
     });
 
+    this.isCurrentlyPlaying = false;
+  }
+
+  /**
+   * Синхронная остановка превью с ожиданием завершения fade-out
+   */
+  private async stopPreviewSync(): Promise<void> {
+    if (!this.currentAudio || !this.isCurrentlyPlaying) {
+      return;
+    }
+
+    console.log('⏹️ Синхронная остановка превью');
+
+    // Применяем fade-out эффект и ждем его завершения
+    await this.fadeOut();
+    this.cleanup();
     this.isCurrentlyPlaying = false;
   }
 
@@ -265,6 +310,7 @@ export class AudioManager implements IAudioManager {
     }
     
     this.isCurrentlyPlaying = false;
+    this.currentTrackId = undefined; // Очищаем ID трека
   }
 
   setVolume(volume: number): void {
@@ -383,6 +429,10 @@ export class AudioManager implements IAudioManager {
     
     this.stopPreview();
     this.cleanup();
+    
+    // Сброс флагов состояния
+    this.isTransitioning = false;
+    this.currentTrackId = undefined;
     
     // Сброс коллбэков
     this.onPlayStart = undefined;

@@ -133,7 +133,7 @@ export class SoulGalaxyAudioIntegration {
       await this.delay(SoulGalaxyAudioIntegration.AUDIO_CONFIG.transitionDelay);
 
       // Начинаем воспроизведение с плавным появлением
-      await this.audioManager.playPreview(track.previewUrl);
+      await this.audioManager.playPreview(track.previewUrl, track.id);
 
       this.isTransitioning = false;
 

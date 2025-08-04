@@ -112,7 +112,7 @@ export interface InteractionManager {
 
 // Интерфейсы для аудио
 export interface AudioManager {
-  playPreview(url: string): Promise<void>;
+  playPreview(url: string, trackId?: string): Promise<void>;
   stopPreview(): void;
   setVolume(volume: number): void;
   getCurrentTime(): number;
