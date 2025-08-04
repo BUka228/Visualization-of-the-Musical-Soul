@@ -3,6 +3,13 @@ dist/
 *.log
 .DS_Store
 .env
+
+# Токены и секретные данные
+scripts/.yandex_token
+.yandex_token
+
+# Локальные данные пользователя
+src/data/music_data.json
 .env.local
 .env.development.local
 .env.test.local

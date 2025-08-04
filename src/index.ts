@@ -3,6 +3,10 @@ import { SceneManager } from './scene/SceneManager';
 import { DataLoader } from './data/DataLoader';
 import { DataProcessor } from './data/DataProcessor';
 import { UIManager } from './ui/UIManager';
+import { FirstLoadScreen } from './ui/FirstLoadScreen';
+import { BurgerMenu } from './ui/BurgerMenu';
+import { TokenManager } from './auth/TokenManager';
+import { setupMockAPI } from './api/MockYandexAPI';
 import { Vector3 } from 'three';
 
 // Импорт тестов в режиме разработки
@@ -53,6 +57,8 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
   private container?: HTMLElement;
   private sceneManager?: SceneManager;
   private uiManager?: UIManager;
+  private firstLoadScreen?: FirstLoadScreen;
+  private burgerMenu?: BurgerMenu;
 
   constructor(config: Partial<AppConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -79,33 +85,9 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
       }
 
       console.log('WebGL поддерживается');
-      console.log('Конфигурация приложения:', this.config);
       
-      // Инициализация UI менеджера
-      this.uiManager = new UIManager();
-      this.uiManager.initialize();
-      this.uiManager.createDataCollectionButton();
-      
-      // Инициализация 3D-сцены
-      this.sceneManager = new SceneManager(container, this.config.scene);
-      this.sceneManager.initializeScene();
-      
-      // Интеграция UI Manager с SceneManager
-      this.sceneManager.setUIManager(this.uiManager);
-      
-      // Загрузка данных треков
-      await this.loadMusicData();
-      
-      this.state.isInitialized = true;
-      this.state.isLoading = false;
-      
-      // Скрыть индикатор загрузки
-      const loadingElement = document.getElementById('loading');
-      if (loadingElement) {
-        loadingElement.style.display = 'none';
-      }
-      
-      console.log('Music Galaxy 3D инициализировано успешно');
+      // Проверяем, нужен ли экран первой загрузки
+      await this.checkFirstLoadRequirement();
       
     } catch (error) {
       this.state.isLoading = false;
@@ -113,6 +95,99 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
       this.showError(error as Error);
       throw error;
     }
+  }
+
+  /**
+   * Проверяет, нужен ли экран первой загрузки
+   */
+  private async checkFirstLoadRequirement(): Promise<void> {
+    // Проверяем наличие данных и токена
+    const hasValidData = await DataLoader.checkDataFileExists();
+    const hasValidToken = TokenManager.hasValidToken();
+    const dataIsFresh = await DataLoader.checkDataFreshness();
+
+    // Показываем экран первой загрузки если:
+    // 1. Нет данных вообще
+    // 2. Данные устарели и нет валидного токена для обновления
+    // 3. Есть токен, но он недействителен
+    const needsFirstLoad = !hasValidData || 
+                          (!dataIsFresh && !hasValidToken) || 
+                          (TokenManager.getToken() && !hasValidToken);
+
+    if (needsFirstLoad) {
+      await this.showFirstLoadScreen();
+    } else {
+      await this.initializeMainApp();
+    }
+  }
+
+  /**
+   * Показывает экран первой загрузки
+   */
+  private async showFirstLoadScreen(): Promise<void> {
+    this.firstLoadScreen = new FirstLoadScreen(this.container!);
+    
+    // Настраиваем обработчик завершения первой загрузки
+    window.addEventListener('first-load-completed', (event: any) => {
+      this.handleFirstLoadCompleted(event.detail);
+    });
+
+    const shown = await this.firstLoadScreen.show();
+    if (!shown) {
+      // Экран не был показан, значит данные есть
+      await this.initializeMainApp();
+    }
+  }
+
+  /**
+   * Обрабатывает завершение первой загрузки
+   */
+  private async handleFirstLoadCompleted(detail: any): Promise<void> {
+    console.log('Первая загрузка завершена:', detail);
+    
+    if (this.firstLoadScreen) {
+      this.firstLoadScreen.hide();
+      this.firstLoadScreen = undefined;
+    }
+
+    // Инициализируем основное приложение
+    await this.initializeMainApp();
+  }
+
+  /**
+   * Инициализирует основное приложение
+   */
+  private async initializeMainApp(): Promise<void> {
+    console.log('Инициализация основного приложения...');
+    
+    // Инициализация UI менеджера
+    this.uiManager = new UIManager();
+    this.uiManager.initialize();
+    
+    // Инициализация бургер-меню
+    this.burgerMenu = new BurgerMenu();
+    this.burgerMenu.initialize();
+    
+    // Инициализация 3D-сцены
+    this.sceneManager = new SceneManager(this.container!, this.config.scene);
+    this.sceneManager.initializeScene();
+    
+    // Интеграция UI Manager с SceneManager
+    this.sceneManager.setUIManager(this.uiManager);
+    
+    // Загрузка данных треков
+    await this.loadMusicData();
+    
+    this.state.isInitialized = true;
+    this.state.isLoading = false;
+    
+    // Скрыть индикатор загрузки
+    const loadingElement = document.getElementById('loading');
+    if (loadingElement) {
+      loadingElement.style.display = 'none';
+    }
+    
+    console.log('Music Galaxy 3D инициализировано успешно');
   }
 
   private async loadMusicData(): Promise<void> {
@@ -201,6 +276,16 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
     if (this.uiManager) {
       this.uiManager.dispose();
       this.uiManager = undefined;
+    }
+    
+    if (this.burgerMenu) {
+      this.burgerMenu.dispose();
+      this.burgerMenu = undefined;
+    }
+    
+    if (this.firstLoadScreen) {
+      this.firstLoadScreen.hide();
+      this.firstLoadScreen = undefined;
     }
     
     this.state.isInitialized = false;
@@ -363,6 +448,9 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
 
 // Инициализация приложения при загрузке страницы
 document.addEventListener('DOMContentLoaded', async () => {
+  // Настраиваем Mock API для демонстрации
+  setupMockAPI();
+  
   const container = document.getElementById('canvas-container');
   if (!container) {
     console.error('Контейнер canvas-container не найден');
@@ -374,23 +462,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     await app.initialize(container);
     
-    // Настройка обработчиков событий UI
-    setupUIEventHandlers(app);
+    // Настройка базовых обработчиков событий UI
+    setupBasicUIEventHandlers(app);
     
   } catch (error) {
     console.error('Не удалось инициализировать приложение:', error);
   }
 });
 
-function setupUIEventHandlers(app: MusicGalaxyApp): void {
-  // Кнопка обновления данных
-  const collectDataButton = document.getElementById('collect-data-button');
-  if (collectDataButton) {
-    collectDataButton.addEventListener('click', () => {
-      showDataCollectionInstructions();
-    });
-  }
-
+function setupBasicUIEventHandlers(app: MusicGalaxyApp): void {
   // Кнопка сброса камеры
   const resetCameraButton = document.getElementById('reset-camera');
   if (resetCameraButton) {
@@ -417,93 +497,6 @@ function setupUIEventHandlers(app: MusicGalaxyApp): void {
         event.preventDefault();
         app.toggleAnimation();
         break;
-    }
-  });
-}
-
-function showDataCollectionInstructions(): void {
-  const modal = document.createElement('div');
-  modal.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.8);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-  `;
-  
-  modal.innerHTML = `
-    <div style="
-      background: #1a1a1a;
-      color: white;
-      padding: 30px;
-      border-radius: 12px;
-      max-width: 600px;
-      max-height: 80vh;
-      overflow-y: auto;
-      border: 1px solid #333;
-    ">
-      <h2 style="margin-top: 0; color: #4fc3f7;">🎵 Обновление данных из Яндекс.Музыки</h2>
-      
-      <div style="margin: 20px 0;">
-        <h3>📋 Пошаговая инструкция:</h3>
-        <ol style="line-height: 1.6;">
-          <li>Откройте <a href="https://music.yandex.ru" target="_blank" style="color: #4fc3f7;">music.yandex.ru</a> в новой вкладке</li>
-          <li>Войдите в свой аккаунт Яндекс</li>
-          <li>Откройте DevTools (нажмите F12)</li>
-          <li>Перейдите на вкладку <strong>Application</strong> → <strong>Cookies</strong></li>
-          <li>Найдите cookie с именем <code style="background: #333; padding: 2px 4px; border-radius: 3px;">Session_id</code></li>
-          <li>Скопируйте его значение (длинная строка символов)</li>
-        </ol>
-      </div>
-      
-      <div style="margin: 20px 0;">
-        <h3>💻 Запуск скрипта:</h3>
-        <p>Откройте терминал в корне проекта и выполните:</p>
-        <div style="background: #333; padding: 15px; border-radius: 8px; font-family: monospace;">
-          npm run collect-data
-        </div>
-        <p style="margin-top: 10px; font-size: 14px; color: #ccc;">
-          Или альтернативно: <code style="background: #333; padding: 2px 4px;">python scripts/collect_yandex_music_data.py</code>
-        </p>
-      </div>
-      
-      <div style="margin: 20px 0;">
-        <h3>⚠️ Важные замечания:</h3>
-        <ul style="line-height: 1.6; color: #ccc;">
-          <li>Используется неофициальное API Яндекс.Музыки</li>
-          <li>Токен действителен ограниченное время</li>
-          <li>Данные сохраняются локально в файл <code>src/data/music_data.json</code></li>
-          <li>После завершения скрипта перезагрузите эту страницу</li>
-        </ul>
-      </div>
-      
-      <div style="text-align: center; margin-top: 30px;">
-        <button onclick="this.closest('div').parentElement.remove()" style="
-          background: #4fc3f7;
-          color: white;
-          border: none;
-          padding: 12px 24px;
-          border-radius: 6px;
-          cursor: pointer;
-          font-size: 16px;
-        ">
-          Понятно
-        </button>
-      </div>
-    </div>
-  `;
-  
-  document.body.appendChild(modal);
-  
-  // Закрытие по клику вне модального окна
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) {
-      modal.remove();
     }
   });
 }

@@ -7,6 +7,7 @@
 import json
 import os
 import sys
+import datetime
 from typing import List, Dict, Any, Optional
 from yandex_music import Client
 from yandex_music.exceptions import YandexMusicError
@@ -15,14 +16,24 @@ from yandex_music.exceptions import YandexMusicError
 def get_token_from_user() -> str:
     """Получает токен от пользователя с инструкциями"""
     print("=" * 60)
-    print("ПОЛУЧЕНИЕ ТОКЕНА ЯНДЕКС.МУЗЫКИ")
+    print("🎵 СБОР ДАННЫХ ИЗ ЯНДЕКС.МУЗЫКИ")
     print("=" * 60)
+    
+    # Проверяем, есть ли сохраненный токен
+    saved_token = load_saved_token()
+    if saved_token:
+        print(f"✅ Найден сохраненный токен: {format_token_for_display(saved_token)}")
+        use_saved = input("Использовать сохраненный токен? (y/n): ").strip().lower()
+        if use_saved in ['y', 'yes', 'да', '']:
+            return saved_token
+    
+    print("\n📋 ИНСТРУКЦИЯ ПО ПОЛУЧЕНИЮ ТОКЕНА:")
     print("1. Откройте music.yandex.ru в браузере")
-    print("2. Войдите в свой аккаунт")
+    print("2. Войдите в свой аккаунт Яндекс")
     print("3. Откройте DevTools (F12)")
-    print("4. Перейдите на вкладку Application → Cookies")
+    print("4. Перейдите: Application → Cookies → music.yandex.ru")
     print("5. Найдите cookie с именем 'Session_id'")
-    print("6. Скопируйте его значение")
+    print("6. Скопируйте его значение (длинная строка)")
     print("-" * 60)
     
     token = input("Введите токен Session_id: ").strip()
@@ -30,7 +41,62 @@ def get_token_from_user() -> str:
         print("❌ Токен не может быть пустым!")
         sys.exit(1)
     
+    if len(token) < 20:
+        print("❌ Токен слишком короткий! Проверьте правильность копирования.")
+        sys.exit(1)
+    
+    # Сохраняем токен для будущего использования
+    save_token(token)
+    
     return token
+
+def load_saved_token() -> Optional[str]:
+    """Загружает сохраненный токен"""
+    try:
+        token_file = os.path.join(os.path.dirname(__file__), '.yandex_token')
+        if os.path.exists(token_file):
+            with open(token_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                
+            # Проверяем возраст токена
+            created_at = datetime.datetime.fromisoformat(data['created_at'])
+            age_hours = (datetime.datetime.now() - created_at).total_seconds() / 3600
+            
+            if age_hours < 24:  # Токен действителен 24 часа
+                return data['token']
+            else:
+                print(f"⚠️ Сохраненный токен устарел ({age_hours:.1f} ч.)")
+                return None
+    except Exception as e:
+        print(f"⚠️ Ошибка загрузки сохраненного токена: {e}")
+        return None
+
+def save_token(token: str) -> None:
+    """Сохраняет токен для будущего использования"""
+    try:
+        token_file = os.path.join(os.path.dirname(__file__), '.yandex_token')
+        data = {
+            'token': token,
+            'created_at': datetime.datetime.now().isoformat()
+        }
+        
+        with open(token_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        
+        print("💾 Токен сохранен для будущего использования")
+    except Exception as e:
+        print(f"⚠️ Не удалось сохранить токен: {e}")
+
+def format_token_for_display(token: str) -> str:
+    """Форматирует токен для безопасного отображения"""
+    if len(token) <= 10:
+        return token
+    
+    start = token[:4]
+    end = token[-4:]
+    middle = '*' * min(12, len(token) - 8)
+    
+    return f"{start}{middle}{end}"
 
 
 def extract_genre(track) -> str:
