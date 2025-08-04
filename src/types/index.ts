@@ -93,6 +93,7 @@ export interface SceneManager {
   getEffectsManager(): EffectsManager;
   getPerformanceOptimizer(): any; // PerformanceOptimizer type will be imported separately
   getSoulGalaxyRenderer(): any; // SoulGalaxyRenderer type will be imported separately
+  getSimpleCameraController(): any; // SimpleCameraController type will be imported separately
 }
 
 // Интерфейсы для взаимодействия

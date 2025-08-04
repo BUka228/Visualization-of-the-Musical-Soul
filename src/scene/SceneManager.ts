@@ -6,7 +6,7 @@ import { EffectsManager } from '../effects/EffectsManager';
 import { PerformanceOptimizer } from '../performance/PerformanceOptimizer';
 import { PerformanceWarning } from '../performance/PerformanceMonitor';
 import { SoulGalaxyRenderer } from '../soul-galaxy/core/SoulGalaxyRenderer';
-import { CinematicCameraController } from '../soul-galaxy/camera/CinematicCameraController';
+import { SimpleCameraController } from '../soul-galaxy/camera/SimpleCameraController';
 
 export class SceneManager implements ISceneManager {
   private scene: THREE.Scene;
@@ -39,8 +39,11 @@ export class SceneManager implements ISceneManager {
   // Soul Galaxy система
   private soulGalaxyRenderer: SoulGalaxyRenderer;
   
-  // Кинематографический контроллер камеры
-  private cinematicCameraController!: CinematicCameraController;
+  // Простой контроллер камеры
+  private simpleCameraController!: SimpleCameraController;
+  
+  // UI Manager для уведомлений
+  private uiManager?: any;
 
   constructor(container: HTMLElement, config: SceneConfig) {
     this.container = container;
@@ -98,8 +101,8 @@ export class SceneManager implements ISceneManager {
     // Инициализация менеджера эффектов
     this.effectsManager.initialize(this.scene, this.camera, this.interactionManager.getAudioManager());
     
-    // Создание кинематографического контроллера камеры
-    this.cinematicCameraController = new CinematicCameraController(
+    // Создание простого контроллера камеры
+    this.simpleCameraController = new SimpleCameraController(
       this.camera, 
       this.renderer, 
       this.scene
@@ -108,11 +111,20 @@ export class SceneManager implements ISceneManager {
     // Инициализация Soul Galaxy рендерера (единственный режим) с контейнером для HUD
     this.soulGalaxyRenderer.initialize(this.scene, this.camera, this.container);
     
-    // Интеграция кинематографического контроллера с системой кристаллов
+    // Интеграция простого контроллера камеры с системой кристаллов
     const crystalTrackSystem = this.soulGalaxyRenderer.getCrystalTrackSystem();
-    crystalTrackSystem.setCameraController(this.cinematicCameraController);
+    crystalTrackSystem.setCameraController(this.simpleCameraController);
     
-    console.log('📹 Cinematic camera controller integrated with Soul Galaxy system');
+    // Интеграция системы кристаллов с контроллером камеры для управления вращением кластера
+    this.simpleCameraController.setCrystalTrackSystem(crystalTrackSystem);
+    
+    // Интеграция UI Manager с системой кристаллов если доступен
+    if (this.uiManager) {
+      crystalTrackSystem.setUIManager(this.uiManager);
+      console.log('🎨 UI Manager integrated with Crystal Track System');
+    }
+    
+    console.log('📹 Simple camera controller integrated with Soul Galaxy system');
     
     // Запуск цикла рендеринга
     this.startRenderLoop();
@@ -307,9 +319,9 @@ export class SceneManager implements ISceneManager {
   }
 
   updateScene(): void {
-    // Обновляем кинематографический контроллер камеры
-    if (this.cinematicCameraController) {
-      this.cinematicCameraController.update(16 / 1000); // Конвертируем в секунды
+    // Обновляем простой контроллер камеры
+    if (this.simpleCameraController) {
+      this.simpleCameraController.update(16 / 1000); // Конвертируем в секунды
     }
     
     // AnimationManager теперь управляет всеми анимациями
@@ -326,9 +338,9 @@ export class SceneManager implements ISceneManager {
   dispose(): void {
     console.log('Освобождение ресурсов SceneManager...');
     
-    // Освобождение ресурсов кинематографического контроллера камеры
-    if (this.cinematicCameraController) {
-      this.cinematicCameraController.dispose();
+    // Освобождение ресурсов простого контроллера камеры
+    if (this.simpleCameraController) {
+      this.simpleCameraController.dispose();
     }
     
     // Освобождение ресурсов Soul Galaxy рендерера
@@ -413,7 +425,33 @@ export class SceneManager implements ISceneManager {
     return this.soulGalaxyRenderer;
   }
 
-  getCinematicCameraController(): CinematicCameraController {
-    return this.cinematicCameraController;
+  getSimpleCameraController(): SimpleCameraController {
+    return this.simpleCameraController;
+  }
+
+  /**
+   * Устанавливает UI Manager для интеграции с системой кристаллов
+   */
+  setUIManager(uiManager: any): void {
+    this.uiManager = uiManager;
+    
+    // Если система кристаллов уже инициализирована, интегрируем UI Manager
+    const crystalTrackSystem = this.soulGalaxyRenderer.getCrystalTrackSystem();
+    if (crystalTrackSystem) {
+      crystalTrackSystem.setUIManager(uiManager);
+      console.log('🎨 UI Manager integrated with Crystal Track System');
+    }
+    
+    // Также интегрируем UI Manager с контроллером камеры
+    if (this.simpleCameraController) {
+      this.simpleCameraController.setUIManager(uiManager);
+      
+      // Если система кристаллов уже доступна, интегрируем её с контроллером камеры
+      if (crystalTrackSystem) {
+        this.simpleCameraController.setCrystalTrackSystem(crystalTrackSystem);
+      }
+      
+      console.log('🎨 UI Manager integrated with Simple Camera Controller');
+    }
   }
 }

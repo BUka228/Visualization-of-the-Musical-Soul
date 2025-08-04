@@ -150,8 +150,8 @@ export class AnimationManager implements IAnimationManager {
   animateTrackDeselection(): void {
     console.log('🎯 Анимация отмены выбора трека');
     
-    // Возвращаем камеру в исходное положение
-    this.animateCameraReset();
+    // НЕ возвращаем камеру в исходное положение - пользователь управляет камерой сам
+    // this.animateCameraReset(); // ОТКЛЮЧЕНО
     
     // Сброс состояния выбора будет выполнен в InteractionManager
   }
@@ -191,24 +191,14 @@ export class AnimationManager implements IAnimationManager {
   }
 
   /**
-   * Проверяет, активна ли анимация фокуса на кристалл
+   * Проверяет, активна ли анимация приближения к кристаллу
    */
   private isFocusAnimationActive(): boolean {
-    // Проверяем глобальный флаг состояния фокуса
-    if (typeof window !== 'undefined' && (window as any).isCameraFocusAnimating === true) {
-      return true;
-    }
-    
-    // Fallback проверки через системы
-    if (typeof window !== 'undefined') {
-      const cameraController = (window as any).cameraController;
-      if (cameraController && typeof cameraController.isCameraAnimating === 'function') {
-        return cameraController.isCameraAnimating();
-      }
-      
-      const focusAnimationSystem = (window as any).focusAnimationSystem;
-      if (focusAnimationSystem && typeof focusAnimationSystem.isAnimating === 'function') {
-        return focusAnimationSystem.isAnimating();
+    // Проверяем через SceneManager и SimpleCameraController
+    if (this.sceneManager) {
+      const cameraController = this.sceneManager.getSimpleCameraController();
+      if (cameraController && typeof cameraController.isZooming === 'function') {
+        return cameraController.isZooming();
       }
     }
     

@@ -8,7 +8,7 @@ import { AlbumTextureManager } from '../materials/AlbumTextureManager';
 import { TextureClaritySystem } from '../materials/TextureClaritySystem';
 import { CrystalHoverSystem } from '../interaction/CrystalHoverSystem';
 import { SoulGalaxyAudioIntegration } from '../audio/SoulGalaxyAudioIntegration';
-import { CinematicCameraController } from '../camera/CinematicCameraController';
+import { SimpleCameraController } from '../camera/SimpleCameraController';
 import { CrystalRotationSystem } from '../effects/CrystalRotationSystem';
 import { DynamicGenreColorUtils } from '../materials/DynamicGenreColorSystem';
 
@@ -23,13 +23,21 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
   private crystalTracks: CrystalTrack[] = [];
   private clusterRotationSpeed: number = 0.0002; // Очень медленное вращение для большого радиуса
   private initialized: boolean = false;
+  
+  // Управление вращением кластера
+  private isClusterRotationPaused: boolean = false;
+  private clusterRotationResumeTimer?: number;
+  private targetRotationSpeed: number = 0.0002;
+  private currentRotationSpeed: number = 0.0002;
+  private rotationTransitionSpeed: number = 0.00001; // Скорость плавного перехода
   private pulseSystem: CrystalPulseSystem;
   private albumTextureManager: AlbumTextureManager;
   private textureClaritySystem: TextureClaritySystem;
   private hoverSystem: CrystalHoverSystem;
   private audioIntegration: SoulGalaxyAudioIntegration;
-  private cameraController?: CinematicCameraController;
+  private cameraController?: SimpleCameraController;
   private rotationSystem: CrystalRotationSystem;
+  private uiManager?: any; // UIManager для показа уведомлений
 
   constructor() {
     this.pulseSystem = new CrystalPulseSystem();
@@ -190,9 +198,62 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
   rotateCluster(deltaTime: number): void {
     if (!this.crystalCluster) return;
 
-    // Медленное вращение всего скопления
-    this.crystalCluster.rotation.y += this.clusterRotationSpeed * deltaTime;
-    this.crystalCluster.rotation.x += this.clusterRotationSpeed * 0.3 * deltaTime;
+    // Плавно изменяем скорость вращения к целевой
+    if (this.currentRotationSpeed !== this.targetRotationSpeed) {
+      const speedDiff = this.targetRotationSpeed - this.currentRotationSpeed;
+      const speedChange = Math.sign(speedDiff) * Math.min(Math.abs(speedDiff), this.rotationTransitionSpeed * deltaTime);
+      this.currentRotationSpeed += speedChange;
+      
+      // Если достигли целевой скорости, точно устанавливаем её
+      if (Math.abs(speedDiff) < this.rotationTransitionSpeed * deltaTime) {
+        this.currentRotationSpeed = this.targetRotationSpeed;
+      }
+    }
+
+    // Применяем текущую скорость вращения
+    if (!this.isClusterRotationPaused) {
+      this.crystalCluster.rotation.y += this.currentRotationSpeed * deltaTime;
+      this.crystalCluster.rotation.x += this.currentRotationSpeed * 0.3 * deltaTime;
+    }
+  }
+
+  /**
+   * Останавливает вращение кластера плавно
+   */
+  pauseClusterRotation(): void {
+    console.log('⏸️ Pausing cluster rotation');
+    this.targetRotationSpeed = 0;
+    this.isClusterRotationPaused = false; // Позволяем плавное замедление
+  }
+
+  /**
+   * Возобновляет вращение кластера плавно
+   */
+  resumeClusterRotation(): void {
+    console.log('▶️ Resuming cluster rotation');
+    this.targetRotationSpeed = this.clusterRotationSpeed;
+    this.isClusterRotationPaused = false;
+  }
+
+  /**
+   * Останавливает вращение кластера с задержкой и автоматическим возобновлением
+   */
+  pauseClusterRotationWithDelay(pauseDuration: number = 3000): void {
+    console.log(`⏸️ Pausing cluster rotation for ${pauseDuration}ms`);
+    
+    // Очищаем предыдущий таймер если есть
+    if (this.clusterRotationResumeTimer) {
+      clearTimeout(this.clusterRotationResumeTimer);
+    }
+    
+    // Останавливаем вращение
+    this.pauseClusterRotation();
+    
+    // Устанавливаем таймер для возобновления
+    this.clusterRotationResumeTimer = window.setTimeout(() => {
+      this.resumeClusterRotation();
+      this.clusterRotationResumeTimer = undefined;
+    }, pauseDuration);
   }
 
   focusOnCrystal(crystal: CrystalTrack): void {
@@ -240,9 +301,43 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
   /**
    * Устанавливает контроллер камеры для кинематографических переходов
    */
-  setCameraController(cameraController: CinematicCameraController): void {
+  setCameraController(cameraController: SimpleCameraController): void {
     this.cameraController = cameraController;
-    console.log('📹 Camera controller integrated with Crystal Track System');
+    
+    // Интегрируем UI Manager с контроллером камеры
+    if (this.uiManager) {
+      cameraController.setUIManager(this.uiManager);
+    }
+    
+    console.log('📹 Simple Camera controller integrated with Crystal Track System');
+  }
+
+  /**
+   * Устанавливает UI Manager для показа уведомлений
+   */
+  setUIManager(uiManager: any): void {
+    this.uiManager = uiManager;
+    console.log('🎨 UI Manager integrated with Crystal Track System');
+  }
+
+  /**
+   * Показывает уведомление о том, как выйти из режима фокуса
+   */
+  private showFocusExitHint(crystal: CrystalTrack): void {
+    if (this.uiManager && typeof this.uiManager.showFocusExitHint === 'function') {
+      this.uiManager.showFocusExitHint(`${crystal.name} by ${crystal.artist}`);
+    } else {
+      console.log(`💡 Focus hint: Press ESC, Space, or move mouse/wheel to exit focus on ${crystal.name}`);
+    }
+  }
+
+  /**
+   * Скрывает уведомление о выходе из режима фокуса
+   */
+  private hideFocusExitHint(): void {
+    if (this.uiManager && typeof this.uiManager.hideFocusExitHint === 'function') {
+      this.uiManager.hideFocusExitHint();
+    }
   }
 
   /**
@@ -257,21 +352,27 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
       return;
     }
 
+    // Проверяем, не выполняется ли уже приближение к этому кристаллу
+    if (this.cameraController && this.cameraController.isZooming()) {
+      const currentTarget = this.cameraController.getTargetCrystal();
+      if (currentTarget && currentTarget.id === trackId) {
+        console.log(`⚠️ Already zooming to crystal: ${crystalTrack.name}`);
+        return;
+      }
+    }
+
     console.log(`🎵 Crystal clicked: ${crystalTrack.name} by ${crystalTrack.artist}`);
 
     try {
       // Убираем подсветку при клике
       this.clearHover();
       
-      // Используем кинематографический переход камеры если доступен
+      // Используем простое приближение камеры если доступно
       if (this.cameraController) {
-        await this.focusOnCrystalWithAnimation(crystalTrack);
-      } else {
-        // Fallback на базовый фокус
-        this.focusOnCrystal(crystalTrack);
+        await this.zoomToCrystalWithAnimation(crystalTrack);
       }
       
-      // Воспроизводим трек с кинематографическим переходом
+      // Воспроизводим трек с переходом
       await this.audioIntegration.playTrackWithTransition(crystalTrack, crystalMesh);
       
     } catch (error) {
@@ -280,35 +381,23 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
   }
 
   /**
-   * Фокусируется на кристалле с кинематографической анимацией камеры
+   * Приближается к кристаллу с простой анимацией камеры
    */
-  async focusOnCrystalWithAnimation(crystal: CrystalTrack): Promise<void> {
+  async zoomToCrystalWithAnimation(crystal: CrystalTrack): Promise<void> {
     if (!this.cameraController) {
-      console.warn('⚠️ Camera controller not available, using basic focus');
-      this.focusOnCrystal(crystal);
+      console.warn('⚠️ Camera controller not available');
       return;
     }
 
-    console.log(`🎬 Starting cinematic focus on crystal: ${crystal.name} by ${crystal.artist}`);
+    console.log(`🔍 Starting zoom to crystal: ${crystal.name} by ${crystal.artist}`);
 
     try {
-      // Устанавливаем глобальные флаги состояния фокуса для защиты от прерываний
-      if (typeof window !== 'undefined') {
-        (window as any).isCameraFocusAnimating = true;
-        (window as any).globalFocusProtection = true;
-        console.log('🛡️ Global focus protection enabled');
-      }
+      // Запускаем простое приближение камеры
+      await this.cameraController.zoomToCrystal(crystal);
       
-      // Запускаем кинематографический переход камеры
-      await this.cameraController.focusOnCrystal(crystal);
-      
-      // Обновляем состояние кристалла
-      crystal.isFocused = true;
-      
-      // Увеличиваем интенсивность свечения сфокусированного кристалла
+      // Увеличиваем интенсивность свечения приближенного кристалла
       const mesh = this.findCrystalMesh(crystal.id);
       if (mesh && mesh.material instanceof CrystalShaderMaterial) {
-        mesh.material.setFocused(true);
         mesh.material.setEmissiveIntensity(0.8);
         
         // Запускаем переход к высококачественной текстуре
@@ -321,89 +410,25 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
         );
       }
       
-      console.log(`✅ Cinematic focus completed on crystal: ${crystal.name}`);
+      console.log(`✅ Zoom completed to crystal: ${crystal.name}`);
       
     } catch (error) {
-      console.error(`❌ Failed to focus on crystal with animation: ${crystal.name}`, error);
-      
-      // Сбрасываем глобальные флаги в случае ошибки
-      if (typeof window !== 'undefined') {
-        (window as any).isCameraFocusAnimating = false;
-        (window as any).globalFocusProtection = false;
-        console.log('🛡️ Global focus protection disabled due to error');
-      }
-      
-      // Fallback на базовый фокус
-      this.focusOnCrystal(crystal);
+      console.error(`❌ Failed to zoom to crystal: ${crystal.name}`, error);
     }
   }
 
   /**
-   * Возвращает камеру к предыдущей позиции
+   * Проверяет, выполняется ли приближение камеры
    */
-  async returnCameraToPreviousPosition(): Promise<void> {
-    if (!this.cameraController) {
-      console.warn('⚠️ Camera controller not available');
-      return;
-    }
-
-    console.log('🔄 Returning camera to previous position');
-
-    try {
-      // Убираем фокус с текущего кристалла
-      const focusedCrystal = this.cameraController.getFocusedCrystal();
-      if (focusedCrystal) {
-        focusedCrystal.isFocused = false;
-        
-        // Возвращаем нормальную интенсивность свечения и текстуру
-        const mesh = this.findCrystalMesh(focusedCrystal.id);
-        if (mesh && mesh.material instanceof CrystalShaderMaterial) {
-          mesh.material.setFocused(false);
-          mesh.material.setEmissiveIntensity(0.3);
-          
-          // Запускаем переход к средней качественной текстуре
-          await this.textureClaritySystem.transitionToMediumQuality(
-            focusedCrystal,
-            mesh.material,
-            () => {
-              console.log(`🎨 Medium-quality texture transition completed for ${focusedCrystal.name}`);
-            }
-          );
-        }
-      }
-      
-      // Запускаем анимацию возврата камеры
-      await this.cameraController.returnToPreviousPosition();
-      
-      console.log('✅ Camera returned to previous position');
-      
-    } catch (error) {
-      console.error('❌ Failed to return camera to previous position:', error);
-    }
+  isCameraZooming(): boolean {
+    return this.cameraController ? this.cameraController.isZooming() : false;
   }
 
   /**
-   * Проверяет, находится ли камера в состоянии фокуса
+   * Получает текущий целевой кристалл для приближения
    */
-  isCameraFocused(): boolean {
-    return this.cameraController ? this.cameraController.isFocused() : false;
-  }
-
-  /**
-   * Проверяет, находится ли система в режиме фокуса (включая анимацию)
-   */
-  isInFocusMode(): boolean {
-    if (this.cameraController) {
-      return this.cameraController.isFocused() || this.cameraController.isCameraAnimating();
-    }
-    return false;
-  }
-
-  /**
-   * Получает текущий сфокусированный кристалл (через камеру)
-   */
-  getFocusedCrystal(): CrystalTrack | undefined {
-    return this.cameraController ? this.cameraController.getFocusedCrystal() : undefined;
+  getTargetCrystal(): CrystalTrack | undefined {
+    return this.cameraController ? this.cameraController.getTargetCrystal() : undefined;
   }
 
   /**
@@ -444,6 +469,12 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
 
   dispose(): void {
     console.log('🗑️ Disposing Crystal Track System...');
+    
+    // Очищаем таймер возобновления вращения кластера
+    if (this.clusterRotationResumeTimer) {
+      clearTimeout(this.clusterRotationResumeTimer);
+      this.clusterRotationResumeTimer = undefined;
+    }
     
     // Dispose of the rotation system
     this.rotationSystem.dispose();

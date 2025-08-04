@@ -90,6 +90,9 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
       this.sceneManager = new SceneManager(container, this.config.scene);
       this.sceneManager.initializeScene();
       
+      // Интеграция UI Manager с SceneManager
+      this.sceneManager.setUIManager(this.uiManager);
+      
       // Загрузка данных треков
       await this.loadMusicData();
       

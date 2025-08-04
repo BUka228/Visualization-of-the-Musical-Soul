@@ -2,12 +2,12 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { InteractionManager as IInteractionManager, SceneManager, AudioManager } from '../types';
 import { AudioManager as AudioManagerImpl } from '../audio/AudioManager';
-import { CinematicCameraController } from '../soul-galaxy/camera/CinematicCameraController';
+
 
 export class InteractionManager implements IInteractionManager {
   private sceneManager?: SceneManager;
   private controls?: OrbitControls;
-  private cinematicCameraController?: CinematicCameraController;
+
   private raycaster: THREE.Raycaster;
   private mouse: THREE.Vector2;
   private container?: HTMLElement;
@@ -312,6 +312,12 @@ export class InteractionManager implements IInteractionManager {
       crystalTrackSystem.stopCurrentPlayback().catch((error: Error) => {
         console.error('❌ Failed to stop current playback:', error);
       });
+      
+      // Проверяем, выполняется ли приближение камеры
+      const cameraController = this.sceneManager.getSimpleCameraController();
+      if (cameraController && cameraController.isZooming()) {
+        console.log('🔄 Camera is zooming, but continuing with deselection');
+      }
       
       // Делегируем анимацию отмены выбора AnimationManager
       const animationManager = this.sceneManager.getAnimationManager();

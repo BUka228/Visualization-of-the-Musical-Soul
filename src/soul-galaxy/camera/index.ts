@@ -1,11 +1,12 @@
 /**
  * Soul Galaxy Camera System
  * 
- * Кинематографическая система камеры для создания захватывающих переходов
- * и эффектов глубины резкости в стиле космических симуляторов
+ * Простая система камеры с приближением к кристаллам
+ * и эффектами глубины резкости
  */
 
-export { CinematicCameraController } from './CinematicCameraController';
+export { SimpleCameraController } from './SimpleCameraController';
+export { SimpleZoomSystem } from './SimpleZoomSystem';
 export { FocusTransitionSystem, EasingType } from './FocusTransitionSystem';
 export { DepthOfFieldSystem } from './DepthOfFieldSystem';
 
