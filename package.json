@@ -11,7 +11,10 @@
     "serve": "npx http-server dist -p 8080",
     "test": "vitest --run",
     "test:watch": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "vercel:dev": "vercel dev",
+    "vercel:deploy": "vercel --prod",
+    "test:api": "echo 'Откройте test-vercel-api.html в браузере для тестирования API'"
   },
   "keywords": [
     "3d",
@@ -38,6 +41,7 @@
     "webpack-dev-server": "^4.15.1"
   },
   "dependencies": {
+    "@vercel/node": "^3.2.29",
     "three": "^0.158.0"
   }
 }

@@ -48,13 +48,26 @@ export class DataLoader {
   private static readonly DEMO_DATA_PATH = '/src/data/demo_data.json';
 
   /**
-   * Загружает данные треков из JSON файла с расширенной информацией о результате
+   * Загружает данные треков из localStorage или файла с расширенной информацией о результате
    */
   static async loadMusicDataWithResult(): Promise<DataLoadResult> {
     try {
       console.log('🔄 Загрузка данных треков...');
       
-      // Пробуем загрузить реальные данные
+      // Сначала пробуем загрузить из localStorage (приоритет)
+      const localData = this.loadFromLocalStorage();
+      if (localData) {
+        console.log(`✅ Загружено из localStorage: ${localData.tracks.length} треков`);
+        const freshness = this.getDataFreshnessFromTimestamp();
+        return {
+          success: true,
+          data: localData,
+          isDemo: false,
+          freshness: freshness
+        };
+      }
+      
+      // Если в localStorage нет данных, пробуем загрузить из файла
       const response = await fetch(this.DATA_FILE_PATH);
       
       if (!response.ok) {
@@ -79,7 +92,7 @@ export class DataLoader {
       // Проверяем свежесть данных
       const freshness = await this.getDataFreshness(data);
       
-      console.log(`✅ Загружено ${data.tracks.length} треков`);
+      console.log(`✅ Загружено из файла: ${data.tracks.length} треков`);
       return {
         success: true,
         data: data,
@@ -368,13 +381,16 @@ export class DataLoader {
     return `
 Для обновления данных из Яндекс.Музыки:
 
-1. Откройте терминал в корне проекта
-2. Выполните команду: npm run collect-data
-3. Следуйте инструкциям для получения токена
-4. Перезагрузите страницу после завершения
+1. Введите свой токен Session_id в интерфейсе приложения
+2. Нажмите кнопку "Загрузить данные"
+3. Дождитесь завершения загрузки
+4. Данные будут автоматически сохранены и использованы
 
-Альтернативно:
-python scripts/collect_yandex_music_data.py
+Как получить токен:
+1. Откройте music.yandex.ru в браузере
+2. Войдите в свой аккаунт
+3. Откройте DevTools (F12) → Application → Cookies
+4. Найдите cookie 'Session_id' и скопируйте его значение
     `.trim();
   }
 
@@ -428,6 +444,76 @@ python scripts/collect_yandex_music_data.py
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Загружает данные из localStorage
+   */
+  private static loadFromLocalStorage(): MusicDataFile | null {
+    try {
+      const dataStr = localStorage.getItem('music_data');
+      if (!dataStr) {
+        return null;
+      }
+
+      const data: MusicDataFile = JSON.parse(dataStr);
+      
+      // Валидация структуры данных
+      const validationResult = this.validateMusicDataDetailed(data);
+      if (!validationResult.isValid) {
+        console.warn('Данные в localStorage повреждены, удаляем их');
+        localStorage.removeItem('music_data');
+        localStorage.removeItem('music_data_timestamp');
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.warn('Ошибка загрузки из localStorage:', error);
+      localStorage.removeItem('music_data');
+      localStorage.removeItem('music_data_timestamp');
+      return null;
+    }
+  }
+
+  /**
+   * Определяет свежесть данных из localStorage по timestamp
+   */
+  private static getDataFreshnessFromTimestamp(): 'fresh' | 'stale' | 'unknown' {
+    try {
+      const timestampStr = localStorage.getItem('music_data_timestamp');
+      if (!timestampStr) {
+        return 'unknown';
+      }
+
+      const timestamp = new Date(timestampStr);
+      const now = new Date();
+      const hoursDiff = (now.getTime() - timestamp.getTime()) / (1000 * 60 * 60);
+
+      if (hoursDiff < 24) {
+        return 'fresh';
+      } else {
+        return 'stale';
+      }
+    } catch {
+      return 'unknown';
+    }
+  }
+
+  /**
+   * Проверяет наличие данных в localStorage
+   */
+  static hasLocalStorageData(): boolean {
+    return localStorage.getItem('music_data') !== null;
+  }
+
+  /**
+   * Очищает данные из localStorage
+   */
+  static clearLocalStorageData(): void {
+    localStorage.removeItem('music_data');
+    localStorage.removeItem('music_data_timestamp');
+    console.log('Данные очищены из localStorage');
   }
 
   /**
