@@ -125,9 +125,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log(`Fetched full info for ${allTracks.length} tracks.`);
 
-    // Обрабатываем треки
+    // Анализируем первые несколько треков для отладки
+    if (allTracks.length > 0) {
+      console.log('Sample track data:', JSON.stringify(allTracks[0], null, 2));
+      const availableCount = allTracks.filter(t => t.available).length;
+      const unavailableCount = allTracks.filter(t => !t.available).length;
+      console.log(`Available tracks: ${availableCount}, Unavailable: ${unavailableCount}`);
+    }
+
+    // Обрабатываем треки (убираем фильтрацию по available)
     const processedTracks: ProcessedTrack[] = allTracks
-      .filter((track: any) => track.available)
       .map((track: any): ProcessedTrack => {
         return {
           id: String(track.id),
@@ -138,11 +145,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           genre: track.albums?.[0]?.genre || 'unknown',
           cover_url: track.coverUri ? `https://${track.coverUri.replace('%%', '400x400')}` : undefined,
           preview_url: undefined, // Превью требуют дополнительных запросов
-          available: track.available,
+          available: track.available !== false, // Считаем доступными все треки, кроме явно недоступных
         };
-      });
+      })
+      .filter((track: ProcessedTrack) => track.title && track.artist); // Фильтруем только треки без базовой информации
 
-    console.log(`Processed ${processedTracks.length} available tracks.`);
+    console.log(`Processed ${processedTracks.length} tracks after filtering.`);
+    
+    if (processedTracks.length > 0) {
+      console.log('Sample processed track:', JSON.stringify(processedTracks[0], null, 2));
+    }
 
     // Формируем и отправляем успешный ответ
     const result: YandexMusicData = {
