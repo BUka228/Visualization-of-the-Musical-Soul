@@ -377,8 +377,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ) || track.downloadInfo.find((info: any) => info.codec === 'mp3' && info.directUrl) || track.downloadInfo.find((info: any) => info.directUrl);
           
           if (previewInfo && previewInfo.directUrl) {
-            // Используем наш прокси вместо прямой ссылки для решения CORS проблемы
-            previewUrl = `/api/audioProxy?url=${encodeURIComponent(previewInfo.directUrl)}`;
+            // Возвращаем прямую ссылку - AudioManager сам будет использовать прокси
+            previewUrl = previewInfo.directUrl;
           }
         }
 
