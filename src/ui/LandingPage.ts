@@ -2,11 +2,11 @@
  * Красивая лендинг-страница с призывом к действию
  */
 
-import { TokenInstructionModal } from './TokenInstructionModal';
+import { FolderSelectionModal } from './FolderSelectionModal';
 
 export class LandingPage {
   private container: HTMLElement;
-  private tokenModal?: TokenInstructionModal;
+  private folderModal?: FolderSelectionModal;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -96,7 +96,7 @@ export class LandingPage {
           line-height: 1.6;
           opacity: 0.9;
         ">
-          Визуализируй любимые треки из Яндекс.Музыки<br>
+          Визуализируй свою музыкальную коллекцию<br>
           в интерактивной 3D-галактике
         </p>
 
@@ -117,9 +117,9 @@ export class LandingPage {
             min-width: 200px;
             animation: float 3s ease-in-out infinite;
           ">
-            <div style="font-size: 2rem; margin-bottom: 10px;">🎵</div>
-            <h3 style="color: #4fc3f7; margin: 0 0 8px 0; font-size: 1.1rem;">3D Визуализация</h3>
-            <p style="color: #ccc; margin: 0; font-size: 0.9rem;">Каждый трек — звезда в твоей галактике</p>
+            <div style="font-size: 2rem; margin-bottom: 10px;">📁</div>
+            <h3 style="color: #4fc3f7; margin: 0 0 8px 0; font-size: 1.1rem;">Локальные файлы</h3>
+            <p style="color: #ccc; margin: 0; font-size: 0.9rem;">Используй свою коллекцию MP3</p>
           </div>
 
           <div style="
@@ -131,9 +131,9 @@ export class LandingPage {
             min-width: 200px;
             animation: float 3s ease-in-out infinite 0.5s;
           ">
-            <div style="font-size: 2rem; margin-bottom: 10px;">🎧</div>
-            <h3 style="color: #4fc3f7; margin: 0 0 8px 0; font-size: 1.1rem;">Превью треков</h3>
-            <p style="color: #ccc; margin: 0; font-size: 0.9rem;">Слушай 30-секундные отрывки</p>
+            <div style="font-size: 2rem; margin-bottom: 10px;">🎵</div>
+            <h3 style="color: #4fc3f7; margin: 0 0 8px 0; font-size: 1.1rem;">3D Визуализация</h3>
+            <p style="color: #ccc; margin: 0; font-size: 0.9rem;">Каждый трек — звезда в галактике</p>
           </div>
 
           <div style="
@@ -146,8 +146,8 @@ export class LandingPage {
             animation: float 3s ease-in-out infinite 1s;
           ">
             <div style="font-size: 2rem; margin-bottom: 10px;">🎨</div>
-            <h3 style="color: #4fc3f7; margin: 0 0 8px 0; font-size: 1.1rem;">Цветовое кодирование</h3>
-            <p style="color: #ccc; margin: 0; font-size: 0.9rem;">Жанры отображаются разными цветами</p>
+            <h3 style="color: #4fc3f7; margin: 0 0 8px 0; font-size: 1.1rem;">Умная группировка</h3>
+            <p style="color: #ccc; margin: 0; font-size: 0.9rem;">Автоматическое распознавание жанров</p>
           </div>
         </div>
 
@@ -196,7 +196,7 @@ export class LandingPage {
           line-height: 1.5;
         ">
           Безопасно и конфиденциально • Данные обрабатываются локально<br>
-          Работает с любой библиотекой Яндекс.Музыки
+          Поддерживает MP3 файлы с метаданными
         </p>
       </div>
 
@@ -395,28 +395,28 @@ export class LandingPage {
    * Обработчик создания галактики
    */
   private handleCreateGalaxy(): void {
-    // Создаем и показываем модальное окно с инструкциями
-    this.tokenModal = new TokenInstructionModal();
-    this.tokenModal.show();
+    // Создаем и показываем модальное окно выбора папки
+    this.folderModal = new FolderSelectionModal();
+    this.folderModal.show();
 
-    // Слушаем событие завершения настройки токена
-    window.addEventListener('token-setup-completed', (event: any) => {
-      this.handleTokenSetupCompleted(event.detail);
+    // Слушаем событие выбора папки
+    window.addEventListener('folder-selected', (event: any) => {
+      this.handleFolderSelected(event.detail);
     }, { once: true });
   }
 
   /**
-   * Обработчик завершения настройки токена
+   * Обработчик выбора папки
    */
-  private handleTokenSetupCompleted(detail: any): void {
-    if (this.tokenModal) {
-      this.tokenModal.hide();
-      this.tokenModal = undefined;
+  private handleFolderSelected(detail: any): void {
+    if (this.folderModal) {
+      this.folderModal.hide();
+      this.folderModal = undefined;
     }
 
     this.hide();
 
-    // Запускаем процесс создания галактики
+    // Запускаем процесс создания галактики с выбранной папкой
     window.dispatchEvent(new CustomEvent('galaxy-creation-started', { 
       detail 
     }));
@@ -428,9 +428,9 @@ export class LandingPage {
   dispose(): void {
     this.hide();
     
-    if (this.tokenModal) {
-      this.tokenModal.dispose();
-      this.tokenModal = undefined;
+    if (this.folderModal) {
+      this.folderModal.dispose();
+      this.folderModal = undefined;
     }
   }
 }

@@ -1,5 +1,5 @@
 import { AudioManager as IAudioManager } from '../types';
-import { TokenManager } from '../auth/TokenManager';
+import { DataLoader } from '../data/DataLoader';
 
 export class AudioManager implements IAudioManager {
   private currentAudio?: HTMLAudioElement;
@@ -20,6 +20,85 @@ export class AudioManager implements IAudioManager {
   }
 
 
+
+  /**
+   * Воспроизводит локальный аудиофайл
+   */
+  async playLocalPreview(trackId: string): Promise<void> {
+    console.log(`🎵 Попытка воспроизведения локального трека: ${trackId}`);
+    
+    // Предотвращаем наложение треков при быстром переключении
+    if (this.isTransitioning) {
+      console.log('⚠️ Переключение уже в процессе, игнорируем запрос');
+      return;
+    }
+
+    // Если это тот же трек, что уже играет, не делаем ничего
+    if (this.currentTrackId === trackId && this.isCurrentlyPlaying) {
+      console.log('🔄 Трек уже воспроизводится');
+      return;
+    }
+
+    this.isTransitioning = true;
+    
+    try {
+      // Останавливаем текущее воспроизведение и ждем завершения
+      await this.stopPreviewSync();
+      
+      // Устанавливаем ID нового трека
+      this.currentTrackId = trackId;
+      
+      // Получаем локальный аудиофайл
+      const audioFile = await DataLoader.getLocalAudioFile(trackId);
+      if (!audioFile) {
+        throw new Error(`Локальный аудиофайл для трека ${trackId} не найден`);
+      }
+      
+      // Создаем URL для локального файла
+      const blobUrl = URL.createObjectURL(audioFile);
+      
+      console.log(`🎵 Создан Blob URL для локального аудио: ${blobUrl}`);
+      
+      // Создаем новый аудио элемент
+      this.currentAudio = new Audio(blobUrl);
+      this.currentAudio.crossOrigin = 'anonymous';
+      this.currentAudio.preload = 'auto';
+      
+      // Настройка обработчиков событий
+      this.setupAudioEventListeners();
+      
+      this.currentAudio.volume = 0; // Начинаем с нулевой громкости для fade-in
+      
+      // Загружаем и воспроизводим
+      await this.loadAndPlay();
+      
+      // Применяем fade-in эффект
+      this.fadeIn();
+      
+      this.isCurrentlyPlaying = true;
+      
+      if (this.onPlayStart) {
+        this.onPlayStart();
+      }
+      
+      console.log('✅ Локальное превью начато успешно');
+      
+    } catch (error) {
+      const audioError = error instanceof Error ? error : new Error('Неизвестная ошибка аудио');
+      console.error('❌ Ошибка воспроизведения локального превью:', audioError.message);
+      
+      // Очищаем состояние при ошибке
+      this.cleanup();
+      
+      if (this.onError) {
+        this.onError(audioError);
+      }
+      
+      throw audioError;
+    } finally {
+      this.isTransitioning = false;
+    }
+  }
 
   async playPreview(yandexDirectUrl: string, trackId?: string): Promise<void> {
     console.log(`🎵 Попытка воспроизведения превью через прокси для трека: ${trackId}`);
@@ -283,32 +362,12 @@ export class AudioManager implements IAudioManager {
   }
 
   /**
-   * Получает аудио через безопасный прокси с токеном авторизации
+   * Получает аудио через безопасный прокси (fallback для старой архитектуры)
    */
   private async fetchAudioWithProxy(yandexUrl: string): Promise<Blob> {
-    // Получаем токены из TokenManager
-    const tokenData = TokenManager.getToken();
-    
-    if (!tokenData || !tokenData.sessionId) {
-      throw new Error("Session_id не найден для аудио-прокси.");
-    }
-
-    // Делаем POST-запрос к нашему прокси с Session_id
-    const response = await fetch('/api/audioProxy', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        url: yandexUrl, 
-        token: tokenData.sessionId 
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`Прокси-сервер вернул ошибку: ${response.status} ${errorData.error || response.statusText}`);
-    }
-
-    return response.blob();
+    // В новой архитектуре этот метод не используется
+    // Оставляем заглушку для совместимости
+    throw new Error("Прокси-метод больше не поддерживается. Используйте локальные файлы.");
   }
 
 

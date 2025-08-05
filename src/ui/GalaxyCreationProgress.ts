@@ -2,7 +2,12 @@
  * Красивый экран прогресса создания галактики
  */
 
-import { CollectionProgress } from '../data/DataCollector';
+// Интерфейс для прогресса загрузки (локальная версия)
+interface LocalProgress {
+  stage: 'loading' | 'processing' | 'complete' | 'error';
+  message: string;
+  progress: number;
+}
 
 export class GalaxyCreationProgress {
   private container: HTMLElement;
@@ -52,7 +57,7 @@ export class GalaxyCreationProgress {
   /**
    * Обновляет прогресс
    */
-  updateProgress(progress: CollectionProgress): void {
+  updateProgress(progress: LocalProgress): void {
     this.updateProgressBar(progress.progress);
     this.updateStatusMessage(progress.message);
     this.updateProgressDetails(progress);
@@ -518,29 +523,40 @@ export class GalaxyCreationProgress {
   /**
    * Обновляет детали прогресса
    */
-  private updateProgressDetails(progress: CollectionProgress): void {
+  private updateProgressDetails(progress: LocalProgress): void {
     const tracksInfo = document.getElementById('tracks-info');
     const currentTrack = document.getElementById('current-track');
     
-    if (tracksInfo && progress.totalTracks) {
-      const processed = progress.processedTracks || 0;
-      tracksInfo.textContent = `Обработано треков: ${processed} из ${progress.totalTracks}`;
+    if (tracksInfo) {
+      // Для локальной архитектуры показываем простое сообщение о стадии
+      switch (progress.stage) {
+        case 'loading':
+          tracksInfo.textContent = 'Загрузка локальных файлов...';
+          break;
+        case 'processing':
+          tracksInfo.textContent = 'Обработка треков для 3D-визуализации...';
+          break;
+        case 'complete':
+          tracksInfo.textContent = 'Все данные успешно загружены!';
+          break;
+        case 'error':
+          tracksInfo.textContent = 'Произошла ошибка при загрузке';
+          break;
+        default:
+          tracksInfo.textContent = progress.message;
+      }
     }
     
     if (currentTrack) {
-      if (progress.currentTrack) {
-        currentTrack.textContent = `♪ ${progress.currentTrack}`;
-        currentTrack.style.animation = 'fadeInUp 0.3s ease-out';
-      } else {
-        currentTrack.textContent = '';
-      }
+      // В локальной архитектуре не показываем текущий трек
+      currentTrack.textContent = '';
     }
   }
 
   /**
    * Обновляет анимацию этапа
    */
-  private updateStageAnimation(stage: CollectionProgress['stage']): void {
+  private updateStageAnimation(stage: LocalProgress['stage']): void {
     // Сбрасываем все этапы
     const stages = ['connecting', 'fetching', 'processing', 'saving'];
     stages.forEach(stageName => {
@@ -569,10 +585,8 @@ export class GalaxyCreationProgress {
     const stageIcon = document.getElementById('stage-icon');
     if (stageIcon) {
       const icons = {
-        connecting: '🔗',
-        fetching: '📥',
+        loading: '📁',
         processing: '⚙️',
-        saving: '💾',
         complete: '✅',
         error: '❌'
       };

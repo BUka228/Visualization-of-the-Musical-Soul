@@ -91,6 +91,31 @@ export class DataProcessor implements IDataProcessor {
   }
 
   /**
+   * Конвертирует локальные данные в стандартный формат Track
+   */
+  convertLocalTrackData(localTracks: any[]): Track[] {
+    console.log(`🔄 Конвертация ${localTracks.length} локальных треков...`);
+
+    const tracks: Track[] = localTracks
+      .filter(track => track.available !== false) // Фильтруем недоступные треки
+      .map(localTrack => ({
+        id: localTrack.id,
+        name: localTrack.title,
+        artist: localTrack.artist,
+        album: localTrack.album,
+        genre: this.normalizeGenre(localTrack.genre),
+        duration: localTrack.duration,
+        popularity: this.estimatePopularityFromDuration(localTrack.duration),
+        previewUrl: undefined, // Будет установлен позже через LocalDataLoader
+        imageUrl: localTrack.cover_url || undefined,
+        playCount: undefined
+      }));
+
+    console.log(`✅ Конвертировано ${tracks.length} локальных треков`);
+    return tracks;
+  }
+
+  /**
    * Конвертирует данные из Яндекс.Музыки в стандартный формат Track
    */
   convertYandexTrackData(yandexTracks: YandexTrackData[]): Track[] {

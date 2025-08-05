@@ -1,14 +1,11 @@
 /**
- * Бургер-меню для управления настройками и токенами
+ * Бургер-меню для управления настройками (упрощенная версия для локальных файлов)
  */
 
-import { TokenManager } from '../auth/TokenManager';
-import { DataCollector, CollectionProgress } from '../data/DataCollector';
 import { DataLoader } from '../data/DataLoader';
 
 export class BurgerMenu {
   private isOpen = false;
-  private collector?: DataCollector;
 
   /**
    * Инициализирует бургер-меню
@@ -104,8 +101,6 @@ export class BurgerMenu {
    * Генерирует HTML меню
    */
   private getMenuHTML(): string {
-    const tokenInfo = TokenManager.getTokenInfo();
-    
     return `
       <div style="padding: 20px;">
         <!-- Заголовок -->
@@ -121,34 +116,11 @@ export class BurgerMenu {
           ">×</button>
         </div>
 
-        <!-- Информация о токене -->
+        <!-- Информация о данных -->
         <div style="margin-bottom: 30px;">
-          <h3 style="color: #fff; margin: 0 0 15px 0; font-size: 18px;">🔑 Токен авторизации</h3>
-          ${this.getTokenStatusHTML(tokenInfo)}
-        </div>
-
-        <!-- Управление данными -->
-        <div style="margin-bottom: 30px;">
-          <h3 style="color: #fff; margin: 0 0 15px 0; font-size: 18px;">📊 Данные</h3>
+          <h3 style="color: #fff; margin: 0 0 15px 0; font-size: 18px;">📁 Локальные данные</h3>
           <div id="data-status-section">
             ${this.getDataStatusHTML()}
-          </div>
-        </div>
-
-        <!-- Прогресс загрузки -->
-        <div id="menu-progress-section" style="display: none; margin-bottom: 30px;">
-          <div style="background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 15px;">
-            <div id="menu-progress-message" style="color: #fff; margin-bottom: 10px; font-size: 14px;"></div>
-            <div style="background: rgba(255, 255, 255, 0.2); border-radius: 10px; height: 8px; overflow: hidden;">
-              <div id="menu-progress-bar" style="
-                background: linear-gradient(90deg, #4fc3f7, #29b6f6);
-                height: 100%;
-                width: 0%;
-                transition: width 0.3s ease;
-                border-radius: 10px;
-              "></div>
-            </div>
-            <div id="menu-progress-details" style="color: #ccc; margin-top: 8px; font-size: 12px;"></div>
           </div>
         </div>
 
@@ -156,22 +128,39 @@ export class BurgerMenu {
         <div style="margin-bottom: 30px;">
           <details>
             <summary style="color: #4fc3f7; cursor: pointer; font-weight: bold; margin-bottom: 10px;">
-              📋 Инструкции по получению токена
+              📋 Как подготовить файлы
             </summary>
             <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 6px; margin-top: 10px;">
-              <ol style="color: #ccc; line-height: 1.6; margin: 0; padding-left: 20px; font-size: 14px;">
-                <li>Откройте <a href="https://music.yandex.ru" target="_blank" style="color: #4fc3f7;">music.yandex.ru</a></li>
-                <li>Войдите в свой аккаунт Яндекс</li>
-                <li>Откройте DevTools (F12)</li>
-                <li>Перейдите: Application → Cookies</li>
-                <li>Найдите cookie 'Session_id'</li>
-                <li>Скопируйте его значение</li>
-              </ol>
-              <p style="color: #999; font-size: 12px; margin: 10px 0 0 0;">
-                ⚠️ Токен действует ограниченное время и требует периодического обновления
+              <p style="color: #ccc; line-height: 1.6; margin: 0 0 10px 0; font-size: 14px;">
+                Создайте папку со следующей структурой:
               </p>
+              <div style="background: rgba(0, 0, 0, 0.3); padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; color: #a0a0a0; margin: 10px 0;">
+📁 Моя музыка/<br>
+├── 📄 metadata.json<br>
+└── 📁 audio/<br>
+&nbsp;&nbsp;&nbsp;&nbsp;├── 🎵 track1.mp3<br>
+&nbsp;&nbsp;&nbsp;&nbsp;└── 🎵 track2.mp3
+              </div>
+              <ul style="color: #ccc; line-height: 1.6; margin: 10px 0 0 20px; font-size: 14px;">
+                <li>metadata.json - информация о треках</li>
+                <li>audio/ - папка с MP3 файлами</li>
+                <li>Имена файлов = ID в metadata.json</li>
+              </ul>
             </div>
           </details>
+        </div>
+
+        <!-- Управление -->
+        <div style="margin-bottom: 30px;">
+          <h3 style="color: #fff; margin: 0 0 15px 0; font-size: 18px;">🎮 Управление</h3>
+          <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 6px;">
+            <div style="color: #ccc; font-size: 14px; line-height: 1.6;">
+              <p style="margin: 0 0 8px 0;"><strong>R</strong> - Сброс камеры</p>
+              <p style="margin: 0 0 8px 0;"><strong>Пробел</strong> - Пауза анимации</p>
+              <p style="margin: 0 0 8px 0;"><strong>Клик по треку</strong> - Воспроизведение</p>
+              <p style="margin: 0;"><strong>Колесо мыши</strong> - Приближение</p>
+            </div>
+          </div>
         </div>
 
         <!-- О приложении -->
@@ -183,11 +172,11 @@ export class BurgerMenu {
             <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 6px; margin-top: 10px;">
               <p style="color: #ccc; line-height: 1.6; margin: 0; font-size: 14px;">
                 <strong>Music Galaxy 3D</strong><br>
-                Интерактивная 3D-визуализация музыкальных предпочтений из Яндекс.Музыки.
+                Интерактивная 3D-визуализация музыкальной коллекции.
               </p>
               <p style="color: #999; font-size: 12px; margin: 10px 0 0 0;">
-                Версия: 1.0.0<br>
-                Использует неофициальное API Яндекс.Музыки
+                Версия: 2.0.0 (Локальные файлы)<br>
+                Работает полностью в браузере
               </p>
             </div>
           </details>
@@ -197,95 +186,9 @@ export class BurgerMenu {
   }
 
   /**
-   * Генерирует HTML статуса токена
-   */
-  private getTokenStatusHTML(tokenInfo: any): string {
-    if (!tokenInfo.hasToken) {
-      return `
-        <div style="background: rgba(255, 193, 7, 0.2); border: 1px solid rgba(255, 193, 7, 0.5); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-          <p style="color: #ffc107; margin: 0 0 10px 0; font-weight: bold;">⚠️ Токен не настроен</p>
-          <p style="color: #ccc; margin: 0; font-size: 14px;">Для загрузки данных необходимо добавить токен</p>
-        </div>
-        <button id="add-token-btn" style="
-          background: linear-gradient(90deg, #4fc3f7, #29b6f6);
-          color: #fff;
-          border: none;
-          padding: 10px 20px;
-          border-radius: 6px;
-          font-size: 14px;
-          cursor: pointer;
-          width: 100%;
-        ">
-          ➕ Добавить токен
-        </button>
-      `;
-    }
-
-    if (!tokenInfo.isValid) {
-      return `
-        <div style="background: rgba(244, 67, 54, 0.2); border: 1px solid rgba(244, 67, 54, 0.5); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-          <p style="color: #f44336; margin: 0 0 10px 0; font-weight: bold;">❌ Токен недействителен</p>
-          <p style="color: #ccc; margin: 0; font-size: 14px;">${tokenInfo.error}</p>
-        </div>
-        <button id="update-token-btn" style="
-          background: rgba(244, 67, 54, 0.8);
-          color: #fff;
-          border: none;
-          padding: 10px 20px;
-          border-radius: 6px;
-          font-size: 14px;
-          cursor: pointer;
-          width: 100%;
-        ">
-          🔄 Обновить токен
-        </button>
-      `;
-    }
-
-    const formattedToken = TokenManager.formatTokenForDisplay(TokenManager.getToken()?.oauthToken || '');
-    return `
-      <div style="background: rgba(76, 175, 80, 0.2); border: 1px solid rgba(76, 175, 80, 0.5); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-        <p style="color: #4caf50; margin: 0 0 10px 0; font-weight: bold;">✅ Токен действителен</p>
-        <div style="color: #ccc; font-size: 14px;">
-          <p style="margin: 0;">Токен: ${formattedToken}</p>
-          <p style="margin: 5px 0 0 0;">Создан: ${tokenInfo.createdAt?.toLocaleString('ru')}</p>
-          <p style="margin: 5px 0 0 0;">Возраст: ${tokenInfo.ageHours?.toFixed(1)} ч.</p>
-        </div>
-      </div>
-      <div style="display: flex; gap: 10px;">
-        <button id="update-token-btn" style="
-          background: rgba(255, 255, 255, 0.1);
-          color: #ccc;
-          border: 1px solid rgba(255, 255, 255, 0.3);
-          padding: 8px 16px;
-          border-radius: 6px;
-          font-size: 14px;
-          cursor: pointer;
-          flex: 1;
-        ">
-          🔄 Обновить
-        </button>
-        <button id="clear-token-btn" style="
-          background: rgba(244, 67, 54, 0.8);
-          color: #fff;
-          border: none;
-          padding: 8px 16px;
-          border-radius: 6px;
-          font-size: 14px;
-          cursor: pointer;
-          flex: 1;
-        ">
-          🗑️ Удалить
-        </button>
-      </div>
-    `;
-  }
-
-  /**
    * Генерирует HTML статуса данных
    */
   private getDataStatusHTML(): string {
-    // Эта функция будет обновляться асинхронно
     return `
       <div id="data-status-content">
         <div style="color: #ccc; text-align: center; padding: 20px;">
@@ -316,33 +219,8 @@ export class BurgerMenu {
       overlay.addEventListener('click', () => this.closeMenu());
     }
 
-    // Обработчики кнопок токена (будут добавлены динамически)
-    this.setupTokenEventListeners();
-
     // Загружаем статус данных
     this.loadDataStatus();
-  }
-
-  /**
-   * Настраивает обработчики для кнопок токена
-   */
-  private setupTokenEventListeners(): void {
-    // Используем делегирование событий
-    document.addEventListener('click', (e) => {
-      const target = e.target as HTMLElement;
-      
-      if (target.id === 'add-token-btn' || target.id === 'update-token-btn') {
-        this.showTokenInput();
-      } else if (target.id === 'clear-token-btn') {
-        this.clearToken();
-      } else if (target.id === 'save-token-menu-btn') {
-        this.saveTokenFromMenu();
-      } else if (target.id === 'cancel-token-btn') {
-        this.cancelTokenInput();
-      } else if (target.id === 'refresh-data-btn') {
-        this.refreshData();
-      }
-    });
   }
 
   /**
@@ -401,116 +279,6 @@ export class BurgerMenu {
   }
 
   /**
-   * Показывает поле ввода токена
-   */
-  private showTokenInput(): void {
-    const tokenSection = document.querySelector('#burger-menu-panel h3:first-of-type')?.nextElementSibling;
-    if (tokenSection) {
-      tokenSection.innerHTML = `
-        <div style="margin-bottom: 15px;">
-          <label style="color: #fff; display: block; margin-bottom: 8px; font-size: 14px;">
-            Новый токен Session_id:
-          </label>
-          <textarea 
-            id="token-menu-input" 
-            placeholder="Вставьте токен Session_id"
-            style="
-              width: 100%;
-              height: 80px;
-              padding: 10px;
-              border: 1px solid rgba(255, 255, 255, 0.3);
-              border-radius: 6px;
-              background: rgba(255, 255, 255, 0.1);
-              color: #fff;
-              font-size: 12px;
-              resize: vertical;
-              box-sizing: border-box;
-              font-family: monospace;
-            "
-          ></textarea>
-        </div>
-        <div style="display: flex; gap: 10px;">
-          <button id="save-token-menu-btn" style="
-            background: linear-gradient(90deg, #4fc3f7, #29b6f6);
-            color: #fff;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            font-size: 14px;
-            cursor: pointer;
-            flex: 1;
-          ">
-            💾 Сохранить
-          </button>
-          <button id="cancel-token-btn" style="
-            background: rgba(255, 255, 255, 0.1);
-            color: #ccc;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            padding: 10px 20px;
-            border-radius: 6px;
-            font-size: 14px;
-            cursor: pointer;
-            flex: 1;
-          ">
-            Отмена
-          </button>
-        </div>
-      `;
-
-      // Фокус на поле ввода
-      const input = document.getElementById('token-menu-input') as HTMLTextAreaElement;
-      if (input) {
-        input.focus();
-      }
-    }
-  }
-
-  /**
-   * Сохраняет токен из меню
-   */
-  private saveTokenFromMenu(): void {
-    const input = document.getElementById('token-menu-input') as HTMLTextAreaElement;
-    if (!input) return;
-
-    const token = input.value.trim();
-    if (!token) {
-      this.showMenuNotification('Введите токен', 'error');
-      return;
-    }
-
-    if (token.length < 10) {
-      this.showMenuNotification('Токен слишком короткий', 'error');
-      return;
-    }
-
-    try {
-      TokenManager.saveToken(token);
-      this.showMenuNotification('Токен сохранен!', 'success');
-      this.updateMenuContent();
-    } catch (error) {
-      this.showMenuNotification('Ошибка сохранения токена', 'error');
-    }
-  }
-
-  /**
-   * Отменяет ввод токена
-   */
-  private cancelTokenInput(): void {
-    this.updateMenuContent();
-  }
-
-  /**
-   * Очищает токен
-   */
-  private clearToken(): void {
-    if (confirm('Удалить сохраненный токен?')) {
-      TokenManager.clearToken();
-      this.showMenuNotification('Токен удален', 'success');
-      this.updateMenuContent();
-    }
-  }
-
-  /**
    * Загружает статус данных
    */
   private async loadDataStatus(): Promise<void> {
@@ -518,64 +286,64 @@ export class BurgerMenu {
     if (!statusContent) return;
 
     try {
-      const dataExists = await DataLoader.checkDataFileExists();
-      const stats = await DataLoader.getDataStatistics();
-
-      if (!dataExists || !stats) {
+      // Проверяем наличие локальных данных
+      const localStats = await DataLoader.getLocalDataStatistics();
+      
+      if (localStats) {
+        const totalDurationMinutes = Math.round(localStats.totalDuration / 60);
+        const avgDurationMinutes = Math.round(localStats.averageDuration / 60);
+        
         statusContent.innerHTML = `
-          <div style="background: rgba(255, 193, 7, 0.2); border: 1px solid rgba(255, 193, 7, 0.5); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-            <p style="color: #ffc107; margin: 0 0 10px 0; font-weight: bold;">⚠️ Данные отсутствуют</p>
-            <p style="color: #ccc; margin: 0; font-size: 14px;">Необходимо загрузить данные из Яндекс.Музыки</p>
+          <div style="background: rgba(76, 175, 80, 0.2); border: 1px solid rgba(76, 175, 80, 0.5); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+            <p style="color: #4caf50; margin: 0 0 10px 0; font-weight: bold;">✅ Локальные данные загружены</p>
+            <div style="color: #ccc; font-size: 14px;">
+              <p style="margin: 0;">Всего треков: ${localStats.totalTracks}</p>
+              <p style="margin: 5px 0 0 0;">Доступно: ${localStats.availableTracks}</p>
+              <p style="margin: 5px 0 0 0;">Общая длительность: ${totalDurationMinutes} мин</p>
+              <p style="margin: 5px 0 0 0;">Средняя длительность: ${avgDurationMinutes} мин</p>
+            </div>
           </div>
-          <button id="refresh-data-btn" style="
-            background: linear-gradient(90deg, #4fc3f7, #29b6f6);
-            color: #fff;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            font-size: 14px;
-            cursor: pointer;
-            width: 100%;
-          ">
-            📥 Загрузить данные
-          </button>
+          
+          <!-- Статистика по жанрам -->
+          <div style="background: rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 15px;">
+            <h4 style="color: #4fc3f7; margin: 0 0 10px 0; font-size: 16px;">🎨 Жанры</h4>
+            <div style="max-height: 150px; overflow-y: auto;">
+              ${this.getGenreStatsHTML(localStats.genres)}
+            </div>
+          </div>
         `;
-        return;
+      } else {
+        // Fallback к старым данным или демо-данным
+        const stats = await DataLoader.getDataStatistics();
+        
+        if (stats) {
+          statusContent.innerHTML = `
+            <div style="background: rgba(255, 193, 7, 0.2); border: 1px solid rgba(255, 193, 7, 0.5); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+              <p style="color: #ffc107; margin: 0 0 10px 0; font-weight: bold;">⚠️ Используются демо-данные</p>
+              <div style="color: #ccc; font-size: 14px;">
+                <p style="margin: 0;">Треков: ${stats.totalTracks}</p>
+                <p style="margin: 5px 0 0 0;">Источник: ${stats.isDemo ? 'Демо' : 'Кэш'}</p>
+              </div>
+            </div>
+            <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 6px;">
+              <p style="color: #ccc; font-size: 14px; margin: 0; line-height: 1.6;">
+                💡 Для полной функциональности выберите папку с вашей музыкальной коллекцией на лендинг-странице.
+              </p>
+            </div>
+          `;
+        } else {
+          statusContent.innerHTML = `
+            <div style="background: rgba(244, 67, 54, 0.2); border: 1px solid rgba(244, 67, 54, 0.5); border-radius: 8px; padding: 15px;">
+              <p style="color: #f44336; margin: 0 0 10px 0; font-weight: bold;">❌ Данные не найдены</p>
+              <p style="color: #ccc; margin: 0; font-size: 14px;">Выберите папку с музыкой на главной странице</p>
+            </div>
+          `;
+        }
       }
-
-      const lastUpdate = new Date(stats.lastUpdate);
-      const ageHours = (Date.now() - lastUpdate.getTime()) / (1000 * 60 * 60);
-      const isStale = ageHours > 24;
-
-      statusContent.innerHTML = `
-        <div style="background: rgba(${isStale ? '255, 193, 7' : '76, 175, 80'}, 0.2); border: 1px solid rgba(${isStale ? '255, 193, 7' : '76, 175, 80'}, 0.5); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-          <p style="color: ${isStale ? '#ffc107' : '#4caf50'}; margin: 0 0 10px 0; font-weight: bold;">
-            ${isStale ? '⚠️ Данные устарели' : '✅ Данные актуальны'}
-          </p>
-          <div style="color: #ccc; font-size: 14px;">
-            <p style="margin: 0;">Треков: ${stats.totalTracks}</p>
-            <p style="margin: 5px 0 0 0;">Обновлено: ${lastUpdate.toLocaleString('ru')}</p>
-            <p style="margin: 5px 0 0 0;">Возраст: ${ageHours.toFixed(1)} ч.</p>
-            <p style="margin: 5px 0 0 0;">Источник: ${stats.isDemo ? 'Демо-данные' : 'Яндекс.Музыка'}</p>
-          </div>
-        </div>
-        <button id="refresh-data-btn" style="
-          background: ${isStale ? 'rgba(255, 193, 7, 0.8)' : 'rgba(255, 255, 255, 0.1)'};
-          color: ${isStale ? '#fff' : '#ccc'};
-          border: ${isStale ? 'none' : '1px solid rgba(255, 255, 255, 0.3)'};
-          padding: 10px 20px;
-          border-radius: 6px;
-          font-size: 14px;
-          cursor: pointer;
-          width: 100%;
-        ">
-          🔄 ${isStale ? 'Обновить данные' : 'Обновить данные'}
-        </button>
-      `;
     } catch (error) {
       statusContent.innerHTML = `
-        <div style="background: rgba(244, 67, 54, 0.2); border: 1px solid rgba(244, 67, 54, 0.5); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-          <p style="color: #f44336; margin: 0 0 10px 0; font-weight: bold;">❌ Ошибка загрузки статуса</p>
+        <div style="background: rgba(244, 67, 54, 0.2); border: 1px solid rgba(244, 67, 54, 0.5); border-radius: 8px; padding: 15px;">
+          <p style="color: #f44336; margin: 0 0 10px 0; font-weight: bold;">❌ Ошибка загрузки</p>
           <p style="color: #ccc; margin: 0; font-size: 14px;">Не удалось получить информацию о данных</p>
         </div>
       `;
@@ -583,97 +351,23 @@ export class BurgerMenu {
   }
 
   /**
-   * Обновляет данные
+   * Генерирует HTML статистики по жанрам
    */
-  private async refreshData(): Promise<void> {
-    const tokenData = TokenManager.getToken();
-    if (!tokenData || !TokenManager.hasValidToken()) {
-      this.showMenuNotification('Сначала настройте действительный токен', 'error');
-      return;
+  private getGenreStatsHTML(genres: { [genre: string]: number }): string {
+    const sortedGenres = Object.entries(genres)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 10); // Показываем топ-10 жанров
+
+    if (sortedGenres.length === 0) {
+      return '<p style="color: #999; margin: 0; font-size: 14px;">Нет данных о жанрах</p>';
     }
 
-    // Показываем прогресс
-    const progressSection = document.getElementById('menu-progress-section');
-    const refreshBtn = document.getElementById('refresh-data-btn');
-    
-    if (progressSection) progressSection.style.display = 'block';
-    if (refreshBtn) refreshBtn.style.display = 'none';
-
-    // Создаем коллектор
-    this.collector = new DataCollector((progress) => this.updateMenuProgress(progress));
-
-    try {
-      // Используем настройки по умолчанию для быстрого обновления из меню
-      const result = await this.collector.collectData(tokenData.oauthToken, tokenData.sessionId, 50); // Ограничиваем превью для быстроты
-      
-      if (result.success) {
-        this.showMenuNotification(`Данные обновлены! Загружено ${result.tracksCollected} треков`, 'success');
-        
-        // Перезагружаем страницу для применения новых данных
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-      } else {
-        this.showMenuNotification(`Ошибка обновления: ${result.error}`, 'error');
-      }
-    } catch (error) {
-      this.showMenuNotification('Ошибка обновления данных', 'error');
-    } finally {
-      if (progressSection) progressSection.style.display = 'none';
-      if (refreshBtn) refreshBtn.style.display = 'block';
-    }
-  }
-
-  /**
-   * Обновляет прогресс в меню
-   */
-  private updateMenuProgress(progress: CollectionProgress): void {
-    const messageEl = document.getElementById('menu-progress-message');
-    const barEl = document.getElementById('menu-progress-bar');
-    const detailsEl = document.getElementById('menu-progress-details');
-
-    if (messageEl) messageEl.textContent = progress.message;
-    if (barEl) barEl.style.width = `${progress.progress}%`;
-    
-    if (detailsEl && progress.totalTracks) {
-      const processed = progress.processedTracks || 0;
-      detailsEl.textContent = `${processed}/${progress.totalTracks} треков`;
-    }
-  }
-
-  /**
-   * Показывает уведомление в меню
-   */
-  private showMenuNotification(message: string, type: 'success' | 'error' | 'info' = 'info'): void {
-    const colors = {
-      success: { bg: 'rgba(76, 175, 80, 0.9)', text: '#fff' },
-      error: { bg: 'rgba(244, 67, 54, 0.9)', text: '#fff' },
-      info: { bg: 'rgba(33, 150, 243, 0.9)', text: '#fff' }
-    };
-
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: ${colors[type].bg};
-      color: ${colors[type].text};
-      padding: 12px 16px;
-      border-radius: 6px;
-      z-index: 10001;
-      font-size: 14px;
-      max-width: 300px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    `;
-    notification.textContent = message;
-    
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-      if (notification.parentElement) {
-        notification.remove();
-      }
-    }, type === 'success' ? 3000 : 4000);
+    return sortedGenres.map(([genre, count]) => `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+        <span style="color: #ccc; font-size: 14px;">${genre}</span>
+        <span style="color: #4fc3f7; font-size: 14px; font-weight: bold;">${count}</span>
+      </div>
+    `).join('');
   }
 
   /**
@@ -692,9 +386,5 @@ export class BurgerMenu {
         element.remove();
       }
     });
-
-    if (this.collector) {
-      this.collector.abort();
-    }
   }
 }

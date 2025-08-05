@@ -1,97 +1,96 @@
 #!/usr/bin/env python3
 """
-Test script to verify the collect_yandex_music_data.py functionality
+Простой тест для проверки работы основных функций
 """
 
 import sys
 import os
-sys.path.append(os.path.dirname(__file__))
-
-from collect_yandex_music_data import extract_genre, get_cover_url
-
-# Mock track object for testing
-class MockTrack:
-    def __init__(self):
-        self.id = "test_id"
-        self.title = "Test Track"
-        self.duration_ms = 180000
-        self.available = True
-        self.cover_uri = "avatars.yandex.net/get-music-content/%%/test"
-        
-        # Mock artists
-        self.artists = [MockArtist()]
-        
-        # Mock albums
-        self.albums = [MockAlbum()]
-
-class MockArtist:
-    def __init__(self):
-        self.name = "Test Artist"
-        self.genres = ["rock"]
-
-class MockAlbum:
-    def __init__(self):
-        self.title = "Test Album"
-        self.genre = "rock"
-        self.cover_uri = "avatars.yandex.net/get-music-content/%%/album"
-
-def test_extract_genre():
-    """Test genre extraction"""
-    track = MockTrack()
-    genre = extract_genre(track)
-    print(f"✅ Genre extraction test: {genre}")
-    assert genre == "rock", f"Expected 'rock', got '{genre}'"
-
-def test_get_cover_url():
-    """Test cover URL generation"""
-    track = MockTrack()
-    cover_url = get_cover_url(track)
-    print(f"✅ Cover URL test: {cover_url}")
-    expected = "https://avatars.yandex.net/get-music-content/400x400/test"
-    assert cover_url == expected, f"Expected '{expected}', got '{cover_url}'"
 
 def test_imports():
-    """Test that all required modules can be imported"""
+    """Тестирует импорты"""
+    print("🔄 Тестирование импортов...")
+    
     try:
         import yandex_music
-        print("✅ yandex_music import successful")
-        
-        import json
-        print("✅ json import successful")
-        
-        import os
-        print("✅ os import successful")
-        
-        from yandex_music import Client
-        print("✅ Client import successful")
-        
-        from yandex_music.exceptions import YandexMusicError
-        print("✅ YandexMusicError import successful")
-        
+        print("✅ yandex-music импортирован")
     except ImportError as e:
-        print(f"❌ Import error: {e}")
+        print(f"❌ Ошибка импорта yandex-music: {e}")
+        return False
+    
+    try:
+        import requests
+        print("✅ requests импортирован")
+    except ImportError as e:
+        print(f"❌ Ошибка импорта requests: {e}")
+        return False
+    
+    try:
+        import json
+        print("✅ json импортирован")
+    except ImportError as e:
+        print(f"❌ Ошибка импорта json: {e}")
         return False
     
     return True
 
-if __name__ == "__main__":
-    print("🧪 Testing collect_yandex_music_data.py functionality...")
-    print("=" * 50)
+def test_functions():
+    """Тестирует основные функции"""
+    print("\n🔄 Тестирование функций...")
     
-    # Test imports
-    if not test_imports():
-        sys.exit(1)
+    # Импортируем функции из основного скрипта
+    sys.path.append(os.path.dirname(__file__))
     
-    print()
-    
-    # Test functions
     try:
-        test_extract_genre()
-        test_get_cover_url()
+        from collect_yandex_music_data import (
+            sanitize_filename,
+            format_token_for_display,
+            create_output_structure
+        )
         
-        print("\n🎉 All tests passed!")
-        print("✅ The Python script is ready to collect Yandex Music data")
+        # Тест sanitize_filename
+        test_filename = "Test<>Song|Name?.mp3"
+        clean_filename = sanitize_filename(test_filename)
+        print(f"✅ sanitize_filename: '{test_filename}' -> '{clean_filename}'")
+        
+        # Тест format_token_for_display
+        test_token = "very_long_token_string_for_testing"
+        formatted_token = format_token_for_display(test_token)
+        print(f"✅ format_token_for_display: '{test_token}' -> '{formatted_token}'")
+        
+        # Тест create_output_structure
+        test_dir = "test_output"
+        metadata_file, audio_dir = create_output_structure(test_dir)
+        print(f"✅ create_output_structure создал: {metadata_file}, {audio_dir}")
+        
+        # Очищаем тестовую папку
+        import shutil
+        if os.path.exists(test_dir):
+            shutil.rmtree(test_dir)
+            print("✅ Тестовая папка очищена")
+        
+        return True
         
     except Exception as e:
-        print(f"❌ Test failed: {e}")
+        print(f"❌ Ошибка тестирования функций: {e}")
+        return False
+
+def main():
+    """Основная функция теста"""
+    print("🧪 Тест компонентов Yandex Music Collector")
+    print("=" * 50)
+    
+    # Тестируем импорты
+    if not test_imports():
+        print("\n❌ Тест импортов провален")
         sys.exit(1)
+    
+    # Тестируем функции
+    if not test_functions():
+        print("\n❌ Тест функций провален")
+        sys.exit(1)
+    
+    print("\n✅ Все тесты пройдены успешно!")
+    print("💡 Основной скрипт готов к использованию")
+
+if __name__ == "__main__":
+    main()

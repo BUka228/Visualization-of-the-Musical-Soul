@@ -1,0 +1,54 @@
+{
+  "metadata": {
+    "total_tracks": 5,
+    "generated_at": "2024-01-15T12:00:00Z",
+    "source": "Local Music Collection"
+  },
+  "tracks": [
+    {
+      "id": "track001",
+      "title": "Bohemian Rhapsody",
+      "artist": "Queen",
+      "album": "A Night at the Opera",
+      "duration": 355,
+      "genre": "rock",
+      "available": true
+    },
+    {
+      "id": "track002", 
+      "title": "Billie Jean",
+      "artist": "Michael Jackson",
+      "album": "Thriller",
+      "duration": 294,
+      "genre": "pop",
+      "available": true
+    },
+    {
+      "id": "track003",
+      "title": "Smells Like Teen Spirit", 
+      "artist": "Nirvana",
+      "album": "Nevermind",
+      "duration": 301,
+      "genre": "alternative",
+      "available": true
+    },
+    {
+      "id": "track004",
+      "title": "Hotel California",
+      "artist": "Eagles", 
+      "album": "Hotel California",
+      "duration": 391,
+      "genre": "rock",
+      "available": true
+    },
+    {
+      "id": "track005",
+      "title": "Imagine",
+      "artist": "John Lennon",
+      "album": "Imagine", 
+      "duration": 183,
+      "genre": "folk",
+      "available": true
+    }
+  ]
+}

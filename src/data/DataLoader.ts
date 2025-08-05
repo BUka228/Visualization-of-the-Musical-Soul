@@ -1,8 +1,9 @@
 /**
- * Модуль для загрузки данных треков из JSON файла
+ * Модуль для загрузки данных треков из различных источников
  */
 
 import { ProcessedTrack } from '../types/index.js';
+import { LocalDataLoader, LocalDataLoadResult } from './LocalDataLoader';
 
 export interface YandexTrackData {
   id: string;
@@ -46,6 +47,7 @@ export interface DataUpdateStatus {
 export class DataLoader {
   private static readonly DATA_FILE_PATH = '/src/data/music_data.json';
   private static readonly DEMO_DATA_PATH = '/src/data/demo_data.json';
+  private static localDataLoader?: LocalDataLoader;
 
   /**
    * Загружает данные треков из localStorage или файла с расширенной информацией о результате
@@ -492,6 +494,87 @@ export class DataLoader {
     localStorage.removeItem('music_data');
     localStorage.removeItem('music_data_timestamp');
     console.log('Данные очищены из localStorage');
+  }
+
+  /**
+   * Устанавливает локальный загрузчик данных
+   */
+  static setLocalDataLoader(folderHandle: FileSystemDirectoryHandle): void {
+    this.localDataLoader = new LocalDataLoader(folderHandle);
+  }
+
+  /**
+   * Загружает данные из локальной папки
+   */
+  static async loadLocalMusicData(): Promise<LocalDataLoadResult> {
+    if (!this.localDataLoader) {
+      return {
+        success: false,
+        error: 'Локальный загрузчик не инициализирован',
+        totalTracks: 0,
+        availableTracks: 0
+      };
+    }
+
+    return await this.localDataLoader.loadMusicData();
+  }
+
+  /**
+   * Получает аудиофайл для трека из локальной папки
+   */
+  static async getLocalAudioFile(trackId: string): Promise<File | null> {
+    if (!this.localDataLoader) {
+      return null;
+    }
+
+    return await this.localDataLoader.getAudioFile(trackId);
+  }
+
+  /**
+   * Создает URL для локального аудиофайла
+   */
+  static createLocalAudioUrl(trackId: string): string | null {
+    if (!this.localDataLoader) {
+      return null;
+    }
+
+    return this.localDataLoader.createAudioUrl(trackId);
+  }
+
+  /**
+   * Освобождает URL локального аудиофайла
+   */
+  static revokeLocalAudioUrl(url: string): void {
+    if (this.localDataLoader) {
+      this.localDataLoader.revokeAudioUrl(url);
+    }
+  }
+
+  /**
+   * Получает статистику локальных данных
+   */
+  static async getLocalDataStatistics(): Promise<{
+    totalTracks: number;
+    availableTracks: number;
+    genres: { [genre: string]: number };
+    totalDuration: number;
+    averageDuration: number;
+  } | null> {
+    if (!this.localDataLoader) {
+      return null;
+    }
+
+    return await this.localDataLoader.getStatistics();
+  }
+
+  /**
+   * Очищает локальный загрузчик
+   */
+  static clearLocalDataLoader(): void {
+    if (this.localDataLoader) {
+      this.localDataLoader.dispose();
+      this.localDataLoader = undefined;
+    }
   }
 
   /**

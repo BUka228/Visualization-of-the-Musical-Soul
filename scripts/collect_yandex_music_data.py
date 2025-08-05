@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """
-Скрипт для сбора данных из Яндекс.Музыки
+Скрипт для сбора данных из Яндекс.Музыки и скачивания треков
 Использует неофициальное API через библиотеку yandex-music
+Создает структуру папок для Music Galaxy 3D
 """
 
 import json
 import os
 import sys
 import datetime
+import requests
+import time
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 from yandex_music import Client
 from yandex_music.exceptions import YandexMusicError
@@ -145,37 +149,108 @@ def get_cover_url(track) -> Optional[str]:
         return None
 
 
-def get_preview_url(client: Client, track) -> Optional[str]:
-    """Получает URL 30-секундного превью трека.
-    
-    Это более простой и надежный метод.
-    """
+def get_download_url(client: Client, track) -> Optional[str]:
+    """Получает URL для скачивания полного трека в высоком качестве"""
     try:
-        # Запрашиваем информацию о загрузке, включая прямые ссылки
-        # Метод на объекте track более надежен, чем client.tracks_download_info
+        # Запрашиваем информацию о загрузке
         download_info_list = track.get_download_info(get_direct_links=True)
         
-        # Превью обычно представляют собой MP3 с низким битрейтом (<= 192 kbps)
-        # Ищем первый подходящий вариант, этого достаточно.
+        # Ищем лучшее качество MP3
+        best_quality = None
         for info in download_info_list:
-            if info.codec == 'mp3' and info.bitrate_in_kbps <= 192:
-                # Прямая ссылка уже получена благодаря get_direct_links=True
-                print(f"  ✅ Превью найдено для '{track.title}' ({info.bitrate_in_kbps}kbps)")
-                return info.direct_link
+            if info.codec == 'mp3':
+                if best_quality is None or info.bitrate_in_kbps > best_quality.bitrate_in_kbps:
+                    best_quality = info
         
-        # Если в цикле ничего не нашлось
-        print(f"  ⚠️  Превью для трека '{track.title}' недоступно в download_info.")
+        if best_quality:
+            print(f"  ✅ Ссылка для скачивания найдена: '{track.title}' ({best_quality.bitrate_in_kbps}kbps)")
+            return best_quality.direct_link
+        
+        print(f"  ⚠️ Ссылка для скачивания недоступна: '{track.title}'")
         return None
         
     except YandexMusicError as e:
-        print(f"  ❌ Ошибка API при получении превью для '{track.title}': {e}")
+        print(f"  ❌ Ошибка API при получении ссылки для '{track.title}': {e}")
         return None
     except Exception as e:
-        print(f"  ❌ Непредвиденная ошибка при получении превью для '{track.title}': {e}")
+        print(f"  ❌ Непредвиденная ошибка при получении ссылки для '{track.title}': {e}")
         return None
 
 
-def process_track(client: Client, track) -> Dict[str, Any]:
+def sanitize_filename(filename: str) -> str:
+    """Очищает имя файла от недопустимых символов"""
+    # Заменяем недопустимые символы
+    invalid_chars = '<>:"/\\|?*'
+    for char in invalid_chars:
+        filename = filename.replace(char, '_')
+    
+    # Убираем лишние пробелы и точки
+    filename = filename.strip('. ')
+    
+    # Ограничиваем длину
+    if len(filename) > 100:
+        filename = filename[:100]
+    
+    return filename
+
+
+def download_track(url: str, output_path: str, track_title: str) -> bool:
+    """Скачивает трек по URL"""
+    try:
+        print(f"  🔄 Скачивание: {track_title}")
+        
+        # Создаем директорию если не существует
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        # Скачиваем файл
+        response = requests.get(url, stream=True, timeout=30)
+        response.raise_for_status()
+        
+        # Сохраняем файл
+        with open(output_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+        
+        # Проверяем размер файла
+        file_size = os.path.getsize(output_path)
+        if file_size < 1024:  # Меньше 1KB - подозрительно
+            print(f"  ⚠️ Подозрительно маленький файл: {file_size} байт")
+            os.remove(output_path)
+            return False
+        
+        print(f"  ✅ Скачано: {track_title} ({file_size // 1024} KB)")
+        return True
+        
+    except requests.exceptions.RequestException as e:
+        print(f"  ❌ Ошибка скачивания {track_title}: {e}")
+        return False
+    except Exception as e:
+        print(f"  ❌ Непредвиденная ошибка при скачивании {track_title}: {e}")
+        return False
+
+
+def create_output_structure(output_dir: str) -> tuple[str, str]:
+    """Создает структуру папок для Music Galaxy 3D"""
+    # Создаем основную папку
+    output_path = Path(output_dir)
+    output_path.mkdir(exist_ok=True)
+    
+    # Создаем папку для аудио
+    audio_path = output_path / "audio"
+    audio_path.mkdir(exist_ok=True)
+    
+    metadata_file = output_path / "metadata.json"
+    
+    print(f"📁 Создана структура папок:")
+    print(f"  📂 {output_path}")
+    print(f"  📂 {audio_path}")
+    print(f"  📄 {metadata_file}")
+    
+    return str(metadata_file), str(audio_path)
+
+
+def process_track(client: Client, track, audio_dir: str, download_audio: bool = True) -> Dict[str, Any]:
     """Обрабатывает один трек и возвращает данные для JSON"""
     try:
         # Основная информация
@@ -187,18 +262,26 @@ def process_track(client: Client, track) -> Dict[str, Any]:
             "duration": track.duration_ms // 1000 if track.duration_ms else 0,
             "genre": extract_genre(track),
             "cover_url": get_cover_url(track),
-            "preview_url": None,  # Будем получать отдельно
             "available": track.available if hasattr(track, 'available') else True
         }
         
-        # Получаем превью только для доступных треков
-        if track_data["available"]:
-            preview_url = get_preview_url(client, track)
-            if preview_url:
-                track_data["preview_url"] = preview_url
-                print(f"  ✅ Превью получено: {track.title}")
+        # Скачиваем аудиофайл если нужно
+        if download_audio and track_data["available"]:
+            download_url = get_download_url(client, track)
+            if download_url:
+                # Создаем имя файла
+                audio_filename = f"{track_data['id']}.mp3"
+                audio_path = os.path.join(audio_dir, audio_filename)
+                
+                # Скачиваем трек
+                if download_track(download_url, audio_path, track_data['title']):
+                    print(f"  ✅ Трек скачан: {track.title}")
+                else:
+                    print(f"  ⚠️ Не удалось скачать: {track.title}")
+                    track_data["available"] = False
             else:
-                print(f"  ⚠️  Превью недоступно: {track.title}")
+                print(f"  ⚠️ Ссылка недоступна: {track.title}")
+                track_data["available"] = False
         
         return track_data
     
@@ -207,8 +290,8 @@ def process_track(client: Client, track) -> Dict[str, Any]:
         return None
 
 
-def collect_liked_tracks(token: str) -> List[Dict[str, Any]]:
-    """Собирает данные о лайкнутых треках"""
+def collect_liked_tracks(token: str, output_dir: str, download_audio: bool = True) -> List[Dict[str, Any]]:
+    """Собирает данные о лайкнутых треках и скачивает их"""
     try:
         print("🔄 Подключение к Яндекс.Музыке...")
         client = Client(token).init()
@@ -222,33 +305,47 @@ def collect_liked_tracks(token: str) -> List[Dict[str, Any]]:
             print("❌ Не найдено лайкнутых треков")
             return []
         
+        # Создаем структуру папок
+        metadata_file, audio_dir = create_output_structure(output_dir)
+        
         tracks_data = []
         total_tracks = len(liked_tracks.tracks)
+        downloaded_count = 0
         
         print(f"📊 Найдено {total_tracks} лайкнутых треков")
-        print("🔄 Обработка треков...")
+        if download_audio:
+            print("🎵 Начинаем скачивание треков...")
+        else:
+            print("🔄 Обработка метаданных...")
         
         for i, track_short in enumerate(liked_tracks.tracks, 1):
             try:
                 # Получаем полную информацию о треке
                 track = client.tracks([track_short.id])[0]
                 
-                print(f"[{i}/{total_tracks}] Обработка: {track.title} - {track.artists[0].name if track.artists else 'Unknown'}")
+                print(f"\n[{i}/{total_tracks}] Обработка: {track.title} - {track.artists[0].name if track.artists else 'Unknown'}")
                 
-                track_data = process_track(client, track)
+                track_data = process_track(client, track, audio_dir, download_audio)
                 if track_data:
                     tracks_data.append(track_data)
+                    if download_audio and track_data.get('available', False):
+                        downloaded_count += 1
+                
+                # Небольшая пауза между запросами
+                time.sleep(0.5)
                 
             except Exception as e:
                 print(f"⚠️  Пропуск трека {i}: {e}")
                 continue
         
-        # Статистика по превью
-        tracks_with_preview = sum(1 for track in tracks_data if track.get('preview_url'))
-        preview_percentage = (tracks_with_preview / len(tracks_data) * 100) if tracks_data else 0
+        # Статистика
+        available_tracks = sum(1 for track in tracks_data if track.get('available', False))
         
-        print(f"✅ Успешно обработано {len(tracks_data)} треков")
-        print(f"🎵 Превью доступно для {tracks_with_preview} треков ({preview_percentage:.1f}%)")
+        print(f"\n✅ Успешно обработано {len(tracks_data)} треков")
+        if download_audio:
+            print(f"🎵 Скачано аудиофайлов: {downloaded_count}")
+            print(f"📁 Доступно для воспроизведения: {available_tracks} треков")
+        
         return tracks_data
     
     except YandexMusicError as e:
@@ -297,12 +394,63 @@ def save_data_to_json(tracks_data: List[Dict[str, Any]], output_file: str):
         sys.exit(1)
 
 
+def get_output_directory() -> str:
+    """Получает папку для сохранения от пользователя"""
+    print("\n📁 ВЫБОР ПАПКИ ДЛЯ СОХРАНЕНИЯ:")
+    print("Где сохранить вашу музыкальную коллекцию?")
+    print("1. В текущей папке (./music_collection)")
+    print("2. Указать свой путь")
+    
+    choice = input("Выберите вариант (1/2): ").strip()
+    
+    if choice == "1" or choice == "":
+        output_dir = os.path.join(os.getcwd(), "music_collection")
+        print(f"📂 Выбрана папка: {output_dir}")
+        return output_dir
+    elif choice == "2":
+        custom_path = input("Введите путь к папке: ").strip()
+        if not custom_path:
+            print("❌ Путь не может быть пустым!")
+            return get_output_directory()
+        
+        # Проверяем, что путь валидный
+        try:
+            os.makedirs(custom_path, exist_ok=True)
+            print(f"📂 Выбрана папка: {custom_path}")
+            return custom_path
+        except Exception as e:
+            print(f"❌ Ошибка создания папки: {e}")
+            return get_output_directory()
+    else:
+        print("❌ Неверный выбор!")
+        return get_output_directory()
+
+
+def ask_download_preference() -> bool:
+    """Спрашивает пользователя, нужно ли скачивать аудиофайлы"""
+    print("\n🎵 СКАЧИВАНИЕ АУДИОФАЙЛОВ:")
+    print("Скачать полные аудиофайлы треков?")
+    print("✅ Да - полная функциональность (займет больше времени и места)")
+    print("❌ Нет - только метаданные (быстрее, но без воспроизведения)")
+    
+    choice = input("Скачивать аудио? (y/n): ").strip().lower()
+    
+    if choice in ['y', 'yes', 'да', '']:
+        print("🎵 Будут скачаны полные аудиофайлы")
+        return True
+    else:
+        print("📄 Будут сохранены только метаданные")
+        return False
+
+
 def main():
     """Основная функция"""
     print("🎵 Сборщик данных Яндекс.Музыки для Music Galaxy 3D")
     print("=" * 60)
+    print("Создает готовую структуру папок для локального использования")
+    print("=" * 60)
     
-    # Проверяем установку библиотеки
+    # Проверяем установку библиотек
     try:
         import yandex_music
         print("✅ Библиотека yandex-music найдена")
@@ -311,22 +459,70 @@ def main():
         print("💡 Установите её командой: pip install yandex-music")
         sys.exit(1)
     
-    # Получаем токен
-    token = get_token_from_user()
+    try:
+        import requests
+        print("✅ Библиотека requests найдена")
+    except ImportError:
+        print("❌ Библиотека requests не установлена!")
+        print("💡 Установите её командой: pip install requests")
+        sys.exit(1)
     
-    # Собираем данные
-    tracks_data = collect_liked_tracks(token)
+    # Получаем настройки от пользователя
+    token = get_token_from_user()
+    output_dir = get_output_directory()
+    download_audio = ask_download_preference()
+    
+    # Собираем данные и скачиваем треки
+    print(f"\n🚀 Начинаем сбор данных...")
+    tracks_data = collect_liked_tracks(token, output_dir, download_audio)
     
     if not tracks_data:
         print("❌ Не удалось собрать данные о треках")
         sys.exit(1)
     
-    # Сохраняем в JSON
-    output_file = "src/data/music_data.json"
-    save_data_to_json(tracks_data, output_file)
+    # Сохраняем метаданные в правильном месте
+    metadata_file = os.path.join(output_dir, "metadata.json")
     
-    print("\n🎉 Готово! Теперь можно запускать веб-приложение")
-    print(f"📁 Данные сохранены в: {output_file}")
+    # Создаем структуру данных для metadata.json
+    metadata = {
+        "metadata": {
+            "total_tracks": len(tracks_data),
+            "generated_at": datetime.datetime.now().isoformat(),
+            "source": "Yandex Music API with Local Files"
+        },
+        "tracks": tracks_data
+    }
+    
+    # Сохраняем metadata.json
+    with open(metadata_file, 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, ensure_ascii=False, indent=2)
+    
+    print(f"\n✅ Метаданные сохранены: {metadata_file}")
+    
+    # Статистика по жанрам
+    genres = {}
+    for track in tracks_data:
+        genre = track.get('genre', 'unknown')
+        genres[genre] = genres.get(genre, 0) + 1
+    
+    print("\n📊 Статистика по жанрам:")
+    for genre, count in sorted(genres.items(), key=lambda x: x[1], reverse=True):
+        print(f"  {genre}: {count} треков")
+    
+    # Финальная информация
+    available_tracks = sum(1 for track in tracks_data if track.get('available', False))
+    
+    print("\n" + "=" * 60)
+    print("🎉 ГОТОВО!")
+    print("=" * 60)
+    print(f"📂 Папка с коллекцией: {output_dir}")
+    print(f"📄 Файл метаданных: metadata.json")
+    if download_audio:
+        print(f"📁 Папка с аудио: audio/")
+        print(f"🎵 Скачано треков: {available_tracks}")
+    print(f"📊 Всего треков в коллекции: {len(tracks_data)}")
+    print("\n💡 Теперь можно использовать эту папку в Music Galaxy 3D!")
+    print("   Просто выберите её в веб-приложении.")
 
 
 if __name__ == "__main__":

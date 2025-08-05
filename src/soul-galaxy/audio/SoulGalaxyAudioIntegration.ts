@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { AudioManager } from '../../audio/AudioManager';
 import { CrystalTrack } from '../types';
 import { CrystalShaderMaterial } from '../materials/CrystalShaderMaterial';
+import { DataLoader } from '../../data/DataLoader';
 
 /**
  * Интеграция аудио системы с Soul Galaxy визуализацией
@@ -115,13 +116,6 @@ export class SoulGalaxyAudioIntegration {
     // Останавливаем текущее воспроизведение если есть
     await this.stopCurrentTrack();
 
-    // Проверяем наличие превью URL
-    if (!track.previewUrl) {
-      console.warn(`⚠️ No preview URL for track: ${track.name}`);
-      this.showNoPreviewIndicator(track, crystalMesh);
-      return;
-    }
-
     try {
       // Устанавливаем текущий трек
       this.currentPlayingTrack = track;
@@ -136,8 +130,19 @@ export class SoulGalaxyAudioIntegration {
       // Задержка для синхронизации с кинематографическим переходом
       await this.delay(SoulGalaxyAudioIntegration.AUDIO_CONFIG.transitionDelay);
 
-      // Начинаем воспроизведение с плавным появлением
-      await this.audioManager.playPreview(track.previewUrl, track.id);
+      // Пробуем воспроизвести локальный файл сначала
+      const hasLocalFile = await this.tryPlayLocalFile(track);
+      
+      if (!hasLocalFile) {
+        // Fallback к удаленному превью если локального файла нет
+        if (track.previewUrl) {
+          await this.audioManager.playPreview(track.previewUrl, track.id);
+        } else {
+          console.warn(`⚠️ No audio source available for track: ${track.name}`);
+          this.showNoPreviewIndicator(track, crystalMesh);
+          return;
+        }
+      }
 
       this.isTransitioning = false;
 
@@ -160,6 +165,27 @@ export class SoulGalaxyAudioIntegration {
       }
 
       throw error;
+    }
+  }
+
+  /**
+   * Пытается воспроизвести локальный аудиофайл
+   */
+  private async tryPlayLocalFile(track: CrystalTrack): Promise<boolean> {
+    try {
+      // Проверяем, есть ли локальный файл для этого трека
+      const localFile = await DataLoader.getLocalAudioFile(track.id);
+      
+      if (localFile) {
+        console.log(`📁 Playing local audio file for: ${track.name}`);
+        await this.audioManager.playLocalPreview(track.id);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.warn(`⚠️ Failed to play local file for ${track.name}:`, error);
+      return false;
     }
   }
 

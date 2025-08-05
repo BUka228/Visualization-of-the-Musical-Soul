@@ -5,10 +5,7 @@ import { DataProcessor } from './data/DataProcessor';
 import { UIManager } from './ui/UIManager';
 import { LandingPage } from './ui/LandingPage';
 import { GalaxyCreationProgress } from './ui/GalaxyCreationProgress';
-import { CollectionSettingsModal } from './ui/CollectionSettingsModal';
-import { DataCollector, CollectionProgress, CollectionResult } from './data/DataCollector';
 import { BurgerMenu } from './ui/BurgerMenu';
-import { TokenManager } from './auth/TokenManager';
 import { setupMockAPI } from './api/MockYandexAPI';
 import { Vector3 } from 'three';
 
@@ -105,24 +102,9 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
    * Проверяет, нужен ли экран первой загрузки
    */
   private async checkFirstLoadRequirement(): Promise<void> {
-    // Проверяем наличие данных и токена
-    const hasValidData = await DataLoader.checkDataFileExists();
-    const hasValidToken = TokenManager.hasValidToken();
-    const dataIsFresh = await DataLoader.checkDataFreshness();
-
-    // Показываем лендинг-страницу если:
-    // 1. Нет данных вообще
-    // 2. Данные устарели и нет валидного токена для обновления
-    // 3. Есть токен, но он недействителен
-    const needsOnboarding = !hasValidData || 
-                           (!dataIsFresh && !hasValidToken) || 
-                           (TokenManager.getToken() && !hasValidToken);
-
-    if (needsOnboarding) {
-      await this.showLandingPage();
-    } else {
-      await this.initializeMainApp();
-    }
+    // В новой архитектуре всегда показываем лендинг для выбора папки
+    // Пользователь сам решает, какие данные использовать
+    await this.showLandingPage();
   }
 
   /**
@@ -176,70 +158,81 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
     this.progressScreen = new GalaxyCreationProgress(this.container!);
     this.progressScreen.show();
 
-    // Запускаем сбор данных
-    await this.startDataCollection(detail.token);
+    // Устанавливаем локальный загрузчик данных
+    if (detail.folderHandle) {
+      DataLoader.setLocalDataLoader(detail.folderHandle);
+      await this.startLocalDataLoading();
+    } else {
+      // Fallback для старой архитектуры (если нужно)
+      await this.startDataCollection(detail.token);
+    }
   }
 
   /**
-   * Запускает сбор данных с отображением прогресса
+   * Запускает сбор данных с отображением прогресса (fallback для старой архитектуры)
    */
   private async startDataCollection(token: string): Promise<void> {
-    // Сначала показываем модал настроек
-    const settingsModal = new CollectionSettingsModal();
-    
-    return new Promise((resolve) => {
-      settingsModal.show(
-        async (settings) => {
-          // Пользователь подтвердил настройки - начинаем сбор
-          await this.performDataCollection(token, settings.previewLimit);
-          resolve();
-        },
-        () => {
-          // Пользователь отменил - возвращаемся к лендингу
-          if (this.progressScreen) {
-            this.progressScreen.hide();
-            this.progressScreen = undefined;
-          }
-          this.showLandingPage();
-          resolve();
-        }
-      );
-    });
+    console.warn('⚠️ Fallback к старой архитектуре - используем демо-данные');
+    await this.handleUseDemoData();
   }
 
   /**
-   * Выполняет сбор данных с заданными настройками
+   * Запускает загрузку локальных данных
    */
-  private async performDataCollection(token: string, previewLimit: number): Promise<void> {
-    const collector = new DataCollector((progress: CollectionProgress) => {
-      if (this.progressScreen) {
-        this.progressScreen.updateProgress(progress);
-      }
-    });
-
+  private async startLocalDataLoading(): Promise<void> {
     try {
-      // Получаем сохраненные токены
-      const tokenData = TokenManager.getToken();
-      const sessionId = tokenData?.sessionId || '';
+      if (this.progressScreen) {
+        this.progressScreen.updateProgress({
+          stage: 'loading',
+          message: 'Загрузка локальных данных...',
+          progress: 0
+        });
+      }
+
+      const result = await DataLoader.loadLocalMusicData();
       
-      const result: CollectionResult = await collector.collectData(token, sessionId, previewLimit);
-      
-      if (result.success && this.progressScreen) {
-        this.progressScreen.showSuccess(
-          result.tracksCollected || 0,
-          result.tracksWithPreview || 0
-        );
-      } else if (this.progressScreen) {
-        this.progressScreen.showError(result.error || 'Неизвестная ошибка');
+      if (result.success && result.data) {
+        if (this.progressScreen) {
+          this.progressScreen.updateProgress({
+            stage: 'processing',
+            message: 'Обработка треков...',
+            progress: 50
+          });
+        }
+
+        // Небольшая задержка для показа прогресса
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        if (this.progressScreen) {
+          this.progressScreen.updateProgress({
+            stage: 'complete',
+            message: 'Данные загружены успешно!',
+            progress: 100
+          });
+        }
+
+        // Показываем успех
+        if (this.progressScreen) {
+          this.progressScreen.showSuccess(
+            result.availableTracks,
+            result.availableTracks // Все локальные треки доступны для воспроизведения
+          );
+        }
+      } else {
+        if (this.progressScreen) {
+          this.progressScreen.showError(result.error || 'Не удалось загрузить локальные данные');
+        }
       }
     } catch (error) {
       if (this.progressScreen) {
         this.progressScreen.showError(
-          error instanceof Error ? error.message : 'Неизвестная ошибка'
+          error instanceof Error ? error.message : 'Неизвестная ошибка при загрузке локальных данных'
         );
       }
     }
   }
+
+
 
   /**
    * Обрабатывает готовность галактики
@@ -322,38 +315,56 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
     try {
       console.log('🔄 Загрузка музыкальных данных...');
       
-      // Проверяем свежесть данных
-      const isFresh = await DataLoader.checkDataFreshness();
-      if (!isFresh) {
-        console.warn('⚠️ Данные устарели или отсутствуют');
-        this.showDataUpdateNotification();
-      }
-      
-      // Загружаем данные
-      const musicData = await DataLoader.loadMusicData();
-      
       // Создаем экземпляр DataProcessor
       const dataProcessor = new DataProcessor();
       
-      // Конвертируем данные Яндекс.Музыки в стандартный формат
-      const convertedTracks = dataProcessor.convertYandexTrackData(musicData.tracks);
+      // Пробуем загрузить локальные данные
+      const localResult = await DataLoader.loadLocalMusicData();
       
-      // Обрабатываем треки для 3D-сцены
-      const processedTracks = dataProcessor.processTrackData(convertedTracks);
-      
-      // Загружаем треки в сцену
-      this.loadTracks(processedTracks);
-      
-      // Обновляем статистику с помощью DataProcessor
-      const genreStats = dataProcessor.analyzeGenres(convertedTracks);
-      this.state.genreStats = genreStats;
+      if (localResult.success && localResult.data) {
+        console.log('📁 Используем локальные данные');
+        
+        // Конвертируем локальные данные в стандартный формат
+        const convertedTracks = dataProcessor.convertLocalTrackData(localResult.data.tracks);
+        
+        // Обрабатываем треки для 3D-сцены
+        const processedTracks = dataProcessor.processTrackData(convertedTracks);
+        
+        // Загружаем треки в сцену
+        this.loadTracks(processedTracks);
+        
+        // Обновляем статистику
+        const genreStats = dataProcessor.analyzeGenres(convertedTracks);
+        this.state.genreStats = genreStats;
+        
+        console.log(`✅ Загружено ${processedTracks.length} локальных треков`);
+        
+      } else {
+        // Fallback к старой архитектуре или демо-данным
+        console.log('🔄 Загружаем демо-данные...');
+        
+        const musicData = await DataLoader.loadMusicData();
+        
+        // Конвертируем данные Яндекс.Музыки в стандартный формат
+        const convertedTracks = dataProcessor.convertYandexTrackData(musicData.tracks);
+        
+        // Обрабатываем треки для 3D-сцены
+        const processedTracks = dataProcessor.processTrackData(convertedTracks);
+        
+        // Загружаем треки в сцену
+        this.loadTracks(processedTracks);
+        
+        // Обновляем статистику
+        const genreStats = dataProcessor.analyzeGenres(convertedTracks);
+        this.state.genreStats = genreStats;
+        
+        console.log(`✅ Загружено ${processedTracks.length} демо-треков`);
+      }
       
       // Обновляем UI через UIManager
       if (this.uiManager) {
         this.uiManager.updateAppState(this.state);
       }
-      
-      console.log(`✅ Загружено ${processedTracks.length} треков`);
       
     } catch (error) {
       console.error('❌ Ошибка загрузки музыкальных данных:', error);
