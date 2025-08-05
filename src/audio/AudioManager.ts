@@ -18,16 +18,7 @@ export class AudioManager implements IAudioManager {
     console.log('AudioManager инициализирован');
   }
 
-  /**
-   * Преобразует URL Яндекс.Музыки в локальный прокси URL
-   */
-  private convertToProxyUrl(originalUrl: string): string {
-    if (originalUrl.startsWith('https://api.music.yandex.net/')) {
-      // Заменяем домен на наш прокси
-      return originalUrl.replace('https://api.music.yandex.net/', '/api/music/');
-    }
-    return originalUrl;
-  }
+
 
   async playPreview(url: string, trackId?: string): Promise<void> {
     console.log(`🎵 Попытка воспроизведения превью: ${url}`);
@@ -53,9 +44,8 @@ export class AudioManager implements IAudioManager {
       // Устанавливаем ID нового трека
       this.currentTrackId = trackId;
       
-      // Преобразуем URL для использования прокси
-      const proxyUrl = this.convertToProxyUrl(url);
-      console.log(`🔄 Использование прокси URL: ${proxyUrl}`);
+      // URL уже является прокси-ссылкой, используем как есть
+      console.log(`🎵 Установка источника аудио: ${url}`);
       
       // Создаем новый аудио элемент
       this.currentAudio = new Audio();
@@ -66,7 +56,7 @@ export class AudioManager implements IAudioManager {
       this.setupAudioEventListeners();
       
       // Устанавливаем источник и начальную громкость
-      this.currentAudio.src = proxyUrl;
+      this.currentAudio.src = url;
       this.currentAudio.volume = 0; // Начинаем с нулевой громкости для fade-in
       
       // Загружаем и воспроизводим

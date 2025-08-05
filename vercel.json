@@ -5,6 +5,9 @@
     "api/getYandexData.ts": {
       "maxDuration": 300
     },
+    "api/audioProxy.ts": {
+      "maxDuration": 60
+    },
     "api/test.ts": {
       "maxDuration": 10
     }

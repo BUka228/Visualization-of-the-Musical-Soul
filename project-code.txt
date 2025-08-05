@@ -1,6 +1,6 @@
 # Music Galaxy 3D - Project Code Collection
-Generated on: 2025-08-04T19:33:09.015Z
-Total files: 144
+Generated on: 2025-08-05T08:39:59.123Z
+Total files: 143
 
 ================================================================================
 
@@ -1658,6 +1658,13 @@ Upon creation, it will be automatically added to your ".gitignore" file.
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Интерфейсы для данных Яндекс.Музыки
+interface DownloadInfo {
+  codec: string;
+  bitrateInKbps: number;
+  downloadInfoUrl: string;
+  direct: boolean;
+}
+
 interface ProcessedTrack {
   id: string;
   title: string;
@@ -1667,6 +1674,7 @@ interface ProcessedTrack {
   genre: string;
   cover_url?: string;
   preview_url?: string;
+  download_urls?: DownloadInfo[];
   available: boolean;
 }
 
@@ -1677,6 +1685,69 @@ interface YandexMusicData {
     source: string;
   };
   tracks: ProcessedTrack[];
+}
+
+/**
+ * Обрабатывает информацию о скачивании для одного трека
+ */
+async function processTrackDownloadInfo(track: any, baseURL: string, headers: any): Promise<any> {
+  try {
+    const downloadInfoResponse = await fetch(`${baseURL}/tracks/${track.id}/download-info`, {
+      method: 'GET',
+      headers
+    });
+
+    if (downloadInfoResponse.ok) {
+      const downloadInfoData = await downloadInfoResponse.json();
+      const downloadInfos = downloadInfoData.result || [];
+      
+      // Получаем прямые ссылки для первых 2 форматов (для производительности)
+      const downloadInfosWithDirectLinks = await Promise.all(
+        downloadInfos.slice(0, 2).map(async (info: any) => {
+          try {
+            if (info.downloadInfoUrl) {
+              const directLinkResponse = await fetch(info.downloadInfoUrl, {
+                method: 'GET',
+                headers
+              });
+              
+              if (directLinkResponse.ok) {
+                const xmlData = await directLinkResponse.text();
+                
+                // Парсим XML для получения прямой ссылки
+                const hostMatch = xmlData.match(/<host>([^<]+)<\/host>/);
+                const pathMatch = xmlData.match(/<path>([^<]+)<\/path>/);
+                const tsMatch = xmlData.match(/<ts>([^<]+)<\/ts>/);
+                const sMatch = xmlData.match(/<s>([^<]+)<\/s>/);
+                
+                if (hostMatch && pathMatch && tsMatch && sMatch) {
+                  const directUrl = `https://${hostMatch[1]}${pathMatch[1]}?ts=${tsMatch[1]}&s=${sMatch[1]}`;
+                  return {
+                    ...info,
+                    directUrl: directUrl
+                  };
+                }
+              }
+            }
+            return info;
+          } catch (directLinkError) {
+            console.log(`Error getting direct link for track ${track.id}:`, directLinkError instanceof Error ? directLinkError.message : 'Unknown error');
+            return info;
+          }
+        })
+      );
+      
+      return {
+        ...track,
+        downloadInfo: downloadInfosWithDirectLinks
+      };
+    } else {
+      return track;
+    }
+  } catch (trackDownloadError) {
+    console.log(`Error getting download info for track ${track.id}:`, trackDownloadError instanceof Error ? trackDownloadError.message : 'Unknown error');
+    return track;
+  }
 }
 
 /**
@@ -1765,13 +1836,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     for (let i = 0; i < trackIds.length; i += batchSize) {
       const batch = trackIds.slice(i, i + batchSize);
-      const tracksResponse = await fetch(`${baseURL}/tracks`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          'track-ids': batch,
-          'with-positions': false
-        })
+      const trackIdsParam = batch.join(',');
+      
+      const tracksResponse = await fetch(`${baseURL}/tracks?track-ids=${trackIdsParam}`, {
+        method: 'GET',
+        headers
       });
 
       if (tracksResponse.ok) {
@@ -1782,10 +1851,193 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log(`Fetched full info for ${allTracks.length} tracks.`);
 
-    // Обрабатываем треки
-    const processedTracks: ProcessedTrack[] = allTracks
-      .filter((track: any) => track.available)
+    // Анализируем первые несколько треков для отладки
+    if (allTracks.length > 0) {
+      console.log('Sample track data:', JSON.stringify(allTracks[0], null, 2));
+      const availableCount = allTracks.filter(t => t.available).length;
+      const unavailableCount = allTracks.filter(t => !t.available).length;
+      console.log(`Available tracks: ${availableCount}, Unavailable: ${unavailableCount}`);
+    } else {
+      console.log('❌ No tracks fetched! Debugging batch requests...');
+      // Попробуем получить хотя бы один трек для отладки
+      if (trackIds.length > 0) {
+        const singleTrackId = trackIds[0];
+        console.log(`Trying to fetch single track: ${singleTrackId}`);
+        
+        try {
+          const singleTrackResponse = await fetch(`${baseURL}/tracks?track-ids=${singleTrackId}`, {
+            method: 'GET',
+            headers
+          });
+          
+          console.log(`Single track response status: ${singleTrackResponse.status}`);
+          
+          if (singleTrackResponse.ok) {
+            const singleTrackData = await singleTrackResponse.json();
+            console.log('Single track data:', JSON.stringify(singleTrackData, null, 2));
+          } else {
+            const errorText = await singleTrackResponse.text();
+            console.log('Single track error:', errorText);
+          }
+        } catch (singleTrackError) {
+          console.log('Single track fetch error:', singleTrackError instanceof Error ? singleTrackError.message : 'Unknown error');
+        }
+      }
+    }
+
+    // Получаем ссылки на превью и скачивание для треков
+    console.log('Fetching download info for tracks...');
+    const tracksWithDownloadInfo: any[] = [];
+    
+    // Настраиваемый лимит превью (можно передать в query параметрах)
+    const previewLimitParam = req.query.previewLimit as string;
+    const maxTracksForPreview = previewLimitParam ? parseInt(previewLimitParam) : allTracks.length;
+    
+    // Определяем режим загрузки и оптимизации
+    let actualPreviewLimit: number;
+    let downloadBatchSize: number;
+    let requestDelay: number;
+    
+    if (maxTracksForPreview === -2) {
+      // ТУРБО-режим для очень больших библиотек (500+ треков)
+      actualPreviewLimit = allTracks.length; // Все треки
+      downloadBatchSize = 20; // Максимальный размер батча
+      requestDelay = 25; // Минимальная задержка
+      console.log(`⚡ ТУРБО-РЕЖИМ: ${allTracks.length} треков с максимальной скоростью`);
+    } else if (maxTracksForPreview === -1) {
+      // Режим максимальной оптимизации для больших библиотек
+      actualPreviewLimit = allTracks.length; // Все треки
+      downloadBatchSize = 10; // Увеличиваем размер батча
+      requestDelay = 50; // Уменьшаем задержку
+      console.log(`🚀 МАКСИМАЛЬНАЯ ЗАГРУЗКА: ${allTracks.length} треков с оптимизацией`);
+    } else if (maxTracksForPreview === 0) {
+      // Стандартный режим "все треки"
+      actualPreviewLimit = allTracks.length;
+      downloadBatchSize = 5;
+      requestDelay = 100;
+      console.log(`📚 Стандартная загрузка всех ${allTracks.length} треков`);
+    } else {
+      // Ограниченный режим
+      actualPreviewLimit = maxTracksForPreview;
+      downloadBatchSize = 5;
+      requestDelay = 100;
+      console.log(`⚙️ Ограниченная загрузка: ${actualPreviewLimit} треков с превью`);
+    }
+    
+    // Обрабатываем все треки, но превью получаем только для указанного количества
+    const tracksToProcess = allTracks.slice(0, Math.min(actualPreviewLimit, allTracks.length));
+    const remainingTracks = allTracks.slice(tracksToProcess.length);
+    
+    console.log(`Processing preview for ${tracksToProcess.length} tracks, basic info for ${remainingTracks.length} tracks`);
+    
+    // В ТУРБО-режиме используем параллельную обработку нескольких батчей
+    if (maxTracksForPreview === -2 && tracksToProcess.length > 100) {
+      console.log(`⚡ Запуск параллельной обработки для ${tracksToProcess.length} треков`);
+      
+      // Разбиваем на супер-батчи для параллельной обработки
+      const superBatchSize = Math.ceil(tracksToProcess.length / 4); // 4 параллельных потока
+      const superBatches = [];
+      
+      for (let i = 0; i < tracksToProcess.length; i += superBatchSize) {
+        superBatches.push(tracksToProcess.slice(i, i + superBatchSize));
+      }
+      
+      console.log(`Создано ${superBatches.length} параллельных потоков`);
+      
+      // Обрабатываем супер-батчи параллельно
+      const allBatchResults = await Promise.all(
+        superBatches.map(async (superBatch, superBatchIndex) => {
+          console.log(`Поток ${superBatchIndex + 1}: обработка ${superBatch.length} треков`);
+          const batchResults = [];
+          
+          for (let i = 0; i < superBatch.length; i += downloadBatchSize) {
+            const batch = superBatch.slice(i, i + downloadBatchSize);
+            
+            try {
+              const batchWithDownloadInfo = await Promise.all(
+                batch.map(async (track) => {
+                  return await processTrackDownloadInfo(track, baseURL, headers);
+                })
+              );
+              
+              batchResults.push(...batchWithDownloadInfo);
+              
+              // Минимальная задержка только в ТУРБО-режиме
+              if (i + downloadBatchSize < superBatch.length) {
+                await new Promise(resolve => setTimeout(resolve, requestDelay));
+              }
+            } catch (error) {
+              console.log(`Ошибка в потоке ${superBatchIndex + 1}, батч ${Math.floor(i/downloadBatchSize) + 1}:`, error);
+              batchResults.push(...batch);
+            }
+          }
+          
+          console.log(`Поток ${superBatchIndex + 1} завершен: ${batchResults.length} треков`);
+          return batchResults;
+        })
+      );
+      
+      // Объединяем результаты всех потоков
+      tracksWithDownloadInfo.push(...allBatchResults.flat());
+      
+    } else {
+      // Стандартная последовательная обработка
+      for (let i = 0; i < tracksToProcess.length; i += downloadBatchSize) {
+        const batch = tracksToProcess.slice(i, i + downloadBatchSize);
+        
+        try {
+          // Получаем информацию о скачивании для каждого трека отдельно
+          const batchWithDownloadInfo = await Promise.all(
+            batch.map(async (track) => {
+              return await processTrackDownloadInfo(track, baseURL, headers);
+            })
+          );
+          
+          tracksWithDownloadInfo.push(...batchWithDownloadInfo);
+        } catch (downloadError) {
+          console.log(`Error fetching download info for batch ${Math.floor(i/downloadBatchSize) + 1}:`, downloadError instanceof Error ? downloadError.message : 'Unknown error');
+          // Добавляем треки без download info
+          tracksWithDownloadInfo.push(...batch);
+        }
+        
+        // Динамическая пауза между запросами в зависимости от режима
+        if (i + downloadBatchSize < tracksToProcess.length) {
+          await new Promise(resolve => setTimeout(resolve, requestDelay));
+        }
+      }
+    }
+
+    // Добавляем оставшиеся треки без превью
+    tracksWithDownloadInfo.push(...remainingTracks);
+
+    console.log(`Processed download info for ${tracksWithDownloadInfo.length} tracks (${actualPreviewLimit} with preview attempts).`);
+
+    // Обрабатываем треки с улучшенной информацией
+    const processedTracks: ProcessedTrack[] = tracksWithDownloadInfo
       .map((track: any): ProcessedTrack => {
+        // Пытаемся найти превью URL и полные ссылки на скачивание
+        let previewUrl: string | undefined = undefined;
+        let downloadUrls: DownloadInfo[] = [];
+        
+        if (track.downloadInfo && Array.isArray(track.downloadInfo)) {
+          // Обрабатываем все доступные форматы
+          downloadUrls = track.downloadInfo.map((info: any) => ({
+            codec: info.codec || 'unknown',
+            bitrateInKbps: info.bitrateInKbps || 0,
+            downloadInfoUrl: info.downloadInfoUrl || '',
+            direct: info.direct || false
+          }));
+          
+          // Ищем превью среди доступных форматов (низкое качество для превью)
+          const previewInfo = track.downloadInfo.find((info: any) => 
+            info.codec === 'mp3' && info.bitrateInKbps <= 192 && info.directUrl
+          ) || track.downloadInfo.find((info: any) => info.codec === 'mp3' && info.directUrl) || track.downloadInfo.find((info: any) => info.directUrl);
+          
+          if (previewInfo && previewInfo.directUrl) {
+            previewUrl = previewInfo.directUrl;
+          }
+        }
+
         return {
           id: String(track.id),
           title: track.title || 'Unknown Title',
@@ -1794,12 +2046,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           duration: Math.floor((track.durationMs || 0) / 1000),
           genre: track.albums?.[0]?.genre || 'unknown',
           cover_url: track.coverUri ? `https://${track.coverUri.replace('%%', '400x400')}` : undefined,
-          preview_url: undefined, // Превью требуют дополнительных запросов
-          available: track.available,
+          preview_url: previewUrl,
+          download_urls: downloadUrls.length > 0 ? downloadUrls : undefined,
+          available: track.available !== false,
         };
-      });
+      })
+      .filter((track: ProcessedTrack) => track.title && track.artist);
 
-    console.log(`Processed ${processedTracks.length} available tracks.`);
+    console.log(`Processed ${processedTracks.length} tracks after filtering.`);
+    
+    if (processedTracks.length > 0) {
+      console.log('Sample processed track:', JSON.stringify(processedTracks[0], null, 2));
+    }
 
     // Формируем и отправляем успешный ответ
     const result: YandexMusicData = {
@@ -2115,10 +2373,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
 - 🎨 **3D-визуализация** треков в виде космической галактики
 - 🎵 **Интеграция с Яндекс.Музыкой** через неофициальное API
-- 🎧 **Превью треков** - 30-секундные отрывки при клике
+- 📚 **Полная загрузка библиотеки** - ВСЕ ваши лайкнутые треки (не только первые 10)
+- ⚙️ **Настраиваемые превью** - выбор количества треков с 30-секундными отрывками
 - 🌈 **Цветовое кодирование** по жанрам
 - 📱 **Адаптивный интерфейс** для всех устройств
 - ⚡ **Высокая производительность** с WebGL
+- 🔧 **Оптимизация для Vercel** - умное управление временем выполнения
 
 ## 🚀 Быстрый старт
 
@@ -4179,8 +4439,10 @@ export class DataCollector {
 
   /**
    * Собирает данные из Яндекс.Музыки через Vercel API
+   * @param token - токен авторизации
+   * @param previewLimit - максимальное количество треков для получения превью (по умолчанию все)
    */
-  async collectData(token: string): Promise<CollectionResult> {
+  async collectData(token: string, previewLimit?: number): Promise<CollectionResult> {
     this.abortController = new AbortController();
     
     try {
@@ -4211,7 +4473,8 @@ export class DataCollector {
       });
 
       // Получаем все данные одним запросом через наш API
-      const response = await fetch('/api/getYandexData', {
+      const url = previewLimit ? `/api/getYandexData?previewLimit=${previewLimit}` : '/api/getYandexData';
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -6748,6 +7011,7 @@ import { DataProcessor } from './data/DataProcessor';
 import { UIManager } from './ui/UIManager';
 import { LandingPage } from './ui/LandingPage';
 import { GalaxyCreationProgress } from './ui/GalaxyCreationProgress';
+import { CollectionSettingsModal } from './ui/CollectionSettingsModal';
 import { DataCollector, CollectionProgress, CollectionResult } from './data/DataCollector';
 import { BurgerMenu } from './ui/BurgerMenu';
 import { TokenManager } from './auth/TokenManager';
@@ -6926,6 +7190,33 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
    * Запускает сбор данных с отображением прогресса
    */
   private async startDataCollection(token: string): Promise<void> {
+    // Сначала показываем модал настроек
+    const settingsModal = new CollectionSettingsModal();
+    
+    return new Promise((resolve) => {
+      settingsModal.show(
+        async (settings) => {
+          // Пользователь подтвердил настройки - начинаем сбор
+          await this.performDataCollection(token, settings.previewLimit);
+          resolve();
+        },
+        () => {
+          // Пользователь отменил - возвращаемся к лендингу
+          if (this.progressScreen) {
+            this.progressScreen.hide();
+            this.progressScreen = undefined;
+          }
+          this.showLandingPage();
+          resolve();
+        }
+      );
+    });
+  }
+
+  /**
+   * Выполняет сбор данных с заданными настройками
+   */
+  private async performDataCollection(token: string, previewLimit: number): Promise<void> {
     const collector = new DataCollector((progress: CollectionProgress) => {
       if (this.progressScreen) {
         this.progressScreen.updateProgress(progress);
@@ -6933,7 +7224,7 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
     });
 
     try {
-      const result: CollectionResult = await collector.collectData(token);
+      const result: CollectionResult = await collector.collectData(token, previewLimit);
       
       if (result.success && this.progressScreen) {
         this.progressScreen.showSuccess(
@@ -25072,7 +25363,8 @@ export class BurgerMenu {
     this.collector = new DataCollector((progress) => this.updateMenuProgress(progress));
 
     try {
-      const result = await this.collector.collectData(tokenData.token);
+      // Используем настройки по умолчанию для быстрого обновления из меню
+      const result = await this.collector.collectData(tokenData.token, 50); // Ограничиваем превью для быстроты
       
       if (result.success) {
         this.showMenuNotification(`Данные обновлены! Загружено ${result.tracksCollected} треков`, 'success');
@@ -25164,6 +25456,431 @@ export class BurgerMenu {
     if (this.collector) {
       this.collector.abort();
     }
+  }
+}
+```
+
+================================================================================
+
+## File: src\ui\CollectionSettingsModal.ts
+
+```
+/**
+ * Модальное окно настроек сбора данных
+ */
+
+export interface CollectionSettings {
+  previewLimit: number;
+  loadAllTracks: boolean;
+}
+
+export class CollectionSettingsModal {
+  private modal?: HTMLElement;
+  private onConfirm?: (settings: CollectionSettings) => void;
+  private onCancel?: () => void;
+
+  /**
+   * Показывает модальное окно настроек
+   */
+  show(onConfirm: (settings: CollectionSettings) => void, onCancel?: () => void): void {
+    this.onConfirm = onConfirm;
+    this.onCancel = onCancel;
+    this.render();
+  }
+
+  /**
+   * Скрывает модальное окно
+   */
+  hide(): void {
+    if (this.modal) {
+      this.modal.style.animation = 'fadeOut 0.3s ease-out';
+      setTimeout(() => {
+        if (this.modal && this.modal.parentElement) {
+          this.modal.remove();
+        }
+      }, 300);
+    }
+  }
+
+  /**
+   * Отрисовывает модальное окно
+   */
+  private render(): void {
+    this.modal = document.createElement('div');
+    this.modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+      font-family: 'Arial', sans-serif;
+      animation: fadeIn 0.3s ease-out;
+    `;
+
+    this.modal.innerHTML = `
+      <div style="
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        border-radius: 16px;
+        padding: 30px;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        animation: slideIn 0.3s ease-out;
+      ">
+        <h2 style="
+          color: #4fc3f7;
+          font-size: 1.8rem;
+          margin: 0 0 20px 0;
+          text-align: center;
+        ">⚙️ Настройки загрузки</h2>
+
+        <div style="
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 12px;
+          padding: 20px;
+          margin-bottom: 25px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        ">
+          <h3 style="
+            color: #e0e0e0;
+            font-size: 1.2rem;
+            margin: 0 0 15px 0;
+          ">🎵 Превью треков</h3>
+          
+          <p style="
+            color: #ccc;
+            font-size: 0.9rem;
+            margin: 0 0 20px 0;
+            line-height: 1.4;
+          ">
+            Получение превью треков занимает больше времени. Вы можете ограничить количество для ускорения загрузки.
+          </p>
+
+          <div style="margin-bottom: 20px;">
+            <label style="
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              color: #e0e0e0;
+              cursor: pointer;
+              margin-bottom: 15px;
+            ">
+              <input type="radio" name="preview-mode" value="all" checked style="
+                accent-color: #4fc3f7;
+                transform: scale(1.2);
+              ">
+              <span>Загрузить превью для всех треков (может занять до 5 минут)</span>
+            </label>
+
+            <label style="
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              color: #e0e0e0;
+              cursor: pointer;
+              margin-bottom: 15px;
+            ">
+              <input type="radio" name="preview-mode" value="maximum" style="
+                accent-color: #4fc3f7;
+                transform: scale(1.2);
+              ">
+              <span>🚀 Максимальная загрузка (все треки + оптимизация)</span>
+            </label>
+
+            <label style="
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              color: #e0e0e0;
+              cursor: pointer;
+              margin-bottom: 15px;
+            ">
+              <input type="radio" name="preview-mode" value="turbo" style="
+                accent-color: #ff6b35;
+                transform: scale(1.2);
+              ">
+              <span style="color: #ff6b35;">⚡ ТУРБО-режим (для 500+ треков)</span>
+            </label>
+
+            <label style="
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              color: #e0e0e0;
+              cursor: pointer;
+              margin-bottom: 15px;
+            ">
+              <input type="radio" name="preview-mode" value="limited" style="
+                accent-color: #4fc3f7;
+                transform: scale(1.2);
+              ">
+              <span>Ограничить количество превью:</span>
+            </label>
+
+            <div id="preview-limit-container" style="
+              margin-left: 30px;
+              opacity: 0.5;
+              transition: opacity 0.3s;
+            ">
+              <input type="range" id="preview-limit-slider" min="10" max="200" value="50" step="10" style="
+                width: 100%;
+                margin: 10px 0;
+                accent-color: #4fc3f7;
+              ">
+              <div style="
+                display: flex;
+                justify-content: space-between;
+                color: #999;
+                font-size: 0.8rem;
+              ">
+                <span>10</span>
+                <span id="preview-limit-value" style="color: #4fc3f7; font-weight: bold;">50</span>
+                <span>200</span>
+              </div>
+            </div>
+
+            <label style="
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              color: #e0e0e0;
+              cursor: pointer;
+            ">
+              <input type="radio" name="preview-mode" value="none" style="
+                accent-color: #4fc3f7;
+                transform: scale(1.2);
+              ">
+              <span>Без превью (только основные данные)</span>
+            </label>
+          </div>
+        </div>
+
+        <div style="
+          background: rgba(255, 193, 7, 0.1);
+          border: 1px solid rgba(255, 193, 7, 0.3);
+          border-radius: 8px;
+          padding: 15px;
+          margin-bottom: 25px;
+        ">
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #ffc107;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+          ">
+            <span>⚠️</span>
+            <strong>Ограничения Vercel</strong>
+          </div>
+          <p style="
+            color: #ffecb3;
+            font-size: 0.85rem;
+            margin: 0;
+            line-height: 1.4;
+          ">
+            Функция имеет лимит времени выполнения 5 минут. Для библиотек >500 треков рекомендуется режим "Максимальная загрузка".
+          </p>
+        </div>
+
+        <div style="
+          display: flex;
+          gap: 15px;
+          justify-content: flex-end;
+        ">
+          <button id="cancel-btn" style="
+            background: rgba(255, 255, 255, 0.1);
+            color: #ccc;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+          ">
+            Отмена
+          </button>
+
+          <button id="confirm-btn" style="
+            background: linear-gradient(45deg, #4fc3f7, #29b6f6);
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(79, 195, 247, 0.3);
+          ">
+            🚀 Начать загрузку
+          </button>
+        </div>
+      </div>
+    `;
+
+    // Добавляем стили анимации
+    this.addStyles();
+
+    // Настраиваем обработчики событий
+    this.setupEventListeners();
+
+    document.body.appendChild(this.modal);
+  }
+
+  /**
+   * Добавляет стили анимации
+   */
+  private addStyles(): void {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      @keyframes fadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(-50px) scale(0.9);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      #confirm-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(79, 195, 247, 0.4) !important;
+      }
+
+      #cancel-btn:hover {
+        background: rgba(255, 255, 255, 0.2) !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  /**
+   * Настраивает обработчики событий
+   */
+  private setupEventListeners(): void {
+    if (!this.modal) return;
+
+    // Радио-кнопки режима превью
+    const radioButtons = this.modal.querySelectorAll('input[name="preview-mode"]');
+    const limitContainer = this.modal.querySelector('#preview-limit-container') as HTMLElement;
+    const limitSlider = this.modal.querySelector('#preview-limit-slider') as HTMLInputElement;
+    const limitValue = this.modal.querySelector('#preview-limit-value') as HTMLElement;
+
+    radioButtons.forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        const target = e.target as HTMLInputElement;
+        if (limitContainer) {
+          limitContainer.style.opacity = target.value === 'limited' ? '1' : '0.5';
+        }
+      });
+    });
+
+    // Слайдер лимита превью
+    if (limitSlider && limitValue) {
+      limitSlider.addEventListener('input', () => {
+        limitValue.textContent = limitSlider.value;
+      });
+    }
+
+    // Кнопка отмены
+    const cancelBtn = this.modal.querySelector('#cancel-btn');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        this.hide();
+        if (this.onCancel) {
+          this.onCancel();
+        }
+      });
+    }
+
+    // Кнопка подтверждения
+    const confirmBtn = this.modal.querySelector('#confirm-btn');
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', () => {
+        const settings = this.getSettings();
+        this.hide();
+        if (this.onConfirm) {
+          this.onConfirm(settings);
+        }
+      });
+    }
+
+    // Закрытие по клику вне модального окна
+    this.modal.addEventListener('click', (e) => {
+      if (e.target === this.modal) {
+        this.hide();
+        if (this.onCancel) {
+          this.onCancel();
+        }
+      }
+    });
+
+    // Закрытие по Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        this.hide();
+        if (this.onCancel) {
+          this.onCancel();
+        }
+      }
+    });
+  }
+
+  /**
+   * Получает настройки из формы
+   */
+  private getSettings(): CollectionSettings {
+    if (!this.modal) {
+      return { previewLimit: 0, loadAllTracks: true };
+    }
+
+    const selectedMode = this.modal.querySelector('input[name="preview-mode"]:checked') as HTMLInputElement;
+    const limitSlider = this.modal.querySelector('#preview-limit-slider') as HTMLInputElement;
+
+    let previewLimit = 0;
+    let loadAllTracks = true;
+
+    if (selectedMode) {
+      switch (selectedMode.value) {
+        case 'all':
+          previewLimit = 0; // 0 означает все треки
+          break;
+        case 'maximum':
+          previewLimit = -1; // -1 означает максимальную оптимизацию
+          break;
+        case 'turbo':
+          previewLimit = -2; // -2 означает ТУРБО-режим для больших библиотек
+          break;
+        case 'limited':
+          previewLimit = parseInt(limitSlider?.value || '50');
+          break;
+        case 'none':
+          previewLimit = 0;
+          loadAllTracks = false; // Не загружаем превью вообще
+          break;
+      }
+    }
+
+    return { previewLimit, loadAllTracks };
   }
 }
 ```
@@ -27295,7 +28012,7 @@ import { TokenManager } from '../auth/TokenManager';
 export class TokenInstructionModal {
   private modal?: HTMLElement;
   private currentStep: number = 1;
-  private totalSteps: number = 6;
+  private totalSteps: number = 4;
 
   /**
    * Показывает модальное окно
@@ -27438,12 +28155,12 @@ export class TokenInstructionModal {
                 font-weight: bold;
                 font-size: 1.1rem;
               ">
-                🎵 Вставьте токен Session_id:
+                🎵 Вставьте OAuth токен:
               </label>
               <input 
                 type="text" 
                 id="token-input" 
-                placeholder="Например: 3:1234567890.5.0.1234567890123:abcdef..."
+                placeholder="Например: AQAAAAAYc***..."
                 style="
                   width: 100%;
                   padding: 15px;
@@ -27476,7 +28193,7 @@ export class TokenInstructionModal {
                   font-size: 0.9rem;
                   line-height: 1.4;
                 ">
-                  Session_id обычно начинается с цифры и содержит двоеточия (например: 3:1234567890.5.0...).
+                  OAuth токен обычно начинается с "AQAAAAAY" и содержит буквы и цифры.
                 </p>
               </div>
             </div>
@@ -27604,35 +28321,11 @@ export class TokenInstructionModal {
   private getStepContent(): string {
     const steps = [
       {
-        icon: '🌐',
-        title: 'Откройте Яндекс.Музыку',
-        content: `
-          <p style="color: #ccc; line-height: 1.6; margin-bottom: 20px;">
-            Откройте <a href="https://music.yandex.ru" target="_blank" style="color: #4fc3f7; text-decoration: none;">music.yandex.ru</a> в новой вкладке и войдите в свой аккаунт.
-          </p>
-          <div style="
-            background: rgba(76, 175, 80, 0.1);
-            border: 1px solid rgba(76, 175, 80, 0.3);
-            border-radius: 8px;
-            padding: 15px;
-            margin-top: 15px;
-          ">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-              <span style="font-size: 1.2rem;">✅</span>
-              <strong style="color: #4caf50;">Важно:</strong>
-            </div>
-            <p style="color: #ccc; margin: 0; font-size: 0.9rem;">
-              Убедитесь, что вы полностью авторизованы и можете видеть свою музыкальную библиотеку.
-            </p>
-          </div>
-        `
-      },
-      {
         icon: '🔧',
-        title: 'Откройте инструменты разработчика',
+        title: 'Откройте DevTools и включите троттлинг',
         content: `
           <p style="color: #ccc; line-height: 1.6; margin-bottom: 20px;">
-            Нажмите клавишу <strong style="color: #4fc3f7;">F12</strong> или щелкните правой кнопкой мыши и выберите "Исследовать элемент".
+            Откройте <strong style="color: #4fc3f7;">DevTools</strong> в браузере (клавиша F12) и на вкладке <strong style="color: #4fc3f7;">Network</strong> включите троттлинг.
           </p>
           <div style="
             background: rgba(255, 193, 7, 0.1);
@@ -27646,37 +28339,41 @@ export class TokenInstructionModal {
               <strong style="color: #ffc107;">Подсказка:</strong>
             </div>
             <p style="color: #ccc; margin: 0; font-size: 0.9rem;">
-              В разных браузерах: Chrome/Edge - F12, Firefox - F12, Safari - Cmd+Option+I (Mac).
+              Троттлинг поможет замедлить редирект и успеть скопировать токен из URL.
             </p>
           </div>
         `
       },
       {
-        icon: '📱',
-        title: 'Перейдите на вкладку Application',
+        icon: '🌐',
+        title: 'Перейдите по OAuth ссылке',
         content: `
           <p style="color: #ccc; line-height: 1.6; margin-bottom: 20px;">
-            В открывшихся инструментах разработчика найдите и нажмите на вкладку <strong style="color: #4fc3f7;">Application</strong> (или "Приложение").
+            Перейдите по ссылке: <a href="https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d" target="_blank" style="color: #4fc3f7; text-decoration: none; word-break: break-all;">https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d</a>
           </p>
           <div style="
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
             border-radius: 8px;
             padding: 15px;
             margin-top: 15px;
           ">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <span style="font-size: 1.2rem;">✅</span>
+              <strong style="color: #4caf50;">Важно:</strong>
+            </div>
             <p style="color: #ccc; margin: 0; font-size: 0.9rem;">
-              <strong>Если не видите вкладку Application:</strong><br>
-              Попробуйте найти вкладку "Storage" или нажмите на стрелочку ">>" чтобы увидеть скрытые вкладки.
+              Авторизуйтесь при необходимости и предоставьте доступ приложению.
             </p>
           </div>
         `
       },
       {
-        icon: '🍪',
-        title: 'Найдите раздел Cookies',
+        icon: '⚡',
+        title: 'Скопируйте токен из URL',
         content: `
           <p style="color: #ccc; line-height: 1.6; margin-bottom: 20px;">
-            В левом меню найдите раздел <strong style="color: #4fc3f7;">Cookies</strong> и разверните его. Выберите <strong>https://music.yandex.ru</strong>.
+            Браузер перенаправит на адрес вида <code style="background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 3px; word-break: break-all;">https://music.yandex.ru/#access_token=AQAAAAAYc***&token_type=bearer&expires_in=31535645</code>
           </p>
           <div style="
             background: rgba(244, 67, 54, 0.1);
@@ -27690,17 +28387,17 @@ export class TokenInstructionModal {
               <strong style="color: #f44336;">Внимание:</strong>
             </div>
             <p style="color: #ccc; margin: 0; font-size: 0.9rem;">
-              Если раздел Cookies пустой, убедитесь, что вы авторизованы на сайте music.yandex.ru.
+              Очень быстро произойдет редирект на другую страницу, поэтому нужно успеть скопировать ссылку!
             </p>
           </div>
         `
       },
       {
-        icon: '🔑',
-        title: 'Найдите Session_id',
+        icon: '🚀',
+        title: 'Введите токен',
         content: `
           <p style="color: #ccc; line-height: 1.6; margin-bottom: 20px;">
-            В списке cookies найдите cookie с именем <strong style="color: #4fc3f7;">Session_id</strong> и скопируйте его значение (колонка Value).
+            Ваш токен - это то, что находится после <strong style="color: #4fc3f7;">access_token=</strong> в скопированной ссылке. Вставьте его в поле ниже.
           </p>
           <div style="
             background: rgba(255, 255, 255, 0.05);
@@ -27710,33 +28407,9 @@ export class TokenInstructionModal {
             border-left: 4px solid #4fc3f7;
           ">
             <p style="color: #ccc; margin: 0; font-size: 0.9rem;">
-              <strong style="color: #4fc3f7;">Как выглядит:</strong><br>
-              Name: <code style="background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 3px;">Session_id</code><br>
-              Value: <code style="background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 3px;">3:1234567890.5.0.1234567890123:abcdef...</code>
-            </p>
-          </div>
-        `
-      },
-      {
-        icon: '🚀',
-        title: 'Введите Session_id',
-        content: `
-          <p style="color: #ccc; line-height: 1.6; margin-bottom: 20px;">
-            Вставьте скопированное значение Session_id в поле ниже и нажмите кнопку для создания вашей музыкальной галактики.
-          </p>
-          <div style="
-            background: rgba(76, 175, 80, 0.1);
-            border: 1px solid rgba(76, 175, 80, 0.3);
-            border-radius: 8px;
-            padding: 15px;
-            margin-top: 15px;
-          ">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-              <span style="font-size: 1.2rem;">🔒</span>
-              <strong style="color: #4caf50;">Безопасность:</strong>
-            </div>
-            <p style="color: #ccc; margin: 0; font-size: 0.9rem;">
-              Session_id сохраняется только локально в вашем браузере и используется исключительно для доступа к вашей музыкальной библиотеке.
+              <strong style="color: #4fc3f7;">Пример:</strong><br>
+              Из URL: <code style="background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 3px;">access_token=AQAAAAAYc***</code><br>
+              Токен: <code style="background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 3px;">AQAAAAAYc***</code>
             </p>
           </div>
         `
@@ -27928,12 +28601,11 @@ export class TokenInstructionModal {
     if (!tokenInput || !nextBtn) return;
 
     const token = tokenInput.value.trim();
-    const isValid = this.isValidTokenFormat(token);
+    const isValid = token.length > 0; // Принимаем любой непустой токен
 
     // Обновляем стиль поля ввода
     tokenInput.style.borderColor = token.length === 0 ? 
-      'rgba(79, 195, 247, 0.3)' : 
-      (isValid ? '#4caf50' : '#f44336');
+      'rgba(79, 195, 247, 0.3)' : '#4caf50';
 
     // Обновляем кнопку
     nextBtn.disabled = !isValid;
@@ -27945,13 +28617,8 @@ export class TokenInstructionModal {
    * Проверяет формат токена
    */
   private isValidTokenFormat(token: string): boolean {
-    if (token.length < 20) return false;
-    
-    // Session_id обычно имеет формат: цифра:число.число.число.число:строка
-    // Например: 3:1234567890.5.0.1234567890123:abcdef...
-    const sessionIdPattern = /^\d+:\d+\.\d+\.\d+\.\d+:[a-zA-Z0-9]+/;
-    
-    return sessionIdPattern.test(token) && !token.includes(' ');
+    // Принимаем любой непустой токен
+    return token.length > 0;
   }
 
   /**
@@ -27964,7 +28631,7 @@ export class TokenInstructionModal {
     const token = tokenInput.value.trim();
     
     if (!this.isValidTokenFormat(token)) {
-      this.showTokenError('Неверный формат токена. Убедитесь, что скопировали значение Session_id полностью.');
+      this.showTokenError('Неверный формат токена. Убедитесь, что скопировали OAuth токен полностью из URL после access_token=');
       return;
     }
 
@@ -28309,345 +28976,6 @@ export class UIManager {
     this.initialized = false;
   }
 }
-```
-
-================================================================================
-
-## File: test-api.html
-
-```
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Yandex Music API</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background: #1a1a1a;
-            color: #fff;
-        }
-        .container {
-            background: #2a2a2a;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-        input, button {
-            padding: 10px;
-            margin: 5px;
-            border: none;
-            border-radius: 5px;
-        }
-        input {
-            background: #3a3a3a;
-            color: #fff;
-            width: 300px;
-        }
-        button {
-            background: #4CAF50;
-            color: white;
-            cursor: pointer;
-        }
-        button:hover {
-            background: #45a049;
-        }
-        .result {
-            background: #333;
-            padding: 15px;
-            border-radius: 5px;
-            margin-top: 10px;
-            white-space: pre-wrap;
-            font-family: monospace;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        .error {
-            background: #d32f2f;
-            color: white;
-        }
-        .success {
-            background: #388e3c;
-            color: white;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🎵 Test Yandex Music API</h1>
-        <p>Введите ваш Session_id токен из Яндекс.Музыки:</p>
-        
-        <div>
-            <input type="text" id="tokenInput" placeholder="Вставьте Session_id токен здесь" />
-            <button onclick="testAPI()">Получить данные</button>
-        </div>
-        
-        <div id="result" class="result" style="display: none;"></div>
-    </div>
-
-    <div class="container">
-        <h2>📋 Как получить Session_id:</h2>
-        <ol>
-            <li>Откройте <a href="https://music.yandex.ru" target="_blank">music.yandex.ru</a></li>
-            <li>Войдите в свой аккаунт</li>
-            <li>Откройте DevTools (F12)</li>
-            <li>Перейдите на вкладку Application/Storage</li>
-            <li>В разделе Cookies найдите Session_id</li>
-            <li>Скопируйте значение и вставьте выше</li>
-        </ol>
-    </div>
-
-    <script>
-        async function testAPI() {
-            const token = document.getElementById('tokenInput').value.trim();
-            const resultDiv = document.getElementById('result');
-            
-            if (!token) {
-                showResult('Пожалуйста, введите токен!', 'error');
-                return;
-            }
-
-            showResult('Загрузка данных...', '');
-            
-            try {
-                // Для локального тестирования используем localhost:3001
-                // Для продакшена замените на ваш Vercel URL
-                const response = await fetch('http://localhost:3001/api/getYandexData', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ token: token })
-                });
-
-                const data = await response.json();
-                
-                if (response.ok) {
-                    showResult(JSON.stringify(data, null, 2), 'success');
-                } else {
-                    showResult(`Ошибка: ${data.error}\nДетали: ${data.details || 'Нет дополнительной информации'}`, 'error');
-                }
-            } catch (error) {
-                showResult(`Ошибка сети: ${error.message}`, 'error');
-            }
-        }
-
-        function showResult(text, type) {
-            const resultDiv = document.getElementById('result');
-            resultDiv.style.display = 'block';
-            resultDiv.textContent = text;
-            resultDiv.className = `result ${type}`;
-        }
-
-        // Автоматически фокусируемся на поле ввода
-        document.getElementById('tokenInput').focus();
-        
-        // Обработка Enter в поле ввода
-        document.getElementById('tokenInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                testAPI();
-            }
-        });
-    </script>
-</body>
-</html>
-```
-
-================================================================================
-
-## File: test-server.js
-
-```
-const express = require('express');
-const path = require('path');
-const cors = require('cors');
-
-const app = express();
-const PORT = 3001;
-
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.static('.'));
-
-// Функция для обработки API Яндекс.Музыки (копия из TypeScript файла)
-async function handleYandexMusicAPI(req, res) {
-  // Обработка CORS для локальной разработки и preflight-запросов
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  // Принимаем только POST-запросы
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
-  }
-
-  try {
-    const { token } = req.body;
-
-    if (!token) {
-      return res.status(400).json({ error: 'Session_id token is required' });
-    }
-
-    console.log('Session_id received, length:', token.length);
-    console.log('Получение данных из Яндекс.Музыки...');
-
-    // Базовые настройки для запросов к API
-    const baseURL = 'https://api.music.yandex.net';
-    const headers = {
-      'Authorization': `OAuth ${token}`,
-      'User-Agent': 'Yandex-Music-API/1.0',
-      'Content-Type': 'application/json'
-    };
-
-    // Получаем информацию о пользователе для проверки токена
-    console.log('Checking user authentication...');
-    const userResponse = await fetch(`${baseURL}/account/status`, {
-      method: 'GET',
-      headers
-    });
-
-    if (!userResponse.ok) {
-      throw new Error(`Authentication failed: ${userResponse.status} ${userResponse.statusText}`);
-    }
-
-    const userData = await userResponse.json();
-    const userId = userData.result.account.uid;
-    console.log(`Authenticated as user: ${userId}`);
-
-    // Получаем лайкнутые треки
-    console.log('Fetching liked tracks...');
-    const likesResponse = await fetch(`${baseURL}/users/${userId}/likes/tracks`, {
-      method: 'GET',
-      headers
-    });
-
-    if (!likesResponse.ok) {
-      throw new Error(`Failed to fetch liked tracks: ${likesResponse.status} ${likesResponse.statusText}`);
-    }
-
-    const likesData = await likesResponse.json();
-    const trackIds = likesData.result.library.tracks.map(track => track.id);
-
-    if (trackIds.length === 0) {
-      console.log('No liked tracks found.');
-      return res.status(200).json({
-        metadata: { 
-          total_tracks: 0, 
-          generated_at: new Date().toISOString(),
-          source: 'Yandex Music API (Direct HTTP)'
-        },
-        tracks: []
-      });
-    }
-
-    console.log(`Found ${trackIds.length} liked tracks.`);
-
-    // Получаем полную информацию о треках (батчами по 100)
-    const batchSize = 100;
-    const allTracks = [];
-
-    for (let i = 0; i < trackIds.length; i += batchSize) {
-      const batch = trackIds.slice(i, i + batchSize);
-      const tracksResponse = await fetch(`${baseURL}/tracks`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          'track-ids': batch,
-          'with-positions': false
-        })
-      });
-
-      if (tracksResponse.ok) {
-        const tracksData = await tracksResponse.json();
-        allTracks.push(...tracksData.result);
-      }
-    }
-
-    console.log(`Fetched full info for ${allTracks.length} tracks.`);
-
-    // Обрабатываем треки
-    const processedTracks = allTracks
-      .filter(track => track.available)
-      .map(track => {
-        return {
-          id: String(track.id),
-          title: track.title || 'Unknown Title',
-          artist: track.artists?.map(a => a.name).join(', ') || 'Unknown Artist',
-          album: track.albums?.[0]?.title || 'Unknown Album',
-          duration: Math.floor((track.durationMs || 0) / 1000),
-          genre: track.albums?.[0]?.genre || 'unknown',
-          cover_url: track.coverUri ? `https://${track.coverUri.replace('%%', '400x400')}` : undefined,
-          preview_url: undefined, // Превью требуют дополнительных запросов
-          available: track.available,
-        };
-      });
-
-    console.log(`Processed ${processedTracks.length} available tracks.`);
-
-    // Формируем и отправляем успешный ответ
-    const result = {
-      metadata: {
-        total_tracks: processedTracks.length,
-        generated_at: new Date().toISOString(),
-        source: 'Yandex Music API (Direct HTTP)'
-      },
-      tracks: processedTracks,
-    };
-
-    return res.status(200).json(result);
-
-  } catch (error) {
-    console.error('Yandex Music API Error:', error);
-    
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-
-    // Возвращаем более понятную ошибку, если проблема в авторизации
-    if (errorMessage.toLowerCase().includes('auth') || 
-        errorMessage.toLowerCase().includes('401') ||
-        errorMessage.toLowerCase().includes('unauthorized')) {
-      return res.status(401).json({
-        error: 'Authorization failed. Your Session_id is likely invalid or expired. Please update it.',
-        details: errorMessage
-      });
-    }
-
-    // Общая ошибка сервера
-    return res.status(500).json({
-      error: 'Failed to fetch data from Yandex Music.',
-      details: errorMessage
-    });
-  }
-}
-
-// API route - реализуем функцию напрямую для тестирования
-app.post('/api/getYandexData', async (req, res) => {
-  try {
-    // Реализуем API функцию напрямую для локального тестирования
-    await handleYandexMusicAPI(req, res);
-  } catch (error) {
-    console.error('API Error:', error);
-    res.status(500).json({ error: 'Internal server error', details: error.message });
-  }
-});
-
-// Serve test page
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'test-api.html'));
-});
-
-app.listen(PORT, () => {
-  console.log(`Test server running at http://localhost:${PORT}`);
-  console.log('Open this URL in your browser to test the API');
-});
 ```
 
 ================================================================================
@@ -44373,7 +44701,7 @@ Tests for 3D rendering, shaders, materials, and visual effects.
   "outputDirectory": "dist",
   "functions": {
     "api/getYandexData.ts": {
-      "maxDuration": 30
+      "maxDuration": 300
     },
     "api/test.ts": {
       "maxDuration": 10
