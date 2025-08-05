@@ -67,37 +67,15 @@ export class DataLoader {
         };
       }
       
-      // Если в localStorage нет данных, пробуем загрузить из файла
-      const response = await fetch(this.DATA_FILE_PATH);
-      
-      if (!response.ok) {
-        console.warn('⚠️ Файл с данными не найден, загружаем демо-данные');
-        const demoData = await this.loadDemoData();
-        return {
-          success: true,
-          data: demoData,
-          isDemo: true,
-          freshness: 'unknown'
-        };
-      }
-
-      const data: MusicDataFile = await response.json();
-      
-      // Валидация структуры данных
-      const validationResult = this.validateMusicDataDetailed(data);
-      if (!validationResult.isValid) {
-        throw new Error(`Неверная структура данных: ${validationResult.errors.join(', ')}`);
-      }
-
-      // Проверяем свежесть данных
-      const freshness = await this.getDataFreshness(data);
-      
-      console.log(`✅ Загружено из файла: ${data.tracks.length} треков`);
+      // Если в localStorage нет данных, загружаем демо-данные
+      // (статический файл больше не используется в serverless архитектуре)
+      console.warn('⚠️ Данные не найдены в localStorage, загружаем демо-данные');
+      const demoData = await this.loadDemoData();
       return {
         success: true,
-        data: data,
-        isDemo: false,
-        freshness: freshness
+        data: demoData,
+        isDemo: true,
+        freshness: 'unknown'
       };
 
     } catch (error) {

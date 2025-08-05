@@ -1,5 +1,4 @@
 import { AudioManager as IAudioManager } from '../types';
-import { TokenManager } from '../auth/TokenManager';
 
 export class AudioManager implements IAudioManager {
   private currentAudio?: HTMLAudioElement;
@@ -22,7 +21,7 @@ export class AudioManager implements IAudioManager {
 
 
   async playPreview(url: string, trackId?: string): Promise<void> {
-    console.log(`🎵 Попытка воспроизведения превью через прокси для трека: ${trackId}`);
+    console.log(`🎵 Попытка воспроизведения превью: ${url}`);
     
     // Предотвращаем наложение треков при быстром переключении
     if (this.isTransitioning) {
@@ -45,15 +44,12 @@ export class AudioManager implements IAudioManager {
       // Устанавливаем ID нового трека
       this.currentTrackId = trackId;
       
-      // Получаем аудио через наш новый безопасный прокси
-      const audioBlob = await this.fetchAudioWithProxy(url);
-      const blobUrl = URL.createObjectURL(audioBlob);
-      
-      console.log(`🎵 Создан Blob URL для аудио: ${blobUrl}`);
+      // Прямая работа с URL, который мы получили от API
+      console.log(`🎵 Установка источника аудио: ${url}`);
       
       // Создаем новый аудио элемент
-      this.currentAudio = new Audio(blobUrl);
-      this.currentAudio.crossOrigin = 'anonymous';
+      this.currentAudio = new Audio(url);
+      this.currentAudio.crossOrigin = 'anonymous'; // ВАЖНО для работы с внешними аудио-источниками
       this.currentAudio.preload = 'auto';
       
       // Настройка обработчиков событий
@@ -282,45 +278,13 @@ export class AudioManager implements IAudioManager {
     });
   }
 
-  /**
-   * Получает аудио через безопасный прокси с токеном авторизации
-   */
-  private async fetchAudioWithProxy(yandexUrl: string): Promise<Blob> {
-    // Получаем токен из TokenManager
-    const tokenData = TokenManager.getToken();
-    
-    if (!tokenData || !tokenData.token) {
-      throw new Error("Токен авторизации не найден для аудио-прокси.");
-    }
 
-    // Делаем POST-запрос к нашему прокси
-    const response = await fetch('/api/audioProxy', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        url: yandexUrl, 
-        token: tokenData.token 
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`Прокси-сервер вернул ошибку: ${response.status} ${errorData.error || ''}`);
-    }
-
-    return response.blob();
-  }
 
   private cleanup(): void {
     if (this.currentAudio) {
       // Останавливаем воспроизведение
       this.currentAudio.pause();
       this.currentAudio.currentTime = 0;
-      
-      // Освобождаем память, занятую Blob URL
-      if (this.currentAudio.src.startsWith('blob:')) {
-        URL.revokeObjectURL(this.currentAudio.src);
-      }
       
       // Удаляем все обработчики событий
       this.currentAudio.removeEventListener('ended', () => {});
