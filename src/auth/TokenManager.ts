@@ -3,7 +3,8 @@
  */
 
 export interface TokenData {
-  token: string;
+  oauthToken: string;
+  sessionId: string;
   expiresAt?: Date;
   createdAt: Date;
   isValid: boolean;
@@ -25,11 +26,12 @@ export class TokenManager {
   }
 
   /**
-   * Сохраняет токен в localStorage
+   * Сохраняет токены в localStorage
    */
-  static saveToken(token: string): void {
+  static saveTokens(oauthToken: string, sessionId: string): void {
     const tokenData: TokenData = {
-      token: token.trim(),
+      oauthToken: oauthToken.trim(),
+      sessionId: sessionId.trim(),
       createdAt: new Date(),
       expiresAt: new Date(Date.now() + this.TOKEN_LIFETIME_HOURS * 60 * 60 * 1000),
       isValid: true
@@ -37,11 +39,20 @@ export class TokenManager {
 
     try {
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(tokenData));
-      console.log('✅ Токен сохранен');
+      console.log('✅ Токены сохранены');
     } catch (error) {
-      console.error('❌ Ошибка сохранения токена:', error);
-      throw new Error('Не удалось сохранить токен');
+      console.error('❌ Ошибка сохранения токенов:', error);
+      throw new Error('Не удалось сохранить токены');
     }
+  }
+
+  /**
+   * Сохраняет токен в localStorage (для обратной совместимости)
+   * @deprecated Используйте saveTokens для сохранения обоих токенов
+   */
+  static saveToken(token: string): void {
+    // Временная заглушка для обратной совместимости
+    console.warn('⚠️ Используется устаревший метод saveToken. Используйте saveTokens.');
   }
 
   /**
@@ -69,7 +80,7 @@ export class TokenManager {
   }
 
   /**
-   * Проверяет валидность токена
+   * Проверяет валидность токенов
    */
   static validateToken(tokenData?: TokenData | null): TokenValidationResult {
     if (!tokenData) {
@@ -79,16 +90,24 @@ export class TokenManager {
     if (!tokenData) {
       return {
         isValid: false,
-        error: 'Токен не найден',
+        error: 'Токены не найдены',
         needsRefresh: true
       };
     }
 
-    // Проверяем формат токена
-    if (!tokenData.token || tokenData.token.length < 10) {
+    // Проверяем формат токенов
+    if (!tokenData.oauthToken || tokenData.oauthToken.length < 10) {
       return {
         isValid: false,
-        error: 'Неверный формат токена',
+        error: 'Неверный формат OAuth токена',
+        needsRefresh: true
+      };
+    }
+
+    if (!tokenData.sessionId || tokenData.sessionId.length < 10) {
+      return {
+        isValid: false,
+        error: 'Неверный формат Session_id',
         needsRefresh: true
       };
     }
@@ -97,17 +116,17 @@ export class TokenManager {
     if (tokenData.expiresAt && new Date() > tokenData.expiresAt) {
       return {
         isValid: false,
-        error: 'Токен истек',
+        error: 'Токены истекли',
         needsRefresh: true
       };
     }
 
-    // Проверяем возраст токена (если нет expiresAt)
+    // Проверяем возраст токенов (если нет expiresAt)
     const ageHours = (Date.now() - tokenData.createdAt.getTime()) / (1000 * 60 * 60);
     if (ageHours > this.TOKEN_LIFETIME_HOURS) {
       return {
         isValid: false,
-        error: 'Токен устарел',
+        error: 'Токены устарели',
         needsRefresh: true
       };
     }
@@ -172,15 +191,16 @@ export class TokenManager {
   }
 
   /**
-   * Тестирует токен, отправляя запрос к API
+   * Тестирует токены, отправляя запрос к API
    */
-  static async testToken(token?: string): Promise<TokenValidationResult> {
-    const testToken = token || this.getToken()?.token;
+  static async testToken(oauthToken?: string): Promise<TokenValidationResult> {
+    const tokenData = this.getToken();
+    const testToken = oauthToken || tokenData?.oauthToken;
     
     if (!testToken) {
       return {
         isValid: false,
-        error: 'Токен не предоставлен',
+        error: 'OAuth токен не предоставлен',
         needsRefresh: true
       };
     }

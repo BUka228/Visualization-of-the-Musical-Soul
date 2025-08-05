@@ -286,20 +286,20 @@ export class AudioManager implements IAudioManager {
    * Получает аудио через безопасный прокси с токеном авторизации
    */
   private async fetchAudioWithProxy(yandexUrl: string): Promise<Blob> {
-    // Получаем токен из TokenManager
+    // Получаем токены из TokenManager
     const tokenData = TokenManager.getToken();
     
-    if (!tokenData || !tokenData.token) {
-      throw new Error("Токен авторизации не найден для аудио-прокси.");
+    if (!tokenData || !tokenData.sessionId) {
+      throw new Error("Session_id не найден для аудио-прокси.");
     }
 
-    // Делаем POST-запрос к нашему прокси
+    // Делаем POST-запрос к нашему прокси с Session_id
     const response = await fetch('/api/audioProxy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         url: yandexUrl, 
-        token: tokenData.token 
+        token: tokenData.sessionId 
       }),
     });
 

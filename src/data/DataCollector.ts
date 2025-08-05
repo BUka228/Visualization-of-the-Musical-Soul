@@ -34,15 +34,21 @@ export class DataCollector {
 
   /**
    * Собирает данные из Яндекс.Музыки через Vercel API
-   * @param token - токен авторизации
+   * @param oauthToken - OAuth токен для API
+   * @param sessionId - Session_id для аудио (опционально)
    * @param previewLimit - максимальное количество треков для получения превью (по умолчанию все)
    */
-  async collectData(token: string, previewLimit?: number): Promise<CollectionResult> {
+  async collectData(oauthToken: string, sessionId?: string, previewLimit?: number): Promise<CollectionResult> {
     this.abortController = new AbortController();
     
     try {
-      // Сохраняем токен
-      TokenManager.saveToken(token);
+      // Сохраняем токены
+      if (sessionId) {
+        TokenManager.saveTokens(oauthToken, sessionId);
+      } else {
+        // Если Session_id не предоставлен, используем OAuth токен для обоих
+        TokenManager.saveTokens(oauthToken, oauthToken);
+      }
       
       this.updateProgress({
         stage: 'connecting',
@@ -74,7 +80,7 @@ export class DataCollector {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ token: oauthToken }),
         signal: this.abortController?.signal
       });
 
@@ -233,7 +239,8 @@ export class DataCollector {
       // Если API недоступно, используем базовую валидацию
       console.warn('API недоступно, используем базовую валидацию токена');
       return TokenManager.validateToken({ 
-        token, 
+        oauthToken: token, 
+        sessionId: '', 
         createdAt: new Date(), 
         isValid: true 
       });

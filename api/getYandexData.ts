@@ -116,7 +116,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { token } = req.body;
 
     if (!token) {
-      return res.status(400).json({ error: 'Session_id token is required' });
+      return res.status(400).json({ error: 'OAuth token is required' });
     }
 
     console.log('Session_id received, length:', token.length);

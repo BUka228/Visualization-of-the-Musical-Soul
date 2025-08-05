@@ -242,7 +242,7 @@ export class BurgerMenu {
       `;
     }
 
-    const formattedToken = TokenManager.formatTokenForDisplay(TokenManager.getToken()?.token || '');
+    const formattedToken = TokenManager.formatTokenForDisplay(TokenManager.getToken()?.oauthToken || '');
     return `
       <div style="background: rgba(76, 175, 80, 0.2); border: 1px solid rgba(76, 175, 80, 0.5); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
         <p style="color: #4caf50; margin: 0 0 10px 0; font-weight: bold;">✅ Токен действителен</p>
@@ -604,7 +604,7 @@ export class BurgerMenu {
 
     try {
       // Используем настройки по умолчанию для быстрого обновления из меню
-      const result = await this.collector.collectData(tokenData.token, 50); // Ограничиваем превью для быстроты
+      const result = await this.collector.collectData(tokenData.oauthToken, tokenData.sessionId, 50); // Ограничиваем превью для быстроты
       
       if (result.success) {
         this.showMenuNotification(`Данные обновлены! Загружено ${result.tracksCollected} треков`, 'success');

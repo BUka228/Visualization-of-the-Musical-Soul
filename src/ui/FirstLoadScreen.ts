@@ -196,7 +196,7 @@ export class FirstLoadScreen {
     const isElectron = typeof window !== 'undefined' && (window as any).electronAPI !== undefined;
     
     if (tokenInfo.hasToken && tokenInfo.isValid) {
-      const formattedToken = TokenManager.formatTokenForDisplay(TokenManager.getToken()?.token || '');
+      const formattedToken = TokenManager.formatTokenForDisplay(TokenManager.getToken()?.oauthToken || '');
       return `
         <div style="margin-bottom: 30px;">
           <div style="background: rgba(76, 175, 80, 0.2); border: 1px solid rgba(76, 175, 80, 0.5); border-radius: 8px; padding: 15px;">
@@ -328,12 +328,33 @@ export class FirstLoadScreen {
         <div id="token-input-section">
           <div style="margin-bottom: 15px;">
             <label style="color: #fff; display: block; margin-bottom: 8px; font-weight: bold;">
-              Токен Session_id:
+              OAuth токен (для API):
             </label>
             <input 
               type="text" 
-              id="token-input" 
-              placeholder="Вставьте токен Session_id из cookies"
+              id="oauth-token-input" 
+              placeholder="Например: AQAAAAAYc***..."
+              style="
+                width: 100%;
+                padding: 12px;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                border-radius: 6px;
+                background: rgba(255, 255, 255, 0.1);
+                color: #fff;
+                font-size: 14px;
+                box-sizing: border-box;
+              "
+            />
+          </div>
+          
+          <div style="margin-bottom: 15px;">
+            <label style="color: #fff; display: block; margin-bottom: 8px; font-weight: bold;">
+              Session_id (для аудио):
+            </label>
+            <input 
+              type="text" 
+              id="session-id-input" 
+              placeholder="Вставьте Session_id из cookies"
               style="
                 width: 100%;
                 padding: 12px;
@@ -349,17 +370,28 @@ export class FirstLoadScreen {
           
           <details style="margin-bottom: 20px;">
             <summary style="color: #4fc3f7; cursor: pointer; font-weight: bold; margin-bottom: 10px;">
-              📋 Как получить токен?
+              📋 Как получить токены?
             </summary>
             <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 6px; margin-top: 10px;">
-              <ol style="color: #ccc; line-height: 1.6; margin: 0; padding-left: 20px;">
-                <li>Откройте <a href="https://music.yandex.ru" target="_blank" style="color: #4fc3f7;">music.yandex.ru</a></li>
-                <li>Войдите в свой аккаунт</li>
-                <li>Откройте DevTools (F12)</li>
-                <li>Перейдите: Application → Cookies</li>
-                <li>Найдите cookie 'Session_id'</li>
-                <li>Скопируйте его значение</li>
-              </ol>
+              <div style="margin-bottom: 15px;">
+                <strong style="color: #4fc3f7;">OAuth токен (для API):</strong>
+                <ol style="color: #ccc; line-height: 1.6; margin: 5px 0; padding-left: 20px;">
+                  <li>Откройте <a href="https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d" target="_blank" style="color: #4fc3f7;">эту ссылку</a></li>
+                  <li>Войдите в аккаунт Яндекс</li>
+                  <li>Разрешите доступ к Яндекс.Музыке</li>
+                  <li>Скопируйте токен из адресной строки (после access_token=)</li>
+                </ol>
+              </div>
+              <div>
+                <strong style="color: #4fc3f7;">Session_id (для аудио):</strong>
+                <ol style="color: #ccc; line-height: 1.6; margin: 5px 0; padding-left: 20px;">
+                  <li>Откройте <a href="https://music.yandex.ru" target="_blank" style="color: #4fc3f7;">music.yandex.ru</a></li>
+                  <li>Войдите в свой аккаунт</li>
+                  <li>Откройте DevTools (F12)</li>
+                  <li>Перейдите: Application → Cookies</li>
+                  <li>Найдите cookie 'Session_id' и скопируйте его значение</li>
+                </ol>
+              </div>
             </div>
           </details>
         </div>
@@ -482,8 +514,27 @@ export class FirstLoadScreen {
       manualTokenBtn.addEventListener('click', () => this.handleShowManualToken());
     }
 
-    // Enter в поле токена
+    // Enter в полях токенов
+    const oauthInput = document.getElementById('oauth-token-input') as HTMLInputElement;
+    const sessionInput = document.getElementById('session-id-input') as HTMLInputElement;
     const tokenInput = document.getElementById('token-input') as HTMLInputElement;
+    
+    if (oauthInput) {
+      oauthInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          this.handleSaveToken();
+        }
+      });
+    }
+    
+    if (sessionInput) {
+      sessionInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          this.handleSaveToken();
+        }
+      });
+    }
+    
     if (tokenInput) {
       tokenInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
@@ -494,9 +545,53 @@ export class FirstLoadScreen {
   }
 
   /**
-   * Обработчик сохранения токена
+   * Обработчик сохранения токенов
    */
   private handleSaveToken(): void {
+    const oauthInput = document.getElementById('oauth-token-input') as HTMLInputElement;
+    const sessionInput = document.getElementById('session-id-input') as HTMLInputElement;
+    
+    // Если есть поля для двух токенов, используем их
+    if (oauthInput && sessionInput) {
+      const oauthToken = oauthInput.value.trim();
+      const sessionId = sessionInput.value.trim();
+      
+      if (!oauthToken) {
+        this.showError('Введите OAuth токен');
+        return;
+      }
+      
+      if (!sessionId) {
+        this.showError('Введите Session_id');
+        return;
+      }
+
+      if (oauthToken.length < 10) {
+        this.showError('OAuth токен слишком короткий');
+        return;
+      }
+
+      if (sessionId.length < 10) {
+        this.showError('Session_id слишком короткий');
+        return;
+      }
+
+      try {
+        TokenManager.saveTokens(oauthToken, sessionId);
+        this.showSuccess('Токены сохранены!');
+        
+        // Перерисовываем экран
+        setTimeout(() => {
+          this.hide();
+          this.show();
+        }, 1000);
+      } catch (error) {
+        this.showError('Ошибка сохранения токенов');
+      }
+      return;
+    }
+
+    // Fallback для старого интерфейса с одним токеном
     const tokenInput = document.getElementById('token-input') as HTMLInputElement;
     if (!tokenInput) return;
 
@@ -540,7 +635,7 @@ export class FirstLoadScreen {
   private async handleCollectData(): Promise<void> {
     const tokenData = TokenManager.getToken();
     if (!tokenData) {
-      this.showError('Токен не найден');
+      this.showError('Токены не найдены');
       return;
     }
 
@@ -555,7 +650,8 @@ export class FirstLoadScreen {
     this.collector = new DataCollector((progress) => this.updateProgress(progress));
 
     try {
-      const result = await this.collector.collectData(tokenData.token);
+      // Передаем оба токена в DataCollector
+      const result = await this.collector.collectData(tokenData.oauthToken, tokenData.sessionId);
       this.showResult(result);
     } catch (error) {
       this.showError(error instanceof Error ? error.message : 'Неизвестная ошибка');

@@ -31,8 +31,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`🎵 Proxying audio request with token for: ${url}`);
 
     const headers: Record<string, string> = {
-      'Authorization': `OAuth ${token}`,
+      'Cookie': `Session_id=${token}`,
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Referer': 'https://music.yandex.ru/',
+      'Origin': 'https://music.yandex.ru'
     };
 
     if (req.headers.range) {

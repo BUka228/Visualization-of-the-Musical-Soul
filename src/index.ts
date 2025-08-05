@@ -218,7 +218,11 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
     });
 
     try {
-      const result: CollectionResult = await collector.collectData(token, previewLimit);
+      // Получаем сохраненные токены
+      const tokenData = TokenManager.getToken();
+      const sessionId = tokenData?.sessionId || '';
+      
+      const result: CollectionResult = await collector.collectData(token, sessionId, previewLimit);
       
       if (result.success && this.progressScreen) {
         this.progressScreen.showSuccess(
