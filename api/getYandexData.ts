@@ -31,6 +31,69 @@ interface YandexMusicData {
 }
 
 /**
+ * Обрабатывает информацию о скачивании для одного трека
+ */
+async function processTrackDownloadInfo(track: any, baseURL: string, headers: any): Promise<any> {
+  try {
+    const downloadInfoResponse = await fetch(`${baseURL}/tracks/${track.id}/download-info`, {
+      method: 'GET',
+      headers
+    });
+
+    if (downloadInfoResponse.ok) {
+      const downloadInfoData = await downloadInfoResponse.json();
+      const downloadInfos = downloadInfoData.result || [];
+      
+      // Получаем прямые ссылки для первых 2 форматов (для производительности)
+      const downloadInfosWithDirectLinks = await Promise.all(
+        downloadInfos.slice(0, 2).map(async (info: any) => {
+          try {
+            if (info.downloadInfoUrl) {
+              const directLinkResponse = await fetch(info.downloadInfoUrl, {
+                method: 'GET',
+                headers
+              });
+              
+              if (directLinkResponse.ok) {
+                const xmlData = await directLinkResponse.text();
+                
+                // Парсим XML для получения прямой ссылки
+                const hostMatch = xmlData.match(/<host>([^<]+)<\/host>/);
+                const pathMatch = xmlData.match(/<path>([^<]+)<\/path>/);
+                const tsMatch = xmlData.match(/<ts>([^<]+)<\/ts>/);
+                const sMatch = xmlData.match(/<s>([^<]+)<\/s>/);
+                
+                if (hostMatch && pathMatch && tsMatch && sMatch) {
+                  const directUrl = `https://${hostMatch[1]}${pathMatch[1]}?ts=${tsMatch[1]}&s=${sMatch[1]}`;
+                  return {
+                    ...info,
+                    directUrl: directUrl
+                  };
+                }
+              }
+            }
+            return info;
+          } catch (directLinkError) {
+            console.log(`Error getting direct link for track ${track.id}:`, directLinkError instanceof Error ? directLinkError.message : 'Unknown error');
+            return info;
+          }
+        })
+      );
+      
+      return {
+        ...track,
+        downloadInfo: downloadInfosWithDirectLinks
+      };
+    } else {
+      return track;
+    }
+  } catch (trackDownloadError) {
+    console.log(`Error getting download info for track ${track.id}:`, trackDownloadError instanceof Error ? trackDownloadError.message : 'Unknown error');
+    return track;
+  }
+}
+
+/**
  * Главная Serverless-функция для получения данных из Яндекс.Музыки
  * Использует прямые HTTP запросы к API
  */
@@ -172,10 +235,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Настраиваемый лимит превью (можно передать в query параметрах)
     const previewLimitParam = req.query.previewLimit as string;
     const maxTracksForPreview = previewLimitParam ? parseInt(previewLimitParam) : allTracks.length;
-    const downloadBatchSize = 5; // Маленький размер батча для стабильности
     
-    // Если лимит 0, загружаем превью для всех треков
-    const actualPreviewLimit = maxTracksForPreview === 0 ? allTracks.length : maxTracksForPreview;
+    // Определяем режим загрузки и оптимизации
+    let actualPreviewLimit: number;
+    let downloadBatchSize: number;
+    let requestDelay: number;
+    
+    if (maxTracksForPreview === -2) {
+      // ТУРБО-режим для очень больших библиотек (500+ треков)
+      actualPreviewLimit = allTracks.length; // Все треки
+      downloadBatchSize = 20; // Максимальный размер батча
+      requestDelay = 25; // Минимальная задержка
+      console.log(`⚡ ТУРБО-РЕЖИМ: ${allTracks.length} треков с максимальной скоростью`);
+    } else if (maxTracksForPreview === -1) {
+      // Режим максимальной оптимизации для больших библиотек
+      actualPreviewLimit = allTracks.length; // Все треки
+      downloadBatchSize = 10; // Увеличиваем размер батча
+      requestDelay = 50; // Уменьшаем задержку
+      console.log(`🚀 МАКСИМАЛЬНАЯ ЗАГРУЗКА: ${allTracks.length} треков с оптимизацией`);
+    } else if (maxTracksForPreview === 0) {
+      // Стандартный режим "все треки"
+      actualPreviewLimit = allTracks.length;
+      downloadBatchSize = 5;
+      requestDelay = 100;
+      console.log(`📚 Стандартная загрузка всех ${allTracks.length} треков`);
+    } else {
+      // Ограниченный режим
+      actualPreviewLimit = maxTracksForPreview;
+      downloadBatchSize = 5;
+      requestDelay = 100;
+      console.log(`⚙️ Ограниченная загрузка: ${actualPreviewLimit} треков с превью`);
+    }
     
     // Обрабатываем все треки, но превью получаем только для указанного количества
     const tracksToProcess = allTracks.slice(0, Math.min(actualPreviewLimit, allTracks.length));
@@ -183,90 +273,87 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     console.log(`Processing preview for ${tracksToProcess.length} tracks, basic info for ${remainingTracks.length} tracks`);
     
-    for (let i = 0; i < tracksToProcess.length; i += downloadBatchSize) {
-      const batch = tracksToProcess.slice(i, i + downloadBatchSize);
+    // В ТУРБО-режиме используем параллельную обработку нескольких батчей
+    if (maxTracksForPreview === -2 && tracksToProcess.length > 100) {
+      console.log(`⚡ Запуск параллельной обработки для ${tracksToProcess.length} треков`);
       
-      try {
-        // Получаем информацию о скачивании для каждого трека отдельно
-        const batchWithDownloadInfo = await Promise.all(
-          batch.map(async (track) => {
-            try {
-              const downloadInfoResponse = await fetch(`${baseURL}/tracks/${track.id}/download-info`, {
-                method: 'GET',
-                headers
-              });
-
-              if (downloadInfoResponse.ok) {
-                const downloadInfoData = await downloadInfoResponse.json();
-                const downloadInfos = downloadInfoData.result || [];
-                
-                // Получаем прямые ссылки для первых 2 форматов (для производительности)
-                const downloadInfosWithDirectLinks = await Promise.all(
-                  downloadInfos.slice(0, 2).map(async (info: any) => {
-                    try {
-                      if (info.downloadInfoUrl) {
-                        const directLinkResponse = await fetch(info.downloadInfoUrl, {
-                          method: 'GET',
-                          headers
-                        });
-                        
-                        if (directLinkResponse.ok) {
-                          const xmlData = await directLinkResponse.text();
-                          
-                          // Парсим XML для получения прямой ссылки
-                          const hostMatch = xmlData.match(/<host>([^<]+)<\/host>/);
-                          const pathMatch = xmlData.match(/<path>([^<]+)<\/path>/);
-                          const tsMatch = xmlData.match(/<ts>([^<]+)<\/ts>/);
-                          const sMatch = xmlData.match(/<s>([^<]+)<\/s>/);
-                          
-                          if (hostMatch && pathMatch && tsMatch && sMatch) {
-                            const directUrl = `https://${hostMatch[1]}${pathMatch[1]}?ts=${tsMatch[1]}&s=${sMatch[1]}`;
-                            return {
-                              ...info,
-                              directUrl: directUrl
-                            };
-                          }
-                        }
-                      }
-                      return info;
-                    } catch (directLinkError) {
-                      console.log(`Error getting direct link for track ${track.id}:`, directLinkError instanceof Error ? directLinkError.message : 'Unknown error');
-                      return info;
-                    }
-                  })
-                );
-                
-                return {
-                  ...track,
-                  downloadInfo: downloadInfosWithDirectLinks
-                };
-              } else {
-                return track;
-              }
-            } catch (trackDownloadError) {
-              console.log(`Error getting download info for track ${track.id}:`, trackDownloadError instanceof Error ? trackDownloadError.message : 'Unknown error');
-              return track;
-            }
-          })
-        );
-        
-        tracksWithDownloadInfo.push(...batchWithDownloadInfo);
-      } catch (downloadError) {
-        console.log(`Error fetching download info for batch ${Math.floor(i/downloadBatchSize) + 1}:`, downloadError instanceof Error ? downloadError.message : 'Unknown error');
-        // Добавляем треки без download info
-        tracksWithDownloadInfo.push(...batch);
+      // Разбиваем на супер-батчи для параллельной обработки
+      const superBatchSize = Math.ceil(tracksToProcess.length / 4); // 4 параллельных потока
+      const superBatches = [];
+      
+      for (let i = 0; i < tracksToProcess.length; i += superBatchSize) {
+        superBatches.push(tracksToProcess.slice(i, i + superBatchSize));
       }
       
-      // Небольшая пауза между запросами
-      if (i + downloadBatchSize < allTracks.length) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+      console.log(`Создано ${superBatches.length} параллельных потоков`);
+      
+      // Обрабатываем супер-батчи параллельно
+      const allBatchResults = await Promise.all(
+        superBatches.map(async (superBatch, superBatchIndex) => {
+          console.log(`Поток ${superBatchIndex + 1}: обработка ${superBatch.length} треков`);
+          const batchResults = [];
+          
+          for (let i = 0; i < superBatch.length; i += downloadBatchSize) {
+            const batch = superBatch.slice(i, i + downloadBatchSize);
+            
+            try {
+              const batchWithDownloadInfo = await Promise.all(
+                batch.map(async (track) => {
+                  return await processTrackDownloadInfo(track, baseURL, headers);
+                })
+              );
+              
+              batchResults.push(...batchWithDownloadInfo);
+              
+              // Минимальная задержка только в ТУРБО-режиме
+              if (i + downloadBatchSize < superBatch.length) {
+                await new Promise(resolve => setTimeout(resolve, requestDelay));
+              }
+            } catch (error) {
+              console.log(`Ошибка в потоке ${superBatchIndex + 1}, батч ${Math.floor(i/downloadBatchSize) + 1}:`, error);
+              batchResults.push(...batch);
+            }
+          }
+          
+          console.log(`Поток ${superBatchIndex + 1} завершен: ${batchResults.length} треков`);
+          return batchResults;
+        })
+      );
+      
+      // Объединяем результаты всех потоков
+      tracksWithDownloadInfo.push(...allBatchResults.flat());
+      
+    } else {
+      // Стандартная последовательная обработка
+      for (let i = 0; i < tracksToProcess.length; i += downloadBatchSize) {
+        const batch = tracksToProcess.slice(i, i + downloadBatchSize);
+        
+        try {
+          // Получаем информацию о скачивании для каждого трека отдельно
+          const batchWithDownloadInfo = await Promise.all(
+            batch.map(async (track) => {
+              return await processTrackDownloadInfo(track, baseURL, headers);
+            })
+          );
+          
+          tracksWithDownloadInfo.push(...batchWithDownloadInfo);
+        } catch (downloadError) {
+          console.log(`Error fetching download info for batch ${Math.floor(i/downloadBatchSize) + 1}:`, downloadError instanceof Error ? downloadError.message : 'Unknown error');
+          // Добавляем треки без download info
+          tracksWithDownloadInfo.push(...batch);
+        }
+        
+        // Динамическая пауза между запросами в зависимости от режима
+        if (i + downloadBatchSize < tracksToProcess.length) {
+          await new Promise(resolve => setTimeout(resolve, requestDelay));
+        }
       }
     }
 
     // Добавляем оставшиеся треки без превью
     tracksWithDownloadInfo.push(...remainingTracks);
 
-    console.log(`Processed download info for ${tracksWithDownloadInfo.length} tracks (${maxTracksForPreview} with preview attempts).`);
+    console.log(`Processed download info for ${tracksWithDownloadInfo.length} tracks (${actualPreviewLimit} with preview attempts).`);
 
     // Обрабатываем треки с улучшенной информацией
     const processedTracks: ProcessedTrack[] = tracksWithDownloadInfo

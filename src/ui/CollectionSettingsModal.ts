@@ -108,7 +108,37 @@ export class CollectionSettingsModal {
                 accent-color: #4fc3f7;
                 transform: scale(1.2);
               ">
-              <span>Загрузить превью для всех треков</span>
+              <span>Загрузить превью для всех треков (может занять до 5 минут)</span>
+            </label>
+
+            <label style="
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              color: #e0e0e0;
+              cursor: pointer;
+              margin-bottom: 15px;
+            ">
+              <input type="radio" name="preview-mode" value="maximum" style="
+                accent-color: #4fc3f7;
+                transform: scale(1.2);
+              ">
+              <span>🚀 Максимальная загрузка (все треки + оптимизация)</span>
+            </label>
+
+            <label style="
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              color: #e0e0e0;
+              cursor: pointer;
+              margin-bottom: 15px;
+            ">
+              <input type="radio" name="preview-mode" value="turbo" style="
+                accent-color: #ff6b35;
+                transform: scale(1.2);
+              ">
+              <span style="color: #ff6b35;">⚡ ТУРБО-режим (для 500+ треков)</span>
             </label>
 
             <label style="
@@ -188,7 +218,7 @@ export class CollectionSettingsModal {
             margin: 0;
             line-height: 1.4;
           ">
-            Функция имеет лимит времени выполнения 60 секунд. При большом количестве треков с превью возможны таймауты.
+            Функция имеет лимит времени выполнения 5 минут. Для библиотек >500 треков рекомендуется режим "Максимальная загрузка".
           </p>
         </div>
 
@@ -366,6 +396,12 @@ export class CollectionSettingsModal {
       switch (selectedMode.value) {
         case 'all':
           previewLimit = 0; // 0 означает все треки
+          break;
+        case 'maximum':
+          previewLimit = -1; // -1 означает максимальную оптимизацию
+          break;
+        case 'turbo':
+          previewLimit = -2; // -2 означает ТУРБО-режим для больших библиотек
           break;
         case 'limited':
           previewLimit = parseInt(limitSlider?.value || '50');
