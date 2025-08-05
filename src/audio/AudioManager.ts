@@ -1,4 +1,5 @@
 import { AudioManager as IAudioManager } from '../types';
+import { TokenManager } from '../auth/TokenManager';
 
 export class AudioManager implements IAudioManager {
   private currentAudio?: HTMLAudioElement;
@@ -21,7 +22,7 @@ export class AudioManager implements IAudioManager {
 
 
   async playPreview(url: string, trackId?: string): Promise<void> {
-    console.log(`🎵 Попытка воспроизведения превью: ${url}`);
+    console.log(`🎵 Попытка воспроизведения превью через прокси для трека: ${trackId}`);
     
     // Предотвращаем наложение треков при быстром переключении
     if (this.isTransitioning) {
@@ -44,19 +45,20 @@ export class AudioManager implements IAudioManager {
       // Устанавливаем ID нового трека
       this.currentTrackId = trackId;
       
-      // URL уже является прокси-ссылкой, используем как есть
-      console.log(`🎵 Установка источника аудио: ${url}`);
+      // Получаем аудио через наш новый безопасный прокси
+      const audioBlob = await this.fetchAudioWithProxy(url);
+      const blobUrl = URL.createObjectURL(audioBlob);
+      
+      console.log(`🎵 Создан Blob URL для аудио: ${blobUrl}`);
       
       // Создаем новый аудио элемент
-      this.currentAudio = new Audio();
+      this.currentAudio = new Audio(blobUrl);
       this.currentAudio.crossOrigin = 'anonymous';
       this.currentAudio.preload = 'auto';
       
       // Настройка обработчиков событий
       this.setupAudioEventListeners();
       
-      // Устанавливаем источник и начальную громкость
-      this.currentAudio.src = url;
       this.currentAudio.volume = 0; // Начинаем с нулевой громкости для fade-in
       
       // Загружаем и воспроизводим
@@ -66,7 +68,6 @@ export class AudioManager implements IAudioManager {
       this.fadeIn();
       
       this.isCurrentlyPlaying = true;
-      this.isTransitioning = false;
       
       if (this.onPlayStart) {
         this.onPlayStart();
@@ -80,13 +81,14 @@ export class AudioManager implements IAudioManager {
       
       // Очищаем состояние при ошибке
       this.cleanup();
-      this.isTransitioning = false;
       
       if (this.onError) {
         this.onError(audioError);
       }
       
       throw audioError;
+    } finally {
+      this.isTransitioning = false;
     }
   }
 
@@ -280,11 +282,45 @@ export class AudioManager implements IAudioManager {
     });
   }
 
+  /**
+   * Получает аудио через безопасный прокси с токеном авторизации
+   */
+  private async fetchAudioWithProxy(yandexUrl: string): Promise<Blob> {
+    // Получаем токен из TokenManager
+    const tokenData = TokenManager.getToken();
+    
+    if (!tokenData || !tokenData.token) {
+      throw new Error("Токен авторизации не найден для аудио-прокси.");
+    }
+
+    // Делаем POST-запрос к нашему прокси
+    const response = await fetch('/api/audioProxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        url: yandexUrl, 
+        token: tokenData.token 
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`Прокси-сервер вернул ошибку: ${response.status} ${errorData.error || ''}`);
+    }
+
+    return response.blob();
+  }
+
   private cleanup(): void {
     if (this.currentAudio) {
       // Останавливаем воспроизведение
       this.currentAudio.pause();
       this.currentAudio.currentTime = 0;
+      
+      // Освобождаем память, занятую Blob URL
+      if (this.currentAudio.src.startsWith('blob:')) {
+        URL.revokeObjectURL(this.currentAudio.src);
+      }
       
       // Удаляем все обработчики событий
       this.currentAudio.removeEventListener('ended', () => {});
