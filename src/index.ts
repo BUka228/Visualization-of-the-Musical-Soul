@@ -5,6 +5,7 @@ import { DataProcessor } from './data/DataProcessor';
 import { UIManager } from './ui/UIManager';
 import { LandingPage } from './ui/LandingPage';
 import { GalaxyCreationProgress } from './ui/GalaxyCreationProgress';
+import { CollectionSettingsModal } from './ui/CollectionSettingsModal';
 import { DataCollector, CollectionProgress, CollectionResult } from './data/DataCollector';
 import { BurgerMenu } from './ui/BurgerMenu';
 import { TokenManager } from './auth/TokenManager';
@@ -183,6 +184,33 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
    * Запускает сбор данных с отображением прогресса
    */
   private async startDataCollection(token: string): Promise<void> {
+    // Сначала показываем модал настроек
+    const settingsModal = new CollectionSettingsModal();
+    
+    return new Promise((resolve) => {
+      settingsModal.show(
+        async (settings) => {
+          // Пользователь подтвердил настройки - начинаем сбор
+          await this.performDataCollection(token, settings.previewLimit);
+          resolve();
+        },
+        () => {
+          // Пользователь отменил - возвращаемся к лендингу
+          if (this.progressScreen) {
+            this.progressScreen.hide();
+            this.progressScreen = undefined;
+          }
+          this.showLandingPage();
+          resolve();
+        }
+      );
+    });
+  }
+
+  /**
+   * Выполняет сбор данных с заданными настройками
+   */
+  private async performDataCollection(token: string, previewLimit: number): Promise<void> {
     const collector = new DataCollector((progress: CollectionProgress) => {
       if (this.progressScreen) {
         this.progressScreen.updateProgress(progress);
@@ -190,7 +218,7 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
     });
 
     try {
-      const result: CollectionResult = await collector.collectData(token);
+      const result: CollectionResult = await collector.collectData(token, previewLimit);
       
       if (result.success && this.progressScreen) {
         this.progressScreen.showSuccess(

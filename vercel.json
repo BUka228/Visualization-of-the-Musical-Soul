@@ -3,7 +3,7 @@
   "outputDirectory": "dist",
   "functions": {
     "api/getYandexData.ts": {
-      "maxDuration": 30
+      "maxDuration": 60
     },
     "api/test.ts": {
       "maxDuration": 10

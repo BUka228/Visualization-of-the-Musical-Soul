@@ -34,8 +34,10 @@ export class DataCollector {
 
   /**
    * Собирает данные из Яндекс.Музыки через Vercel API
+   * @param token - токен авторизации
+   * @param previewLimit - максимальное количество треков для получения превью (по умолчанию все)
    */
-  async collectData(token: string): Promise<CollectionResult> {
+  async collectData(token: string, previewLimit?: number): Promise<CollectionResult> {
     this.abortController = new AbortController();
     
     try {
@@ -66,7 +68,8 @@ export class DataCollector {
       });
 
       // Получаем все данные одним запросом через наш API
-      const response = await fetch('/api/getYandexData', {
+      const url = previewLimit ? `/api/getYandexData?previewLimit=${previewLimit}` : '/api/getYandexData';
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -603,7 +603,8 @@ export class BurgerMenu {
     this.collector = new DataCollector((progress) => this.updateMenuProgress(progress));
 
     try {
-      const result = await this.collector.collectData(tokenData.token);
+      // Используем настройки по умолчанию для быстрого обновления из меню
+      const result = await this.collector.collectData(tokenData.token, 50); // Ограничиваем превью для быстроты
       
       if (result.success) {
         this.showMenuNotification(`Данные обновлены! Загружено ${result.tracksCollected} треков`, 'success');

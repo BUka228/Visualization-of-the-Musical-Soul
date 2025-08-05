@@ -169,16 +169,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('Fetching download info for tracks...');
     const tracksWithDownloadInfo: any[] = [];
     
-    // Обрабатываем треки батчами для получения ссылок на скачивание
-    // Ограничиваем количество треков для получения превью (для тестирования)
-    const maxTracksForPreview = 10; // Получаем превью только для первых 10 треков
-    const downloadBatchSize = 5; // Очень маленький размер батча для download info
+    // Настраиваемый лимит превью (можно передать в query параметрах)
+    const previewLimitParam = req.query.previewLimit as string;
+    const maxTracksForPreview = previewLimitParam ? parseInt(previewLimitParam) : allTracks.length;
+    const downloadBatchSize = 5; // Маленький размер батча для стабильности
     
-    // Ограничиваем обработку превью только первыми треками
-    const tracksToProcess = allTracks.slice(0, maxTracksForPreview);
-    const remainingTracks = allTracks.slice(maxTracksForPreview);
+    // Если лимит 0, загружаем превью для всех треков
+    const actualPreviewLimit = maxTracksForPreview === 0 ? allTracks.length : maxTracksForPreview;
     
-    console.log(`Processing preview for first ${tracksToProcess.length} tracks, skipping ${remainingTracks.length} tracks`);
+    // Обрабатываем все треки, но превью получаем только для указанного количества
+    const tracksToProcess = allTracks.slice(0, Math.min(actualPreviewLimit, allTracks.length));
+    const remainingTracks = allTracks.slice(tracksToProcess.length);
+    
+    console.log(`Processing preview for ${tracksToProcess.length} tracks, basic info for ${remainingTracks.length} tracks`);
     
     for (let i = 0; i < tracksToProcess.length; i += downloadBatchSize) {
       const batch = tracksToProcess.slice(i, i + downloadBatchSize);
