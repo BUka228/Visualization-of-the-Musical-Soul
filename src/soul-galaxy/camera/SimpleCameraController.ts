@@ -46,7 +46,7 @@ export class SimpleCameraController {
         
         // Ограничения
         this.orbitControls.minDistance = 10;
-        this.orbitControls.maxDistance = 500;
+        this.orbitControls.maxDistance = 800; // Установлено на 1500 для оптимального отдаления
         this.orbitControls.maxPolarAngle = Math.PI;
         this.orbitControls.minPolarAngle = 0;
         

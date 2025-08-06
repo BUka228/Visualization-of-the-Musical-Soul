@@ -296,6 +296,11 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
     // Интеграция UI Manager с SceneManager
     this.sceneManager.setUIManager(this.uiManager);
     
+    // Настраиваем коллбэк для выбора трека из поиска
+    this.uiManager.setOnTrackSelected((trackId: string) => {
+      this.selectTrackFromSearch(trackId);
+    });
+    
     // Загрузка данных треков
     await this.loadMusicData();
     
@@ -382,11 +387,43 @@ class MusicGalaxyApplication implements MusicGalaxyApp {
       await this.sceneManager.createTrackObjects(tracks);
       console.log('3D-объекты треков созданы и анимации запущены');
     }
+    
+    // Устанавливаем треки в UI Manager для поиска
+    if (this.uiManager) {
+      this.uiManager.setTracks(tracks);
+      console.log(`🔍 Search functionality enabled for ${tracks.length} tracks`);
+    }
   }
 
   selectTrack(trackId: string): void {
     console.log(`Выбор трека: ${trackId}`);
     // Реализация будет добавлена в следующих задачах
+  }
+
+  /**
+   * Выбирает трек из поиска и переходит к нему
+   */
+  private selectTrackFromSearch(trackId: string): void {
+    console.log(`🎯 Selecting track from search: ${trackId}`);
+    
+    if (!this.sceneManager) {
+      console.warn('⚠️ Scene manager not available');
+      return;
+    }
+
+    // Получаем систему кристаллов из Soul Galaxy рендерера
+    const soulGalaxyRenderer = this.sceneManager.getSoulGalaxyRenderer();
+    const crystalTrackSystem = soulGalaxyRenderer.getCrystalTrackSystem();
+    
+    // Имитируем клик по кристаллу для навигации и воспроизведения
+    crystalTrackSystem.handleCrystalClick(trackId).catch((error: Error) => {
+      console.error(`❌ Failed to navigate to track from search: ${trackId}`, error);
+    });
+    
+    // Обновляем состояние приложения
+    this.state.selectedTrackId = trackId;
+    
+    console.log(`✅ Navigated to track from search: ${trackId}`);
   }
 
   resetView(): void {
@@ -617,13 +654,31 @@ document.addEventListener('DOMContentLoaded', async () => {
 function setupBasicUIEventHandlers(app: MusicGalaxyApp): void {
   // Обработчики клавиатуры остаются для удобства пользователей
   document.addEventListener('keydown', (event) => {
+    // Проверяем, не открыто ли модальное окно поиска
+    const appInstance = app as MusicGalaxyApplication;
+    const isSearchOpen = appInstance['uiManager']?.isTrackSearchOpen();
+    
     switch (event.code) {
       case 'KeyR':
-        app.resetView();
+        if (!isSearchOpen) {
+          app.resetView();
+        }
         break;
       case 'Space':
-        event.preventDefault();
-        app.toggleAnimation();
+        if (!isSearchOpen) {
+          event.preventDefault();
+          app.toggleAnimation();
+        }
+        break;
+      case 'KeyF':
+        // Ctrl+F или Cmd+F для открытия поиска
+        if ((event.ctrlKey || event.metaKey) && !isSearchOpen) {
+          event.preventDefault();
+          const uiManager = appInstance['uiManager'];
+          if (uiManager) {
+            uiManager.openTrackSearch();
+          }
+        }
         break;
     }
   });

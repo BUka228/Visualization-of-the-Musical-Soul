@@ -40,7 +40,7 @@ export class FrustumCullingManager {
     updateInterval: 16, // Интервал обновления в мс (60 FPS)
     maxChecksPerFrame: 100, // Максимальное количество проверок за кадр
     enableDistanceCulling: true, // Включить отсечение по расстоянию
-    maxDistance: 500, // Максимальное расстояние видимости
+    maxDistance: 2500, // Максимальное расстояние видимости - увеличено для поддержки отдаления до 1500
     enableOcclusionCulling: false, // Отсечение по перекрытию (пока отключено)
     priorityUpdateInterval: 1000, // Интервал обновления приоритетов в мс
     boundingSphereMargin: 1.2 // Запас для ограничивающих сфер

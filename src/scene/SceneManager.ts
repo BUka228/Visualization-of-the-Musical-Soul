@@ -136,8 +136,8 @@ export class SceneManager implements ISceneManager {
     // Установка цвета фона (космическое пространство)
     this.scene.background = new THREE.Color(0x000011);
     
-    // Добавление тумана для глубины
-    this.scene.fog = new THREE.Fog(0x000011, 200, 800);
+    // Добавление тумана для глубины - увеличены дистанции для поддержки большего отдаления
+    this.scene.fog = new THREE.Fog(0x000011, 500, 3000);
   }
 
   private setupCamera(): void {
@@ -146,7 +146,7 @@ export class SceneManager implements ISceneManager {
       75, // field of view
       this.container.clientWidth / this.container.clientHeight, // aspect ratio
       0.1, // near clipping plane
-      2000 // far clipping plane
+      5000 // far clipping plane - увеличено для поддержки большего отдаления камеры
     );
     
     // Позиционирование камеры

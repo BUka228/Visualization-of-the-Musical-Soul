@@ -113,7 +113,7 @@ export class InteractionManager implements IInteractionManager {
     
     // Ограничения зума
     this.controls.minDistance = 10;
-    this.controls.maxDistance = 500;
+    this.controls.maxDistance = 800; // Установлено на 1500 для оптимального отдаления
     
     // Ограничения вертикального угла
     this.controls.maxPolarAngle = Math.PI;

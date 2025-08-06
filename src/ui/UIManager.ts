@@ -1,11 +1,82 @@
-import { AppState } from '../types';
+import { AppState, ProcessedTrack } from '../types';
+import { TrackSearchModal, TrackSearchCallbacks } from './TrackSearchModal';
+import { SearchButton } from './SearchButton';
 
 export class UIManager {
   private initialized: boolean = false;
+  private trackSearchModal: TrackSearchModal;
+  private searchButton: SearchButton;
+  private tracks: ProcessedTrack[] = [];
+  private onTrackSelected?: (trackId: string) => void;
+
+  constructor() {
+    this.trackSearchModal = new TrackSearchModal();
+    this.searchButton = new SearchButton();
+  }
 
   initialize(): void {
     console.log('Инициализация UI Manager...');
     this.initialized = true;
+  }
+
+  /**
+   * Устанавливает треки для поиска
+   */
+  setTracks(tracks: ProcessedTrack[]): void {
+    this.tracks = tracks;
+    
+    // Показываем кнопку поиска если есть треки
+    if (tracks.length > 0) {
+      this.searchButton.show(() => this.openTrackSearch());
+      console.log(`🔍 Search functionality enabled for ${tracks.length} tracks`);
+    } else {
+      this.searchButton.hide();
+    }
+  }
+
+  /**
+   * Устанавливает коллбэк для выбора трека
+   */
+  setOnTrackSelected(callback: (trackId: string) => void): void {
+    this.onTrackSelected = callback;
+  }
+
+  /**
+   * Открывает модальное окно поиска треков
+   */
+  openTrackSearch(): void {
+    if (this.tracks.length === 0) {
+      console.warn('⚠️ No tracks available for search');
+      return;
+    }
+
+    const callbacks: TrackSearchCallbacks = {
+      onTrackSelected: (trackId: string) => {
+        console.log(`🎯 Track selected from search: ${trackId}`);
+        if (this.onTrackSelected) {
+          this.onTrackSelected(trackId);
+        }
+      },
+      onSearchClosed: () => {
+        console.log('🔍 Track search closed');
+      }
+    };
+
+    this.trackSearchModal.show(this.tracks, callbacks);
+  }
+
+  /**
+   * Закрывает модальное окно поиска треков
+   */
+  closeTrackSearch(): void {
+    this.trackSearchModal.hide();
+  }
+
+  /**
+   * Проверяет, открыто ли модальное окно поиска
+   */
+  isTrackSearchOpen(): boolean {
+    return this.trackSearchModal.isOpen();
   }
 
   createDataCollectionButton(): void {
@@ -182,6 +253,10 @@ export class UIManager {
   dispose(): void {
     console.log('Освобождение ресурсов UI Manager...');
     
+    // Освобождаем ресурсы поиска треков
+    this.trackSearchModal.dispose();
+    this.searchButton.dispose();
+    
     // Удаляем созданные элементы
     const collectButton = document.getElementById('collect-data-button');
     if (collectButton) {
@@ -200,6 +275,9 @@ export class UIManager {
       styles.remove();
     }
     
+    // Очищаем данные
+    this.tracks = [];
+    this.onTrackSelected = undefined;
     this.initialized = false;
   }
 }

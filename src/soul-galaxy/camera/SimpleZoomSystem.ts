@@ -194,7 +194,7 @@ export class SimpleZoomSystem {
         
         // Проверяем, что камера не слишком далеко от центра
         const distanceFromCenter = cameraPosition.length();
-        if (distanceFromCenter > 2000) {
+        if (distanceFromCenter > 5000) { // Увеличено с 2000 до 5000
             console.error(`❌ Camera too far from center: ${distanceFromCenter}`);
             return false;
         }
