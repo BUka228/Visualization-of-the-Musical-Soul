@@ -45,11 +45,14 @@ export class LandingPage {
       background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 30%, #16213e 70%, #0f3460 100%);
       display: flex;
       flex-direction: column;
-      justify-content: center;
+      justify-content: flex-start;
       align-items: center;
       z-index: 9999;
       font-family: 'Arial', sans-serif;
-      overflow: hidden;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 20px 0;
+      box-sizing: border-box;
     `;
 
     landing.innerHTML = `
@@ -69,19 +72,21 @@ export class LandingPage {
         position: relative;
         z-index: 2;
         text-align: center;
-        max-width: 800px;
-        padding: 40px;
+        max-width: 900px;
+        padding: 20px;
         animation: fadeInUp 1s ease-out;
+        width: 100%;
+        box-sizing: border-box;
       ">
         <!-- Заголовок -->
         <h1 style="
-          font-size: 4rem;
+          font-size: 3rem;
           font-weight: bold;
           background: linear-gradient(45deg, #4fc3f7, #29b6f6, #03a9f4);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
-          margin: 0 0 20px 0;
+          margin: 0 0 15px 0;
           text-shadow: 0 0 30px rgba(79, 195, 247, 0.3);
           animation: glow 2s ease-in-out infinite alternate;
         ">
@@ -90,25 +95,253 @@ export class LandingPage {
 
         <!-- Подзаголовок -->
         <p style="
-          font-size: 1.5rem;
+          font-size: 1.2rem;
           color: #e0e0e0;
-          margin: 0 0 40px 0;
-          line-height: 1.6;
+          margin: 0 0 25px 0;
+          line-height: 1.4;
           opacity: 0.9;
         ">
-          Визуализируй свою музыкальную коллекцию<br>
-          в интерактивной 3D-галактике
+          Визуализируй свою музыкальную коллекцию в интерактивной 3D-галактике
         </p>
 
+        <!-- Инструкция по подготовке данных -->
+        <div class="instructions-container" style="
+          background: rgba(255, 255, 255, 0.08);
+          border-radius: 20px;
+          padding: 25px;
+          margin: 25px auto 30px auto;
+          backdrop-filter: blur(15px);
+          border: 1px solid rgba(79, 195, 247, 0.3);
+          text-align: left;
+          max-width: 700px;
+          animation: fadeInUp 1s ease-out 0.3s both;
+        ">
+          <h3 style="
+            color: #4fc3f7;
+            margin: 0 0 20px 0;
+            font-size: 1.2rem;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+          ">
+            <span>📋</span> Подготовка музыкальной коллекции
+          </h3>
+          
+          <div class="instructions-grid" style="
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+          ">
+            <!-- Вариант 1: Автоматический сбор -->
+            <div class="instruction-card" style="
+              background: rgba(79, 195, 247, 0.1);
+              border-radius: 15px;
+              padding: 18px;
+              border: 1px solid rgba(79, 195, 247, 0.2);
+            ">
+              <h4 style="
+                color: #4fc3f7;
+                margin: 0 0 12px 0;
+                font-size: 1rem;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+              ">
+                <span>🤖</span> Автоматический сбор
+              </h4>
+              <p style="color: #ccc; margin: 0 0 15px 0; font-size: 0.85rem; line-height: 1.4;">
+                Готовый сборщик для Яндекс.Музыки
+              </p>
+              <a href="https://github.com/BUka228/Visualization-of-the-Musical-Soul/releases/download/v1.0.0/YandexMusicCollector.exe" 
+                 target="_blank"
+                 style="
+                   display: inline-flex;
+                   align-items: center;
+                   gap: 8px;
+                   background: linear-gradient(45deg, #4fc3f7, #29b6f6);
+                   color: #fff;
+                   text-decoration: none;
+                   padding: 8px 14px;
+                   border-radius: 20px;
+                   font-size: 0.8rem;
+                   font-weight: bold;
+                   transition: all 0.3s ease;
+                   box-shadow: 0 4px 15px rgba(79, 195, 247, 0.3);
+                 "
+                 onmouseover="this.style.transform = 'translateY(-2px)'; this.style.boxShadow = '0 6px 20px rgba(79, 195, 247, 0.4)';"
+                 onmouseout="this.style.transform = 'translateY(0)'; this.style.boxShadow = '0 4px 15px rgba(79, 195, 247, 0.3)';">
+                <span>⬇️</span> Скачать сборщик
+              </a>
+            </div>
+
+            <!-- Вариант 2: Ручная подготовка -->
+            <div class="instruction-card" style="
+              background: rgba(255, 193, 7, 0.1);
+              border-radius: 15px;
+              padding: 18px;
+              border: 1px solid rgba(255, 193, 7, 0.2);
+            ">
+              <h4 style="
+                color: #ffc107;
+                margin: 0 0 12px 0;
+                font-size: 1rem;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+              ">
+                <span>📁</span> Ручная подготовка
+              </h4>
+              <p style="color: #ccc; margin: 0 0 15px 0; font-size: 0.85rem; line-height: 1.4;">
+                Папка с MP3 + metadata.json
+              </p>
+              <button onclick="document.getElementById('manual-instructions').style.display = document.getElementById('manual-instructions').style.display === 'none' ? 'block' : 'none';"
+                      style="
+                        background: linear-gradient(45deg, #ffc107, #ff9800);
+                        color: #fff;
+                        border: none;
+                        padding: 8px 14px;
+                        border-radius: 20px;
+                        font-size: 0.8rem;
+                        font-weight: bold;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);
+                      "
+                      onmouseover="this.style.transform = 'translateY(-2px)'; this.style.boxShadow = '0 6px 20px rgba(255, 193, 7, 0.4)';"
+                      onmouseout="this.style.transform = 'translateY(0)'; this.style.boxShadow = '0 4px 15px rgba(255, 193, 7, 0.3)';">
+                📖 Подробнее
+              </button>
+            </div>
+          </div>
+
+          <!-- Детальная инструкция для ручной подготовки -->
+          <div id="manual-instructions" style="
+            display: none;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+          ">
+            <h5 style="color: #ffc107; margin: 0 0 15px 0; font-size: 1rem; font-weight: bold;">
+              📁 Структура папки с музыкой:
+            </h5>
+            
+            <div style="
+              background: rgba(0, 0, 0, 0.4);
+              border-radius: 10px;
+              padding: 15px;
+              margin: 0 0 15px 0;
+              font-family: 'Courier New', monospace;
+              font-size: 0.8rem;
+              color: #4fc3f7;
+              overflow-x: auto;
+            ">
+📁 Моя_музыка/
+├── 📄 metadata.json
+└── 📁 audio/
+    ├── 🎵 track001.mp3
+    ├── 🎵 track002.mp3
+    └── 🎵 track003.mp3
+            </div>
+
+            <h6 style="color: #ffc107; margin: 0 0 10px 0; font-size: 0.9rem; font-weight: bold;">
+              📄 Содержимое metadata.json:
+            </h6>
+            
+            <div style="
+              background: rgba(0, 0, 0, 0.4);
+              border-radius: 10px;
+              padding: 15px;
+              margin: 0 0 15px 0;
+              font-family: 'Courier New', monospace;
+              font-size: 0.75rem;
+              color: #a5d6a7;
+              overflow-x: auto;
+            ">
+{
+  "metadata": {
+    "total_tracks": 3,
+    "generated_at": "2024-01-15T12:00:00Z",
+    "source": "Local Music Collection"
+  },
+  "tracks": [
+    {
+      "id": "track001",
+      "title": "Название песни",
+      "artist": "Исполнитель",
+      "album": "Альбом",
+      "duration": 180,
+      "genre": "rock",
+      "available": true
+    },
+    {
+      "id": "track002",
+      "title": "Another Song",
+      "artist": "Artist Name",
+      "album": "Album Name",
+      "duration": 240,
+      "genre": "pop",
+      "available": true
+    }
+  ]
+}
+            </div>
+
+            <h6 style="color: #ffc107; margin: 0 0 10px 0; font-size: 0.9rem; font-weight: bold;">
+              ⚙️ Важные требования:
+            </h6>
+            
+            <ul style="color: #ccc; font-size: 0.8rem; margin: 0; padding-left: 20px; line-height: 1.5;">
+              <li><strong>ID треков</strong> в metadata.json должны совпадать с именами MP3 файлов</li>
+              <li><strong>Поддерживаемые жанры:</strong> rock, pop, indie, metal, electronic, jazz, classical, hip-hop, rap, kpop, dance, rnb, alternative, punk, blues, country, folk, reggae, ambient, house, techno, trance, dubstep</li>
+              <li><strong>Формат аудио:</strong> только MP3 файлы</li>
+              <li><strong>Кодировка:</strong> metadata.json должен быть в UTF-8</li>
+              <li><strong>Обязательные поля:</strong> id, title, artist, album, duration, genre, available</li>
+            </ul>
+
+            <div style="
+              background: rgba(79, 195, 247, 0.1);
+              border-radius: 10px;
+              padding: 12px;
+              margin-top: 15px;
+              border: 1px solid rgba(79, 195, 247, 0.2);
+            ">
+              <p style="color: #4fc3f7; margin: 0; font-size: 0.8rem; font-weight: bold;">
+                💡 Совет: Используйте автоматический сборщик для простоты!
+              </p>
+            </div>
+          </div>
+
+          <!-- Краткая инструкция по использованию сборщика -->
+          <div style="
+            background: rgba(79, 195, 247, 0.05);
+            border-radius: 15px;
+            padding: 15px;
+            margin-top: 15px;
+            border: 1px solid rgba(79, 195, 247, 0.1);
+          ">
+            <p style="color: #4fc3f7; margin: 0 0 10px 0; font-size: 0.9rem; font-weight: bold;">
+              🔑 Использование сборщика:
+            </p>
+            <p style="color: #ccc; font-size: 0.8rem; margin: 0; line-height: 1.4;">
+              1. Запустите exe → 2. Получите токен по ссылке → 3. Выберите папку → 4. Дождитесь скачивания
+            </p>
+          </div>
+        </div>
+
         <!-- Особенности -->
-        <div style="
+        <div class="features-grid" style="
           display: flex;
           justify-content: center;
           gap: 40px;
           margin: 40px 0 60px 0;
           flex-wrap: wrap;
         ">
-          <div style="
+          <div class="feature-card" style="
             background: rgba(255, 255, 255, 0.1);
             border-radius: 16px;
             padding: 20px;
@@ -122,7 +355,7 @@ export class LandingPage {
             <p style="color: #ccc; margin: 0; font-size: 0.9rem;">Используй свою коллекцию MP3</p>
           </div>
 
-          <div style="
+          <div class="feature-card" style="
             background: rgba(255, 255, 255, 0.1);
             border-radius: 16px;
             padding: 20px;
@@ -136,7 +369,7 @@ export class LandingPage {
             <p style="color: #ccc; margin: 0; font-size: 0.9rem;">Каждый трек — звезда в галактике</p>
           </div>
 
-          <div style="
+          <div class="feature-card" style="
             background: rgba(255, 255, 255, 0.1);
             border-radius: 16px;
             padding: 20px;
@@ -285,6 +518,75 @@ export class LandingPage {
         background: #fff;
         border-radius: 50%;
         animation: twinkle 2s ease-in-out infinite;
+      }
+
+      /* Адаптивные стили для мобильных устройств */
+      @media (max-width: 768px) {
+        #landing-page h1 {
+          font-size: 2.5rem !important;
+          margin-bottom: 15px !important;
+        }
+        
+        #landing-page p {
+          font-size: 1.2rem !important;
+        }
+        
+        .instructions-grid {
+          grid-template-columns: 1fr !important;
+          gap: 15px !important;
+        }
+        
+        .instruction-card {
+          padding: 15px !important;
+        }
+        
+        .features-grid {
+          flex-direction: column !important;
+          gap: 20px !important;
+        }
+        
+        .feature-card {
+          min-width: auto !important;
+          max-width: 300px !important;
+        }
+        
+        #create-galaxy-btn {
+          padding: 15px 30px !important;
+          font-size: 1.1rem !important;
+        }
+        
+        .instructions-container {
+          padding: 20px !important;
+          margin: 20px 0 30px 0 !important;
+        }
+        
+        pre {
+          font-size: 0.7rem !important;
+          padding: 10px !important;
+        }
+      }
+
+      @media (max-width: 480px) {
+        #landing-page h1 {
+          font-size: 2rem !important;
+        }
+        
+        #landing-page p {
+          font-size: 1rem !important;
+        }
+        
+        .instructions-container {
+          padding: 15px !important;
+        }
+        
+        .instruction-card {
+          padding: 12px !important;
+        }
+        
+        #create-galaxy-btn {
+          padding: 12px 25px !important;
+          font-size: 1rem !important;
+        }
       }
     `;
     document.head.appendChild(style);

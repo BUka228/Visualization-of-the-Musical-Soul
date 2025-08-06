@@ -1,39 +1,25 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-block_cipher = None
 
 a = Analysis(
-    ['collect_yandex_music_data.py'],
+    ['A:\\Progects\\Visualization of the Musical Soul\\scripts\\collect_yandex_music_data.py'],
     pathex=[],
     binaries=[],
     datas=[],
-    hiddenimports=[
-        'yandex_music',
-        'requests',
-        'json',
-        'os',
-        'sys',
-        'datetime',
-        'time',
-        'pathlib'
-    ],
+    hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
     noarchive=False,
+    optimize=0,
 )
-
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
-    a.zipfiles,
     a.datas,
     [],
     name='YandexMusicCollector',
@@ -49,5 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    version='version_info.txt'
+    icon='NONE',
 )
