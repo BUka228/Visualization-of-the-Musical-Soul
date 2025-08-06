@@ -4,6 +4,11 @@ dist/
 .DS_Store
 .env
 
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
 # Токены и секретные данные
 scripts/.yandex_token
 .yandex_token
