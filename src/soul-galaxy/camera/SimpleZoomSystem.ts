@@ -160,15 +160,16 @@ export class SimpleZoomSystem {
         // Получаем направление от центра к кристаллу
         const directionFromCenter = crystalPosition.clone().normalize();
         
-        // Рассчитываем позицию камеры на расстоянии zoomDistance от кристалла
-        // но в направлении от центра, чтобы избежать "пролета" через кристалл
+        // Позиционируем камеру ПОЗАДИ кристалла (между кристаллом и центром)
+        // чтобы камера смотрела в сторону центральной сферы
         const cameraPosition = crystalPosition.clone()
-            .add(directionFromCenter.multiplyScalar(this.zoomDistance));
+            .sub(directionFromCenter.multiplyScalar(this.zoomDistance));
         
-        console.log(`📐 Calculated zoom position:`, {
+        console.log(`📐 Calculated zoom position (behind crystal):`, {
             crystal: crystalPosition,
             camera: cameraPosition,
-            distance: cameraPosition.distanceTo(crystalPosition)
+            distance: cameraPosition.distanceTo(crystalPosition),
+            directionToCenter: directionFromCenter.clone().negate()
         });
         
         return cameraPosition;

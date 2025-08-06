@@ -21,7 +21,7 @@ const DEFAULT_CONFIG: AppConfig = {
     objectMinSize: 0.5,
     objectMaxSize: 3.0,
     animationSpeed: 0.001,
-    cameraDistance: 100,
+    cameraDistance: 600, // Увеличено до 600, чтобы камера была за всеми кристаллами на значительно большем расстоянии
     genreColors: {
       'metal': '#FF0000',
       'rock': '#FF4500',

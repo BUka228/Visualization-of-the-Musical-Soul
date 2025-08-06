@@ -137,7 +137,7 @@ export class SceneManager implements ISceneManager {
     this.scene.background = new THREE.Color(0x000011);
     
     // Добавление тумана для глубины
-    this.scene.fog = new THREE.Fog(0x000011, 50, 200);
+    this.scene.fog = new THREE.Fog(0x000011, 200, 800);
   }
 
   private setupCamera(): void {
@@ -146,7 +146,7 @@ export class SceneManager implements ISceneManager {
       75, // field of view
       this.container.clientWidth / this.container.clientHeight, // aspect ratio
       0.1, // near clipping plane
-      1000 // far clipping plane
+      2000 // far clipping plane
     );
     
     // Позиционирование камеры
@@ -186,18 +186,18 @@ export class SceneManager implements ISceneManager {
     
     // Основной направленный свет
     this.directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    this.directionalLight.position.set(50, 50, 50);
+    this.directionalLight.position.set(200, 200, 200);
     this.directionalLight.castShadow = true;
     
     // Настройка теней
     this.directionalLight.shadow.mapSize.width = 2048;
     this.directionalLight.shadow.mapSize.height = 2048;
     this.directionalLight.shadow.camera.near = 0.5;
-    this.directionalLight.shadow.camera.far = 500;
-    this.directionalLight.shadow.camera.left = -100;
-    this.directionalLight.shadow.camera.right = 100;
-    this.directionalLight.shadow.camera.top = 100;
-    this.directionalLight.shadow.camera.bottom = -100;
+    this.directionalLight.shadow.camera.far = 1500;
+    this.directionalLight.shadow.camera.left = -400;
+    this.directionalLight.shadow.camera.right = 400;
+    this.directionalLight.shadow.camera.top = 400;
+    this.directionalLight.shadow.camera.bottom = -400;
     
     this.scene.add(this.directionalLight);
     

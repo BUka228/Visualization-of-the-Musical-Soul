@@ -74,10 +74,10 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
 
   // Конфигурация кластера
   private static readonly CLUSTER_CONFIG = {
-    radius: 120,          // Радиус звездного скопления (значительно увеличен)
-    heightVariation: 40,  // Вариация по высоте (значительно увеличена)
-    minDistance: 10,      // Минимальное расстояние между кристаллами (значительно увеличено)
-    rotationSpeed: 0.0002 // Скорость вращения кластера (значительно уменьшена для большого радиуса)
+    radius: 400,          // Радиус звездного скопления (максимально увеличен для огромного пространства)
+    heightVariation: 150, // Вариация по высоте (увеличена пропорционально)
+    minDistance: 40,      // Минимальное расстояние между кристаллами (увеличено для большого пространства)
+    rotationSpeed: 0.00005
   };
 
   initialize(scene: THREE.Scene, camera: THREE.Camera, container?: HTMLElement): void {

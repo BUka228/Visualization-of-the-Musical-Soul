@@ -12,6 +12,9 @@ export class CentralSphere {
   private particleSystem: THREE.Points;
   private energyBeams: THREE.Group;
   private orbitalParticles: THREE.Group;
+  private auraSystem: THREE.Group;
+  private innerGlow: THREE.Mesh;
+  private outerGlow: THREE.Mesh;
   
   // Аудио анализ
   private audioContext?: AudioContext;
@@ -40,17 +43,23 @@ export class CentralSphere {
     this.coreMaterial = this.createCoreMaterial();
     this.particleMaterial = this.createParticleMaterial();
     
-    // Создаем компоненты сферы (без ауры)
+    // Создаем компоненты сферы с аурой
     this.coreSphere = this.createCoreSphere();
     this.particleSystem = this.createParticleSystem();
     this.energyBeams = this.createEnergyBeams();
     this.orbitalParticles = this.createOrbitalParticles();
+    this.auraSystem = this.createAuraSystem();
+    this.innerGlow = this.createInnerGlow();
+    this.outerGlow = this.createOuterGlow();
     
-    // Добавляем все в группу (без ауры)
-    this.sphereGroup.add(this.coreSphere);
-    this.sphereGroup.add(this.particleSystem);
-    this.sphereGroup.add(this.energyBeams);
+    // Добавляем все в группу с правильным порядком рендеринга
+    this.sphereGroup.add(this.outerGlow);
+    this.sphereGroup.add(this.auraSystem);
     this.sphereGroup.add(this.orbitalParticles);
+    this.sphereGroup.add(this.particleSystem);
+    this.sphereGroup.add(this.innerGlow);
+    this.sphereGroup.add(this.coreSphere);
+    this.sphereGroup.add(this.energyBeams);
   }
 
   initialize(scene: THREE.Scene): void {
@@ -91,6 +100,7 @@ export class CentralSphere {
         varying vec3 vPosition;
         varying vec3 vNormal;
         varying vec2 vUv;
+        varying vec3 vWorldPosition;
         uniform float time;
         uniform float pulseIntensity;
         uniform float bassLevel;
@@ -101,30 +111,37 @@ export class CentralSphere {
           vNormal = normal;
           vUv = uv;
           
-          // Сохраняем идеальную сферическую форму
+          // Создаем сложную деформацию поверхности
           vec3 pos = position;
           
-          // Плавная но интенсивная пульсация
-          float smoothPulse = sin(time * 3.0) * 0.5 + 0.5;  // Медленная плавная волна
-          float bassScale = 1.0 + bassLevel * smoothPulse * 0.6;  // Более интенсивное увеличение по басам (до 60%)
+          // Многослойные волны для органичной деформации
+          float wave1 = sin(pos.x * 0.1 + time * 2.0) * sin(pos.y * 0.1 + time * 1.5) * sin(pos.z * 0.1 + time * 1.8);
+          float wave2 = cos(pos.x * 0.15 + time * 1.2) * cos(pos.y * 0.12 + time * 2.1) * cos(pos.z * 0.13 + time * 1.6);
+          float wave3 = sin(pos.x * 0.08 + time * 0.8) * cos(pos.y * 0.09 + time * 1.1) * sin(pos.z * 0.11 + time * 0.9);
           
-          // Плавное дрожание высоких частот
-          float trebleWave = sin(time * 8.0 + cos(time * 2.0)) * 0.5 + 0.5;
-          float trebleJitter = 1.0 + trebleLevel * trebleWave * 0.3;  // Плавное дрожание
+          // Комбинируем волны для создания сложной поверхности
+          float surfaceDisplacement = (wave1 * 0.4 + wave2 * 0.3 + wave3 * 0.3) * 2.0;
           
-          // Основная пульсация с более интенсивным эффектом
-          float mainPulse = sin(time * 4.0) * sin(time * 1.5) * 0.5 + 0.5;  // Сложная плавная волна
-          float pulseScale = 1.0 + pulseIntensity * mainPulse * 0.8;  // Очень интенсивная пульсация (до 80%)
+          // Музыкальная реактивность с более сложными паттернами
+          float bassWave = sin(time * 4.0 + length(pos) * 0.1) * bassLevel;
+          float trebleWave = sin(time * 8.0 + dot(pos, vec3(1.0, 0.5, 0.8)) * 0.2) * trebleLevel;
+          float pulseWave = sin(time * 6.0 + pos.x * pos.y * 0.01) * pulseIntensity;
           
-          // Дополнительные плавные волны для более богатого эффекта
-          float secondaryPulse = cos(time * 2.5 + sin(time * 0.8)) * 0.3 + 0.7;  // Вторичная волна
-          float bassWave = smoothstep(0.3, 1.0, bassLevel) * secondaryPulse * 0.4;  // Плавный переход басов
-          float trebleWave2 = smoothstep(0.2, 1.0, trebleLevel) * sin(time * 6.0) * 0.2;  // Плавные высокие частоты
+          // Основная пульсация с органичными изменениями
+          float mainPulse = sin(time * 3.0) * cos(time * 1.7) * 0.5 + 0.5;
+          float bassScale = 1.0 + bassLevel * mainPulse * 0.4;
           
-          // Комбинируем все масштабы плавно
-          float totalScale = bassScale * trebleJitter * pulseScale + bassWave + trebleWave2;
-          pos *= totalScale;
+          // Высокочастотные вибрации
+          float trebleJitter = 1.0 + trebleLevel * sin(time * 12.0 + length(pos) * 0.3) * 0.15;
           
+          // Общая пульсация с более плавными переходами
+          float pulseScale = 1.0 + pulseIntensity * (sin(time * 2.5) * 0.3 + 0.7) * 0.5;
+          
+          // Применяем деформации
+          pos += normalize(pos) * (surfaceDisplacement + bassWave + trebleWave + pulseWave) * 3.0;
+          pos *= bassScale * trebleJitter * pulseScale;
+          
+          vWorldPosition = (modelMatrix * vec4(pos, 1.0)).xyz;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
         }
       `,
@@ -132,6 +149,7 @@ export class CentralSphere {
         varying vec3 vPosition;
         varying vec3 vNormal;
         varying vec2 vUv;
+        varying vec3 vWorldPosition;
         uniform float time;
         uniform float pulseIntensity;
         uniform float bassLevel;
@@ -139,31 +157,69 @@ export class CentralSphere {
         uniform vec3 genreColor;
         uniform float emissiveIntensity;
         
+        // Функция для создания красивых градиентов
+        vec3 createGradient(vec3 baseColor, vec3 pos, float time) {
+          float gradient1 = sin(pos.x * 0.1 + time * 1.5) * 0.5 + 0.5;
+          float gradient2 = cos(pos.y * 0.12 + time * 1.8) * 0.5 + 0.5;
+          float gradient3 = sin(pos.z * 0.08 + time * 2.1) * 0.5 + 0.5;
+          
+          vec3 color1 = baseColor;
+          vec3 color2 = baseColor * 1.5 + vec3(0.2, 0.1, 0.3);
+          vec3 color3 = baseColor * 0.8 + vec3(0.1, 0.3, 0.2);
+          
+          return mix(mix(color1, color2, gradient1), color3, gradient2 * gradient3);
+        }
+        
+        // Функция для создания энергетических паттернов
+        float createEnergyPattern(vec3 pos, float time) {
+          float pattern1 = sin(pos.x * 0.2 + time * 3.0) * cos(pos.y * 0.15 + time * 2.5);
+          float pattern2 = cos(pos.z * 0.18 + time * 1.8) * sin(length(pos.xy) * 0.1 + time * 2.2);
+          float pattern3 = sin(dot(pos, vec3(0.1, 0.12, 0.08)) + time * 4.0);
+          
+          return (pattern1 + pattern2 + pattern3) * 0.33;
+        }
+        
         void main() {
           vec3 normal = normalize(vNormal);
+          vec3 viewDir = normalize(cameraPosition - vWorldPosition);
           
-          // Однородный неоновый цвет без узоров
-          vec3 color = genreColor;
+          // Создаем базовый цвет с градиентами
+          vec3 baseColor = createGradient(genreColor, vPosition, time);
           
-          // Усиливаем яркость для неонового эффекта
-          color *= 1.5;
+          // Энергетические паттерны
+          float energyPattern = createEnergyPattern(vPosition, time);
           
-          // Добавляем интенсивное свечение на основе музыки
+          // Музыкальная реактивность цвета
           float musicIntensity = (bassLevel + trebleLevel + pulseIntensity) / 3.0;
-          color += genreColor * musicIntensity * 2.0;  // Очень яркое свечение
+          vec3 musicColor = baseColor + genreColor * musicIntensity * 1.5;
           
-          // Создаем мощный rim lighting эффект для неонового свечения
-          float rimLight = 1.0 - abs(dot(normal, vec3(0.0, 0.0, 1.0)));
-          rimLight = pow(rimLight, 1.5);  // Более мягкий переход
-          color += genreColor * rimLight * 3.0;  // Очень яркий rim light
+          // Добавляем энергетические паттерны
+          musicColor += baseColor * energyPattern * 0.8;
           
-          // Динамическое эмиссивное свечение с высокой интенсивностью
-          float emissive = emissiveIntensity * 2.0 + musicIntensity * 3.0;
+          // Создаем многослойный rim lighting
+          float rimPower1 = 1.0 - max(0.0, dot(normal, viewDir));
+          float rimPower2 = pow(rimPower1, 2.0);
+          float rimPower3 = pow(rimPower1, 0.5);
           
-          // Добавляем дополнительное свечение для неонового эффекта
-          color += genreColor * 0.8;  // Базовое свечение
+          vec3 rimColor1 = genreColor * rimPower2 * 2.5;
+          vec3 rimColor2 = genreColor * 1.3 * rimPower3 * 1.8;
+          vec3 rimColor3 = genreColor * 0.7 * rimPower1 * 3.0;
           
-          gl_FragColor = vec4(color * emissive, 1.0);
+          // Комбинируем все эффекты
+          vec3 finalColor = musicColor + rimColor1 + rimColor2 + rimColor3;
+          
+          // Добавляем динамическое свечение
+          float dynamicGlow = sin(time * 5.0) * 0.3 + 0.7;
+          finalColor += baseColor * dynamicGlow * 0.5;
+          
+          // Усиливаем яркость на основе музыки
+          float totalIntensity = emissiveIntensity * (1.5 + musicIntensity * 2.0);
+          
+          // Добавляем пульсирующее внутреннее свечение
+          float innerGlow = sin(time * 4.0 + length(vPosition) * 0.1) * 0.4 + 0.6;
+          finalColor += genreColor * innerGlow * musicIntensity * 1.2;
+          
+          gl_FragColor = vec4(finalColor * totalIntensity, 1.0);
         }
       `,
       transparent: true,
@@ -178,13 +234,14 @@ export class CentralSphere {
         bassLevel: { value: 0 },
         trebleLevel: { value: 0 },
         genreColor: { value: new THREE.Color(0x00FFCC) },
-        size: { value: 2.0 }
+        size: { value: 8.0 }
       },
       vertexShader: `
         attribute float particleId;
         attribute vec3 velocity;
         varying float vParticleId;
         varying vec3 vVelocity;
+        varying vec3 vPosition;
         uniform float time;
         uniform float pulseIntensity;
         uniform float bassLevel;
@@ -194,15 +251,23 @@ export class CentralSphere {
         void main() {
           vParticleId = particleId;
           vVelocity = velocity;
+          vPosition = position;
           
-          // Статичный размер частиц без музыкальной реактивности
-          gl_PointSize = size;
+          // Динамический размер частиц с музыкальной реактивностью
+          float musicSize = size * (1.0 + pulseIntensity * 0.8 + bassLevel * 0.6);
+          
+          // Добавляем индивидуальную пульсацию для каждой частицы
+          float individualPulse = sin(time * 3.0 + particleId * 0.1) * 0.3 + 0.7;
+          musicSize *= individualPulse;
+          
+          gl_PointSize = musicSize;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }
       `,
       fragmentShader: `
         varying float vParticleId;
         varying vec3 vVelocity;
+        varying vec3 vPosition;
         uniform float time;
         uniform float pulseIntensity;
         uniform float bassLevel;
@@ -210,18 +275,39 @@ export class CentralSphere {
         uniform vec3 genreColor;
         
         void main() {
-          // Круглые частицы
           vec2 center = gl_PointCoord - 0.5;
           float dist = length(center);
-          if (dist > 0.5) discard;
           
-          // Цвет с реактивностью
+          // Создаем красивую форму частицы с мягкими краями
+          float particleShape = 1.0 - smoothstep(0.3, 0.5, dist);
+          if (particleShape < 0.01) discard;
+          
+          // Создаем внутреннее свечение
+          float innerGlow = 1.0 - smoothstep(0.0, 0.2, dist);
+          float outerGlow = 1.0 - smoothstep(0.2, 0.4, dist);
+          
+          // Базовый цвет с градиентами
           vec3 color = genreColor;
-          color += vec3(bassLevel * 0.3, trebleLevel * 0.2, pulseIntensity * 0.4);
           
-          float alpha = (1.0 - dist * 2.0) * (0.7 + pulseIntensity * 0.3);
+          // Музыкальная реактивность цвета
+          float musicIntensity = (bassLevel + trebleLevel + pulseIntensity) / 3.0;
+          color += genreColor * musicIntensity * 1.2;
           
-          gl_FragColor = vec4(color, alpha);
+          // Добавляем цветовые вариации для каждой частицы
+          float colorVariation = sin(vParticleId * 0.1 + time * 2.0) * 0.3;
+          color += vec3(colorVariation * 0.2, colorVariation * 0.15, colorVariation * 0.25);
+          
+          // Создаем многослойное свечение
+          vec3 finalColor = color * innerGlow * 2.0 + color * outerGlow * 0.8;
+          
+          // Добавляем пульсирующее свечение
+          float pulse = sin(time * 4.0 + vParticleId * 0.05) * 0.4 + 0.6;
+          finalColor *= pulse;
+          
+          // Динамическая прозрачность
+          float alpha = particleShape * (0.6 + musicIntensity * 0.4) * pulse;
+          
+          gl_FragColor = vec4(finalColor, alpha);
         }
       `,
       transparent: true,
@@ -229,7 +315,7 @@ export class CentralSphere {
     });
   } 
  private createCoreSphere(): THREE.Mesh {
-    const geometry = new THREE.IcosahedronGeometry(8, 3); // Детализированная сфера
+    const geometry = new THREE.IcosahedronGeometry(40, 3); // Очень большая детализированная сфера
     return new THREE.Mesh(geometry, this.coreMaterial);
   }
 
@@ -246,8 +332,8 @@ export class CentralSphere {
     for (let i = 0; i < particleCount; i++) {
       const i3 = i * 3;
       
-      // Случайные позиции в сфере
-      const radius = 15 + Math.random() * 10;
+      // Случайные позиции в сфере (увеличенные для большой центральной сферы)
+      const radius = 50 + Math.random() * 30;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
       
@@ -280,11 +366,11 @@ export class CentralSphere {
     const orbitalsGroup = new THREE.Group();
     orbitalsGroup.name = 'OrbitalParticles';
     
-    // Создаем орбитальные кольца частиц
-    for (let ring = 0; ring < 3; ring++) {
+    // Создаем орбитальные кольца частиц с улучшенными эффектами
+    for (let ring = 0; ring < 4; ring++) {
       const ringGroup = new THREE.Group();
-      const radius = 20 + ring * 8;
-      const particleCount = 50 + ring * 20;
+      const radius = 65 + ring * 25; // Увеличенные и более разнесенные радиусы колец
+      const particleCount = 60 + ring * 30;
       
       const geometry = new THREE.BufferGeometry();
       const positions = new Float32Array(particleCount * 3);
@@ -294,9 +380,12 @@ export class CentralSphere {
         const angle = (i / particleCount) * Math.PI * 2;
         const i3 = i * 3;
         
-        positions[i3] = Math.cos(angle) * radius;
-        positions[i3 + 1] = (Math.random() - 0.5) * 4;
-        positions[i3 + 2] = Math.sin(angle) * radius;
+        // Добавляем небольшие вариации в радиус для более органичного вида
+        const radiusVariation = radius + (Math.random() - 0.5) * 8;
+        
+        positions[i3] = Math.cos(angle) * radiusVariation;
+        positions[i3 + 1] = (Math.random() - 0.5) * 6; // Больше вертикального разброса
+        positions[i3 + 2] = Math.sin(angle) * radiusVariation;
         
         particleIds[i] = i;
       }
@@ -304,7 +393,7 @@ export class CentralSphere {
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
       geometry.setAttribute('particleId', new THREE.BufferAttribute(particleIds, 1));
       
-      // Создаем шейдерный материал для орбитальных частиц
+      // Создаем улучшенный шейдерный материал для орбитальных частиц
       const material = new THREE.ShaderMaterial({
         uniforms: {
           time: { value: 0 },
@@ -312,7 +401,7 @@ export class CentralSphere {
           bassLevel: { value: 0 },
           trebleLevel: { value: 0 },
           genreColor: { value: new THREE.Color(0x00FFCC) },
-          size: { value: 1.5 + ring * 0.3 },
+          size: { value: 5.0 + ring * 1.2 },
           ringIndex: { value: ring }
         },
         vertexShader: `
@@ -324,12 +413,18 @@ export class CentralSphere {
           uniform float size;
           uniform float ringIndex;
           varying float vParticleId;
+          varying float vRingIndex;
           
           void main() {
             vParticleId = particleId;
+            vRingIndex = ringIndex;
             
-            // Статичный размер частиц без музыкальной реактивности
-            gl_PointSize = size;
+            // Музыкально-реактивный размер с индивидуальными вариациями
+            float musicSize = size * (1.0 + pulseIntensity * 0.6 + bassLevel * 0.4);
+            float individualPulse = sin(time * 2.5 + particleId * 0.08 + ringIndex) * 0.25 + 0.75;
+            musicSize *= individualPulse;
+            
+            gl_PointSize = musicSize;
             gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
           }
         `,
@@ -341,21 +436,41 @@ export class CentralSphere {
           uniform vec3 genreColor;
           uniform float ringIndex;
           varying float vParticleId;
+          varying float vRingIndex;
           
           void main() {
-            // Круглые частицы
             vec2 center = gl_PointCoord - 0.5;
             float dist = length(center);
-            if (dist > 0.5) discard;
             
-            // Статичный цвет без музыкальной реактивности
+            // Создаем красивую форму частицы с мягким свечением
+            float particleShape = 1.0 - smoothstep(0.35, 0.5, dist);
+            if (particleShape < 0.01) discard;
+            
+            // Внутреннее и внешнее свечение
+            float innerGlow = 1.0 - smoothstep(0.0, 0.25, dist);
+            float outerGlow = 1.0 - smoothstep(0.25, 0.45, dist);
+            
+            // Цвет с музыкальной реактивностью
             vec3 color = genreColor;
+            float musicIntensity = (bassLevel + trebleLevel + pulseIntensity) / 3.0;
+            color += genreColor * musicIntensity * 0.8;
             
-            // Различная интенсивность для разных колец (статичная)
-            float ringIntensity = 0.6 + ringIndex * 0.2;
-            float alpha = (1.0 - dist * 2.0) * ringIntensity;
+            // Индивидуальные цветовые вариации для каждого кольца
+            float ringColorShift = sin(time * 1.5 + vRingIndex * 2.0) * 0.2;
+            color += vec3(ringColorShift * 0.15, ringColorShift * 0.1, ringColorShift * 0.2);
             
-            gl_FragColor = vec4(color, alpha);
+            // Пульсирующее свечение
+            float pulse = sin(time * 3.5 + vParticleId * 0.06 + vRingIndex * 0.8) * 0.3 + 0.7;
+            
+            // Финальный цвет с многослойным свечением
+            vec3 finalColor = color * innerGlow * 1.8 + color * outerGlow * 0.6;
+            finalColor *= pulse;
+            
+            // Различная интенсивность для разных колец
+            float ringIntensity = 0.5 + vRingIndex * 0.15 + musicIntensity * 0.3;
+            float alpha = particleShape * ringIntensity * pulse;
+            
+            gl_FragColor = vec4(finalColor, alpha);
           }
         `,
         transparent: true,
@@ -366,12 +481,271 @@ export class CentralSphere {
       ringGroup.add(points);
       ringGroup.userData.ring = ring;
       ringGroup.userData.radius = radius;
-      ringGroup.userData.material = material; // Сохраняем ссылку на материал
+      ringGroup.userData.material = material;
       
       orbitalsGroup.add(ringGroup);
     }
     
     return orbitalsGroup;
+  }
+
+  private createAuraSystem(): THREE.Group {
+    const auraGroup = new THREE.Group();
+    auraGroup.name = 'AuraSystem';
+    
+    // Создаем несколько слоев ауры с разными размерами и эффектами
+    for (let layer = 0; layer < 3; layer++) {
+      const auraGeometry = new THREE.SphereGeometry(50 + layer * 15, 32, 32);
+      const auraMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+          time: { value: 0 },
+          pulseIntensity: { value: 0 },
+          bassLevel: { value: 0 },
+          trebleLevel: { value: 0 },
+          genreColor: { value: new THREE.Color(0x00FFCC) },
+          layerIndex: { value: layer },
+          opacity: { value: 0.15 - layer * 0.04 }
+        },
+        vertexShader: `
+          varying vec3 vPosition;
+          varying vec3 vNormal;
+          varying vec3 vWorldPosition;
+          uniform float time;
+          uniform float pulseIntensity;
+          uniform float bassLevel;
+          uniform float trebleLevel;
+          uniform float layerIndex;
+          
+          void main() {
+            vPosition = position;
+            vNormal = normal;
+            
+            // Деформация ауры на основе музыки
+            vec3 pos = position;
+            float layerOffset = layerIndex * 0.5;
+            
+            // Волнообразные деформации
+            float wave1 = sin(pos.x * 0.05 + time * 1.8 + layerOffset) * sin(pos.y * 0.04 + time * 1.3);
+            float wave2 = cos(pos.z * 0.06 + time * 2.1 + layerOffset) * cos(pos.x * 0.03 + time * 1.6);
+            
+            // Музыкальная реактивность
+            float musicDeformation = (bassLevel * 0.6 + pulseIntensity * 0.4) * 8.0;
+            float displacement = (wave1 + wave2) * 3.0 + musicDeformation;
+            
+            pos += normalize(pos) * displacement;
+            
+            vWorldPosition = (modelMatrix * vec4(pos, 1.0)).xyz;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+          }
+        `,
+        fragmentShader: `
+          varying vec3 vPosition;
+          varying vec3 vNormal;
+          varying vec3 vWorldPosition;
+          uniform float time;
+          uniform float pulseIntensity;
+          uniform float bassLevel;
+          uniform float trebleLevel;
+          uniform vec3 genreColor;
+          uniform float layerIndex;
+          uniform float opacity;
+          
+          void main() {
+            vec3 normal = normalize(vNormal);
+            vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+            
+            // Создаем эффект ауры с rim lighting
+            float rimPower = 1.0 - abs(dot(normal, viewDir));
+            rimPower = pow(rimPower, 1.5 + layerIndex * 0.5);
+            
+            // Цвет ауры с музыкальной реактивностью
+            vec3 auraColor = genreColor * 0.8;
+            float musicIntensity = (bassLevel + trebleLevel + pulseIntensity) / 3.0;
+            auraColor += genreColor * musicIntensity * 1.2;
+            
+            // Пульсирующий эффект
+            float pulse = sin(time * 4.0 + layerIndex * 1.5) * 0.4 + 0.6;
+            auraColor *= pulse;
+            
+            // Энергетические паттерны
+            float energyPattern = sin(vPosition.x * 0.1 + time * 2.0) * cos(vPosition.y * 0.08 + time * 1.7);
+            auraColor += genreColor * energyPattern * 0.3;
+            
+            float finalAlpha = opacity * rimPower * (0.8 + musicIntensity * 0.4) * pulse;
+            
+            gl_FragColor = vec4(auraColor, finalAlpha);
+          }
+        `,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        side: THREE.BackSide,
+        depthWrite: false
+      });
+      
+      const auraMesh = new THREE.Mesh(auraGeometry, auraMaterial);
+      auraMesh.userData.layer = layer;
+      auraMesh.userData.material = auraMaterial;
+      auraGroup.add(auraMesh);
+    }
+    
+    return auraGroup;
+  }
+
+  private createInnerGlow(): THREE.Mesh {
+    const glowGeometry = new THREE.SphereGeometry(42, 32, 32);
+    const glowMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        time: { value: 0 },
+        pulseIntensity: { value: 0 },
+        bassLevel: { value: 0 },
+        trebleLevel: { value: 0 },
+        genreColor: { value: new THREE.Color(0x00FFCC) }
+      },
+      vertexShader: `
+        varying vec3 vPosition;
+        varying vec3 vNormal;
+        varying vec3 vWorldPosition;
+        uniform float time;
+        uniform float pulseIntensity;
+        uniform float bassLevel;
+        
+        void main() {
+          vPosition = position;
+          vNormal = normal;
+          
+          // Легкая деформация для внутреннего свечения
+          vec3 pos = position;
+          float pulse = sin(time * 3.0) * 0.5 + 0.5;
+          float scale = 1.0 + (bassLevel + pulseIntensity) * pulse * 0.1;
+          pos *= scale;
+          
+          vWorldPosition = (modelMatrix * vec4(pos, 1.0)).xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vPosition;
+        varying vec3 vNormal;
+        varying vec3 vWorldPosition;
+        uniform float time;
+        uniform float pulseIntensity;
+        uniform float bassLevel;
+        uniform float trebleLevel;
+        uniform vec3 genreColor;
+        
+        void main() {
+          vec3 normal = normalize(vNormal);
+          vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+          
+          // Внутреннее свечение с мягким переходом
+          float fresnel = 1.0 - dot(normal, viewDir);
+          fresnel = pow(fresnel, 0.8);
+          
+          // Цвет с музыкальной реактивностью
+          vec3 glowColor = genreColor * 1.2;
+          float musicIntensity = (bassLevel + trebleLevel + pulseIntensity) / 3.0;
+          glowColor += genreColor * musicIntensity * 1.5;
+          
+          // Пульсирующее свечение
+          float pulse = sin(time * 5.0) * 0.3 + 0.7;
+          glowColor *= pulse;
+          
+          float alpha = fresnel * 0.25 * (0.7 + musicIntensity * 0.5);
+          
+          gl_FragColor = vec4(glowColor, alpha);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      depthWrite: false
+    });
+    
+    const innerGlow = new THREE.Mesh(glowGeometry, glowMaterial);
+    innerGlow.name = 'InnerGlow';
+    innerGlow.userData.material = glowMaterial;
+    return innerGlow;
+  }
+
+  private createOuterGlow(): THREE.Mesh {
+    const glowGeometry = new THREE.SphereGeometry(120, 32, 32);
+    const glowMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        time: { value: 0 },
+        pulseIntensity: { value: 0 },
+        bassLevel: { value: 0 },
+        trebleLevel: { value: 0 },
+        genreColor: { value: new THREE.Color(0x00FFCC) }
+      },
+      vertexShader: `
+        varying vec3 vPosition;
+        varying vec3 vNormal;
+        varying vec3 vWorldPosition;
+        uniform float time;
+        uniform float pulseIntensity;
+        uniform float bassLevel;
+        
+        void main() {
+          vPosition = position;
+          vNormal = normal;
+          
+          // Большие волнообразные деформации для внешнего свечения
+          vec3 pos = position;
+          float wave = sin(length(pos) * 0.02 + time * 1.5) * 5.0;
+          float musicWave = (bassLevel + pulseIntensity) * sin(time * 2.0) * 8.0;
+          
+          pos += normalize(pos) * (wave + musicWave);
+          
+          vWorldPosition = (modelMatrix * vec4(pos, 1.0)).xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vPosition;
+        varying vec3 vNormal;
+        varying vec3 vWorldPosition;
+        uniform float time;
+        uniform float pulseIntensity;
+        uniform float bassLevel;
+        uniform float trebleLevel;
+        uniform vec3 genreColor;
+        
+        void main() {
+          vec3 normal = normalize(vNormal);
+          vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+          
+          // Очень мягкое внешнее свечение
+          float fresnel = 1.0 - dot(normal, viewDir);
+          fresnel = pow(fresnel, 2.5);
+          
+          // Расстояние от центра для градиента
+          float distanceFromCenter = length(vPosition) / 120.0;
+          float falloff = 1.0 - smoothstep(0.7, 1.0, distanceFromCenter);
+          
+          // Цвет с очень мягкой музыкальной реактивностью
+          vec3 glowColor = genreColor * 0.6;
+          float musicIntensity = (bassLevel + trebleLevel + pulseIntensity) / 3.0;
+          glowColor += genreColor * musicIntensity * 0.8;
+          
+          // Медленное пульсирующее свечение
+          float pulse = sin(time * 2.0) * 0.2 + 0.8;
+          glowColor *= pulse;
+          
+          float alpha = fresnel * falloff * 0.08 * (0.5 + musicIntensity * 0.3);
+          
+          gl_FragColor = vec4(glowColor, alpha);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      depthWrite: false
+    });
+    
+    const outerGlow = new THREE.Mesh(glowGeometry, glowMaterial);
+    outerGlow.name = 'OuterGlow';
+    outerGlow.userData.material = glowMaterial;
+    return outerGlow;
   }
 
   // Методы для управления эффектами
@@ -392,12 +766,30 @@ export class CentralSphere {
   }
 
   private updateOrbitalParticleColors(genreColor: THREE.Color): void {
+    // Обновляем цвета орбитальных частиц
     this.orbitalParticles.children.forEach(ringGroup => {
       const material = ringGroup.userData.material;
       if (material && material.uniforms && material.uniforms.genreColor) {
         material.uniforms.genreColor.value = genreColor;
       }
     });
+    
+    // Обновляем цвета системы ауры
+    this.auraSystem.children.forEach(auraMesh => {
+      const material = auraMesh.userData.material;
+      if (material && material.uniforms && material.uniforms.genreColor) {
+        material.uniforms.genreColor.value = genreColor;
+      }
+    });
+    
+    // Обновляем цвета внутреннего и внешнего свечения
+    if (this.innerGlow.userData.material && this.innerGlow.userData.material.uniforms.genreColor) {
+      this.innerGlow.userData.material.uniforms.genreColor.value = genreColor;
+    }
+    
+    if (this.outerGlow.userData.material && this.outerGlow.userData.material.uniforms.genreColor) {
+      this.outerGlow.userData.material.uniforms.genreColor.value = genreColor;
+    }
   }
 
   async connectAudioSource(audioElement: HTMLAudioElement): Promise<void> {
@@ -671,6 +1063,7 @@ export class CentralSphere {
       console.log(`🎨 Central Sphere Audio Reactive - Bass: ${this.bassLevel.toFixed(2)}, Treble: ${this.trebleLevel.toFixed(2)}, Pulse: ${this.pulseIntensity.toFixed(2)}`);
     }
     
+    // Обновляем основные материалы
     Object.entries(uniforms).forEach(([key, value]) => {
       if (this.coreMaterial.uniforms[key]) {
         this.coreMaterial.uniforms[key].value = value;
@@ -683,6 +1076,12 @@ export class CentralSphere {
     
     // Обновляем униформы орбитальных частиц
     this.updateOrbitalParticleUniforms(uniforms);
+    
+    // Обновляем униформы системы ауры
+    this.updateAuraSystemUniforms(uniforms);
+    
+    // Обновляем униформы внутреннего и внешнего свечения
+    this.updateGlowUniforms(uniforms);
   }
 
   private updateOrbitalParticleUniforms(uniforms: any): void {
@@ -696,6 +1095,39 @@ export class CentralSphere {
         });
       }
     });
+  }
+
+  private updateAuraSystemUniforms(uniforms: any): void {
+    this.auraSystem.children.forEach(auraMesh => {
+      const material = auraMesh.userData.material;
+      if (material && material.uniforms) {
+        Object.entries(uniforms).forEach(([key, value]) => {
+          if (material.uniforms[key]) {
+            material.uniforms[key].value = value;
+          }
+        });
+      }
+    });
+  }
+
+  private updateGlowUniforms(uniforms: any): void {
+    // Обновляем внутреннее свечение
+    if (this.innerGlow.userData.material && this.innerGlow.userData.material.uniforms) {
+      Object.entries(uniforms).forEach(([key, value]) => {
+        if (this.innerGlow.userData.material.uniforms[key]) {
+          this.innerGlow.userData.material.uniforms[key].value = value;
+        }
+      });
+    }
+    
+    // Обновляем внешнее свечение
+    if (this.outerGlow.userData.material && this.outerGlow.userData.material.uniforms) {
+      Object.entries(uniforms).forEach(([key, value]) => {
+        if (this.outerGlow.userData.material.uniforms[key]) {
+          this.outerGlow.userData.material.uniforms[key].value = value;
+        }
+      });
+    }
   }
 
   private animateParticles(deltaTime: number): void {
@@ -713,11 +1145,11 @@ export class CentralSphere {
       posArray[i + 1] += velArray[i + 1] * deltaTime;
       posArray[i + 2] += velArray[i + 2] * deltaTime;
       
-      // Ограничиваем частицы в фиксированной сфере
+      // Ограничиваем частицы в увеличенной сфере (соответствует большой центральной сфере)
       const distance = Math.sqrt(posArray[i] ** 2 + posArray[i + 1] ** 2 + posArray[i + 2] ** 2);
-      if (distance > 25) {
+      if (distance > 90) {
         // Возвращаем частицу к центру
-        const factor = 15 / distance;
+        const factor = 60 / distance;
         posArray[i] *= factor;
         posArray[i + 1] *= factor;
         posArray[i + 2] *= factor;
@@ -876,6 +1308,31 @@ export class CentralSphere {
         });
       }
     });
+    
+    // Очищаем систему ауры
+    this.auraSystem.children.forEach(auraMesh => {
+      if (auraMesh instanceof THREE.Mesh) {
+        auraMesh.geometry.dispose();
+        if (auraMesh.material instanceof THREE.Material) {
+          auraMesh.material.dispose();
+        }
+      }
+    });
+    
+    // Очищаем внутреннее и внешнее свечение
+    if (this.innerGlow) {
+      this.innerGlow.geometry.dispose();
+      if (this.innerGlow.material instanceof THREE.Material) {
+        this.innerGlow.material.dispose();
+      }
+    }
+    
+    if (this.outerGlow) {
+      this.outerGlow.geometry.dispose();
+      if (this.outerGlow.material instanceof THREE.Material) {
+        this.outerGlow.material.dispose();
+      }
+    }
     
     // Удаляем из сцены
     if (this.scene) {

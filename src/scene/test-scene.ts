@@ -21,7 +21,7 @@ export async function testSceneManager(): Promise<void> {
     objectMinSize: 0.5,
     objectMaxSize: 3.0,
     animationSpeed: 0.001,
-    cameraDistance: 100,
+    cameraDistance: 200, // Увеличено до 200, чтобы камера была за всеми кристаллами на большом расстоянии
     genreColors: {
       'metal': '#FF0000',
       'rock': '#FF4500',
