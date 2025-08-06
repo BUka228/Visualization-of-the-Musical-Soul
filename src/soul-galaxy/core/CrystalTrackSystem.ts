@@ -11,6 +11,7 @@ import { SoulGalaxyAudioIntegration } from '../audio/SoulGalaxyAudioIntegration'
 import { SimpleCameraController } from '../camera/SimpleCameraController';
 import { CrystalRotationSystem } from '../effects/CrystalRotationSystem';
 import { DynamicGenreColorUtils } from '../materials/DynamicGenreColorSystem';
+import { CentralSphereIntegration } from './CentralSphereIntegration';
 
 /**
  * Система управления кристаллическими треками
@@ -41,6 +42,7 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
   private cameraController?: SimpleCameraController;
   private rotationSystem: CrystalRotationSystem;
   private uiManager?: any; // UIManager для показа уведомлений
+  private centralSphereIntegration: CentralSphereIntegration;
 
   constructor() {
     this.pulseSystem = new CrystalPulseSystem();
@@ -67,6 +69,7 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
       useEnergyFallback: true,
       rotationAxes: new THREE.Vector3(0.2, 1.0, 0.3)
     });
+    this.centralSphereIntegration = new CentralSphereIntegration();
   }
 
   // Конфигурация кластера
@@ -92,6 +95,9 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
     
     // Настраиваем коллбэки для вращения кристаллов
     this.setupRotationCallbacks();
+    
+    // Инициализируем центральную сферу
+    this.centralSphereIntegration.initialize(scene, this);
     
     // Регистрируем систему в глобальном пространстве для доступа из других систем
     if (typeof window !== 'undefined') {
@@ -188,6 +194,9 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
     
     // Обновляем систему подсветки
     this.hoverSystem.update(deltaTime);
+    
+    // Обновляем центральную сферу
+    this.centralSphereIntegration.update(deltaTime);
   }
 
   setPulsationFromBPM(track: ProcessedTrack, bpm?: number): void {
@@ -645,6 +654,9 @@ export class CrystalTrackSystem implements ICrystalTrackSystem {
     
     // Dispose of the album texture manager
     this.albumTextureManager.dispose();
+    
+    // Dispose of the central sphere integration
+    this.centralSphereIntegration.dispose();
     
     this.clearCluster();
     this.crystalTracks = [];

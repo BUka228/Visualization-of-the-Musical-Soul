@@ -27,7 +27,7 @@ export class SoulGalaxyAudioIntegration {
   };
 
   // Коллбэки для событий
-  private onTrackPlayStart?: (track: CrystalTrack) => void;
+  private onTrackPlayStart?: (track: CrystalTrack, audioElement: HTMLAudioElement) => void;
   private onTrackPlayEnd?: (track: CrystalTrack) => void;
   private onAudioError?: (track: CrystalTrack, error: Error) => void;
   private onTransitionStart?: (track: CrystalTrack) => void;
@@ -64,7 +64,13 @@ export class SoulGalaxyAudioIntegration {
         this.showNowPlayingPanel();
         
         if (this.onTrackPlayStart) {
-          this.onTrackPlayStart(this.currentPlayingTrack);
+          // Получаем аудио элемент из AudioManager
+          const audioElement = this.getAudioElement();
+          if (audioElement) {
+            this.onTrackPlayStart(this.currentPlayingTrack, audioElement);
+          } else {
+            console.warn('⚠️ Audio element not available for Central Sphere integration');
+          }
         }
       }
     });
@@ -382,9 +388,17 @@ export class SoulGalaxyAudioIntegration {
   }
 
   /**
+   * Получает текущий аудио элемент из AudioManager
+   */
+  private getAudioElement(): HTMLAudioElement | undefined {
+    // Получаем доступ к приватному аудио элементу через рефлексию
+    return (this.audioManager as any).currentAudio;
+  }
+
+  /**
    * Устанавливает коллбэк для начала воспроизведения трека
    */
-  setOnTrackPlayStart(callback: (track: CrystalTrack) => void): void {
+  setOnTrackPlayStart(callback: (track: CrystalTrack, audioElement: HTMLAudioElement) => void): void {
     this.onTrackPlayStart = callback;
   }
 

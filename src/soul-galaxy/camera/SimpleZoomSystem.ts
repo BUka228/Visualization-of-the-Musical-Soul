@@ -14,7 +14,7 @@ export class SimpleZoomSystem {
     private targetCrystal?: CrystalTrack;
     
     // Настройки приближения
-    private zoomDistance: number = 15.0; // Расстояние приближения
+    private zoomDistance: number = 25.0; // Расстояние приближения (увеличено для большей дистанции)
     private animationDuration: number = 1000; // 1 секунда
     
     // Анимация
